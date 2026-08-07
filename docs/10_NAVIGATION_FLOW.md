@@ -10,7 +10,7 @@
 > **Terminology.** "Navigation" here means **in-app screen routing** via Expo Router. Driving
 > guidance is *handoff*, specified in
 > [`16_INTERNAL_NAVIGATION.md`](16_INTERNAL_NAVIGATION.md). The two are unrelated
-> ([`00_PROJECT_OVERVIEW.md`](00_PROJECT_OVERVIEW.md) §7).
+> ([`00_PROJECT_OVERVIEW.md`](00_PROJECT_OVERVIEW.md) §8).
 
 ---
 

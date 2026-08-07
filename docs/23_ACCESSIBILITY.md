@@ -166,7 +166,19 @@ Every gesture has a visible, non-gesture equivalent
 
 ---
 
-## 6. Edge cases
+## 6. Architectural decisions
+
+| ID | Decision | Applies to |
+|---|---|---|
+| [0009](adr/0009-visual-direction.md) | Mint accent darkened in light theme to reach 4.5:1 | Contrast |
+| [0009](adr/0009-visual-direction.md) | Never colour alone; every state carries a glyph | All states |
+| [0010](adr/0010-mobile-only-scope.md) | Sheet rather than sidebar — thumb reach serves motor impairment too | Layout |
+
+**Decided here:** the map is a single accessibility element, with the stop list as its
+traversable equivalent (§13). This is a departure from exposing every marker, and it is
+deliberate.
+
+## 7. Edge cases
 
 | # | Condition | Expected behaviour |
 |---|---|---|
@@ -181,7 +193,7 @@ Every gesture has a visible, non-gesture equivalent
 | 9 | Landscape with Dynamic Type at maximum | Sheet detents recompute; the primary action stays reachable |
 | 10 | Colour filters active | All states remain distinguishable by glyph and shape |
 
-## 7. Error handling
+## 8. Error handling
 
 | Failure | Result |
 |---|---|
@@ -191,7 +203,7 @@ Every gesture has a visible, non-gesture equivalent
 | Announcement not fired on a state change | Manual QA finding; treated as a defect, not a polish item |
 | Layout truncates at 200% | Defect; the layout is fixed rather than the limit lowered |
 
-## 8. Best practices
+## 9. Best practices
 
 1. **Compose labels at the component**, once, rather than exposing four sub-elements per row.
 2. **Label outcomes, not element types.**
@@ -204,7 +216,7 @@ Every gesture has a visible, non-gesture equivalent
 8. **Prefer the better equivalent to more elements.** The stop list serves screen-reader users
    better than 25 traversable markers.
 
-## 9. Checklist
+## 10. Checklist
 
 - [ ] Contrast verified: 4.5:1 text, 3:1 UI, both themes, including over map imagery.
 - [ ] Light-theme accent verified at 4.5:1 against `surface`.
@@ -218,7 +230,7 @@ Every gesture has a visible, non-gesture equivalent
 - [ ] State-change announcements verified.
 - [ ] Outdoor sunlight legibility verified on a physical device.
 
-## 10. Roadmap
+## 11. Roadmap
 
 | Phase | Scope | Trigger |
 |---|---|---|
@@ -227,7 +239,7 @@ Every gesture has a visible, non-gesture equivalent
 | 1.2 | High-contrast variant for extreme sunlight | User feedback |
 | 2.0 | Voice input for adding stops | Demand from the driving context |
 
-## 11. Decision log
+## 12. Decision log
 
 | Date | Change | Reason | Author |
 |---|---|---|---|
@@ -236,7 +248,7 @@ Every gesture has a visible, non-gesture equivalent
 | 2026-08-06 | Reorder remains perceptible under Reduce Motion | The reorder is information, not decoration | Design |
 | 2026-08-06 | Outdoor legibility added to the release checklist | Sunlight is this product's defining situational impairment | Design |
 
-## 12. Rationale
+## 13. Rationale
 
 The situational-impairment overlap is the core argument of this document. A driver in sunlight
 wearing gloves, holding a parcel, glancing at a phone for two seconds has, temporarily, reduced
@@ -256,7 +268,7 @@ against fidelity to the source images. The reference's mint was chosen against a
 on paper-white it falls below 4.5:1. Shipping it unchanged would have put an accessibility
 failure on the most-tapped control in the product.
 
-## 13. Rejected alternatives
+## 14. Rejected alternatives
 
 | Alternative | Attraction | Why rejected |
 |---|---|---|

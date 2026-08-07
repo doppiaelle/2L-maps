@@ -88,7 +88,7 @@ Verified by the **reviewer**, not asserted by the author.
 - [ ] No specification was invented. Ambiguities were asked, not assumed
       ([`30_CLAUDE_RULES.md`](30_CLAUDE_RULES.md) Flow B).
 - [ ] Domain terms match the glossary in
-      [`00_PROJECT_OVERVIEW.md`](00_PROJECT_OVERVIEW.md) §7.
+      [`00_PROJECT_OVERVIEW.md`](00_PROJECT_OVERVIEW.md) §8.
 
 ### Quality gates
 

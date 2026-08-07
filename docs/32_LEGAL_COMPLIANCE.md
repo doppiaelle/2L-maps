@@ -143,7 +143,7 @@ published in the privacy policy and kept current.
 
 Notification to the supervisory authority within **72 hours** where the breach is likely to
 result in a risk to rights and freedoms; affected individuals notified where the risk is high.
-Containment precedes assessment ([`19_SECURITY.md`](19_SECURITY.md) §9).
+Containment precedes assessment ([`19_SECURITY.md`](19_SECURITY.md) §10).
 
 ---
 

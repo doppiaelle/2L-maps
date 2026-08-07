@@ -105,7 +105,7 @@ logic is in the wrong place.
 | Test files | mirror the source, `.test.ts` | `tier-selection.test.ts` |
 
 **Domain vocabulary is fixed by the glossary** in
-[`docs/00_PROJECT_OVERVIEW.md`](docs/00_PROJECT_OVERVIEW.md#7-glossary). A stop is a `Stop`,
+[`docs/00_PROJECT_OVERVIEW.md`](docs/00_PROJECT_OVERVIEW.md#8-glossary). A stop is a `Stop`,
 never a `Location`, `Point`, `Destination` or `Address`. Renaming a domain concept requires
 updating the glossary first.
 

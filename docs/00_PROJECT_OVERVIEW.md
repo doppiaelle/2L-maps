@@ -34,7 +34,16 @@ drift.
 
 ---
 
-## 3. The product
+## 3. Responsibilities
+
+| Concern | Owner | Notes |
+|---|---|---|
+| Product thesis and scope | Product owner | Changes require an ADR |
+| Glossary | This document | The single source; other documents use these terms exactly |
+| Architecture overview | Architecture | Must match [`13_BACKEND.md`](13_BACKEND.md) |
+| Decision index | [`adr/`](adr/) | Referenced by ID, never summarised divergently |
+
+## 4. The product
 
 ### The problem
 
@@ -88,7 +97,7 @@ loss, while a bounded trial costs about a quarter of a dollar and either convert
 
 ---
 
-## 4. Text diagrams
+## 5. Text diagrams
 
 ### System at a glance
 
@@ -155,7 +164,7 @@ bundle ID and signing certificate. Every other call is proxied
 
 ---
 
-## 5. Flows
+## 6. Flows
 
 The three journeys that define the product. Full detail in
 [`03_USER_JOURNEYS.md`](03_USER_JOURNEYS.md).
@@ -189,7 +198,7 @@ so the second month is faster than the first.
 
 ---
 
-## 6. Architectural decisions
+## 7. Architectural decisions
 
 All twelve ADRs are binding. This table is the map; the reasoning is in each file.
 
@@ -210,7 +219,7 @@ All twelve ADRs are binding. This table is the map; the reasoning is in each fil
 
 ---
 
-## 7. Glossary
+## 8. Glossary
 
 **These definitions are binding.** Where a document uses one of these words, it means this.
 
@@ -241,7 +250,7 @@ All twelve ADRs are binding. This table is the map; the reasoning is in each fil
 
 ---
 
-## 8. Edge cases
+## 9. Edge cases
 
 Cases that shape the architecture rather than any single screen. Per-area edge cases live in
 each document.
@@ -257,7 +266,7 @@ each document.
 | 7 | Two devices edit the same route offline | Per-field last-write-wins; explicit conflict surface only on true divergence | [`11_STATE_MANAGEMENT.md`](11_STATE_MANAGEMENT.md) |
 | 8 | Google returns no route between two stops | Stop flagged unreachable, excluded from ordering, surfaced to the user rather than dropped silently | [`15_ROUTE_OPTIMIZATION.md`](15_ROUTE_OPTIMIZATION.md) |
 
-## 9. Error handling
+## 10. Error handling
 
 The product-wide principle: **no silent failure, and no failure without a next action.**
 Every error state tells the user what happened, what they can still do, and what will happen
@@ -273,7 +282,7 @@ next. Per-endpoint handling is in [`33_API_CONTRACTS.md`](33_API_CONTRACTS.md).
 | Map style ID fails | Map SDK | Default Google style, no user-visible error | No | Default style |
 | Navigation app missing | Client, at handoff | Provider absent from the list | No | Web universal link |
 
-## 10. Best practices
+## 11. Best practices
 
 1. **Cite, never restate.** A number that appears in two documents will diverge. API limits
    live in [`33_API_CONTRACTS.md`](33_API_CONTRACTS.md), costs in
@@ -288,16 +297,16 @@ next. Per-endpoint handling is in [`33_API_CONTRACTS.md`](33_API_CONTRACTS.md).
 5. **Specify the failure alongside the success.** A flow without its error states is half a
    specification.
 
-## 11. Checklist
+## 12. Checklist
 
 - [ ] The reader can state the product thesis in one sentence after this document.
 - [ ] Every glossary term used in `/docs` is defined here.
-- [ ] All twelve ADRs exist and are linked from §6.
+- [ ] All twelve ADRs exist and are linked from §7.
 - [ ] No cost figure, API limit, schema definition or design token is restated here.
 - [ ] The architecture diagram matches [`13_BACKEND.md`](13_BACKEND.md).
-- [ ] Every "not" in §3 is enforced by at least one ADR.
+- [ ] Every "not" in §4 is enforced by at least one ADR.
 
-## 12. Roadmap
+## 13. Roadmap
 
 | Phase | Scope | Trigger |
 |---|---|---|
@@ -305,13 +314,13 @@ next. Per-endpoint handling is in [`33_API_CONTRACTS.md`](33_API_CONTRACTS.md).
 | **2 — Retention** | List import at scale, richer address book, Live Activities, arrival geofencing, paywall placement experiment | MVP shipped, retention measured |
 | **3 — Expansion** | Multi-vehicle, time windows, web companion, T3 self-hosted matrix | Segment demand, or a trigger in [ADR-0012](adr/0012-long-term-osm-exit-path.md) |
 
-## 13. Decision log
+## 14. Decision log
 
 | Date | Change | Reason | Author |
 |---|---|---|---|
 | 2026-08-06 | Document created; D1–D10 recorded as ADR-0001…0012 | Project inception | Product owner |
 
-## 14. Rationale
+## 15. Rationale
 
 The architecture follows from one observation: **the expensive part of this product is not
 the hard part.** Computing a good stop order for 25 places is a solved problem available for
@@ -328,7 +337,7 @@ The visual direction follows the same logic. A professional opens this app many 
 in a vehicle. Calm, high-contrast, one-handed and three taps to the answer beats feature
 density every time.
 
-## 15. Rejected alternatives
+## 16. Rejected alternatives
 
 Product-level alternatives. Technical ones are in the ADRs.
 

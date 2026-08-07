@@ -35,7 +35,20 @@ the tokens in [`07_DESIGN_SYSTEM.md`](07_DESIGN_SYSTEM.md).
 
 ---
 
-## 4. Screen inventory
+## 4. Text diagrams
+
+Screen layouts are drawn in place, beside the state tables that govern them — the Plan layout in
+§6, the sheet detents in §6, and the route summary in §7. They are not collected here because a
+layout separated from its states is read without the constraints that shaped it.
+
+```
+   Plan  ──tap Route──▶  sheet detents  ──tap Start──▶  handoff
+     │                    peek/half/full                   │
+     │                                                     ▼
+     └──tap stop──▶ stop detail                    external nav app
+```
+
+## 5. Screen inventory
 
 | Screen | Route | Purpose |
 |---|---|---|
@@ -52,7 +65,7 @@ the tokens in [`07_DESIGN_SYSTEM.md`](07_DESIGN_SYSTEM.md).
 
 ---
 
-## 5. Plan — the primary screen
+## 6. Plan — the primary screen
 
 ### Layout
 
@@ -119,7 +132,7 @@ moves it — its position is learned once and stays true.
 
 ---
 
-## 6. Other screens
+## 7. Other screens
 
 ### Add stop (modal)
 
@@ -205,7 +218,7 @@ Grouped so the two things users come for are immediately visible: **Subscription
 
 ---
 
-## 7. Edge cases
+## 8. Edge cases
 
 | # | Condition | Expected behaviour |
 |---|---|---|
@@ -222,7 +235,7 @@ Grouped so the two things users come for are immediately visible: **Subscription
 | 11 | Theme changes with the sheet open | Tokens swap without remount; detent preserved |
 | 12 | Recenter tapped with no location permission | Camera fits the route instead; no error |
 
-## 8. Error handling
+## 9. Error handling
 
 | Failure | Screen | Presentation |
 |---|---|---|
@@ -235,7 +248,7 @@ Grouped so the two things users come for are immediately visible: **Subscription
 | Handoff failed | Plan | Non-blocking bottom surface with alternatives |
 | Sync conflict | History | Row-level flag with a resolution action |
 
-## 9. Best practices
+## 10. Best practices
 
 1. **Pin the primary action.** Its position is learned once.
 2. **Never mutate the list during optimization.** The user must see their order the whole time.
@@ -245,9 +258,9 @@ Grouped so the two things users come for are immediately visible: **Subscription
 6. **Errors attach to their subject**, never to a global banner.
 7. **The sheet must work when the map fails.** The list is the product.
 
-## 10. Checklist
+## 11. Checklist
 
-- [ ] Every state in §5 implemented and tested.
+- [ ] Every state in §6 and §7 implemented and tested.
 - [ ] Primary action position identical across all three detents.
 - [ ] Order preserved through every optimization failure, verified by test.
 - [ ] Degraded label present in header, polyline style, and history.
@@ -258,7 +271,7 @@ Grouped so the two things users come for are immediately visible: **Subscription
 - [ ] Time saved verified as a true measurement, including the zero case.
 - [ ] Plan verified functional with the map failed.
 
-## 11. Roadmap
+## 12. Roadmap
 
 | Phase | Scope | Trigger |
 |---|---|---|
@@ -267,7 +280,7 @@ Grouped so the two things users come for are immediately visible: **Subscription
 | 1.2 | Live Activity surface; stop notes in detail | Release 1.2 |
 | 2.0 | Time-window editing in stop detail | Gate D3 |
 
-## 12. Decision log
+## 13. Decision log
 
 | Date | Change | Reason | Author |
 |---|---|---|---|
@@ -276,7 +289,7 @@ Grouped so the two things users come for are immediately visible: **Subscription
 | 2026-08-06 | List remains visible and unchanged during optimization | Losing the visible order on failure is the worst outcome | Design |
 | 2026-08-06 | Route summary states honestly when saving is zero | An inflated number, once disbelieved, discredits every other number | Design |
 
-## 13. Rationale
+## 14. Rationale
 
 Plan carries almost the entire product, which is why it has eleven specified states while every
 other screen has four or five. The states that matter most are the unglamorous ones — degraded,
@@ -297,7 +310,7 @@ numeric proof of value, and the temptation to compare against a deliberately bad
 real. Comparing against the user's own entry order — and admitting when it was already optimal —
 is what makes the number believable the other ninety percent of the time.
 
-## 14. Rejected alternatives
+## 15. Rejected alternatives
 
 | Alternative | Attraction | Why rejected |
 |---|---|---|

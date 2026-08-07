@@ -40,7 +40,24 @@ in the sun.
 
 ---
 
-## 4. Reference devices
+## 4. Text diagrams
+
+```
+  WHERE THE FRAME BUDGET GOES — 25 stops, sheet at full detent
+
+  ┌────────────────────────────────────────────┐
+  │ map: 25 markers + polyline                 │  memoised by id+state,
+  │                                            │  decoded once, clustered
+  ├────────────────────────────────────────────┤  ← 16 ms frame boundary
+  │ sheet: virtualised list, native gestures   │  no JS-thread work
+  │                                            │  during a drag
+  └────────────────────────────────────────────┘
+
+  Measured on battery, warm, on a 3-year-old device — not on a
+  cool plugged-in flagship, which is nobody's actual condition.
+```
+
+## 5. Reference devices
 
 **Budgets are met on these, not on the newest hardware.**
 
@@ -56,7 +73,7 @@ August is thermally throttled, and that is the condition that matters.
 
 ---
 
-## 5. Budgets
+## 6. Budgets
 
 ### Startup
 
@@ -109,7 +126,7 @@ user is between charges for a working day.
 
 ---
 
-## 6. Techniques
+## 7. Techniques
 
 ### Rendering
 
@@ -148,7 +165,7 @@ user is between charges for a working day.
 
 ---
 
-## 7. Edge cases
+## 8. Edge cases
 
 | # | Condition | Expected behaviour |
 |---|---|---|
@@ -162,7 +179,7 @@ user is between charges for a working day.
 | 8 | Backgrounded during optimization | Request continues; the result applies on return |
 | 9 | Map and list both rendering 25 items | Shared memoised data; markers and rows derive from one source |
 
-## 8. Error handling
+## 9. Error handling
 
 | Failure | Detection | Result |
 |---|---|---|
@@ -172,7 +189,7 @@ user is between charges for a working day.
 | Optimization exceeds p95 | Server metrics | Async threshold lowered, or waiting UX strengthened |
 | Battery drain over budget | Manual testing | Investigated; background work is the usual cause |
 
-## 9. Best practices
+## 10. Best practices
 
 1. **Measure before optimising, and record the measurement in the pull request.** An unmeasured
    optimisation is a guess that adds complexity.
@@ -183,7 +200,7 @@ user is between charges for a working day.
 6. **Prefer removing work to making work faster.** The address book beats a faster autocomplete.
 7. **Never evict the draft route** under memory pressure — it is the user's unsaved work.
 
-## 10. Checklist
+## 11. Checklist
 
 - [ ] Cold start measured on both reference devices, on battery, warm.
 - [ ] 60 fps verified with 25 stops on the low-tier Android device.
@@ -197,7 +214,7 @@ user is between charges for a working day.
 - [ ] Download size measured against the 60 MB budget.
 - [ ] Dynamic Type 200% verified at 60 fps on the densest screen.
 
-## 11. Roadmap
+## 12. Roadmap
 
 | Phase | Scope | Trigger |
 |---|---|---|
@@ -206,7 +223,7 @@ user is between charges for a working day.
 | 1.x | Startup profiling and deferred-initialisation tuning | If cold start approaches budget |
 | 2.0 | Budgets revisited if stop counts rise above 25 | Gate D3 |
 
-## 12. Decision log
+## 13. Decision log
 
 | Date | Change | Reason | Author |
 |---|---|---|---|
@@ -215,7 +232,7 @@ user is between charges for a working day.
 | 2026-08-06 | Perceived latency budgeted rather than request time | The debounce is deliberate; the address book answers instantly | Architecture |
 | 2026-08-06 | Draft route exempt from memory-pressure eviction | It is unsaved user work | Architecture |
 
-## 13. Rationale
+## 14. Rationale
 
 The budgets are set against old, warm devices because that is the population. A professional who
 bought a phone three years ago and mounts it on a windscreen in August is the modal user, not the
@@ -237,7 +254,7 @@ Exempting the draft route from memory-pressure eviction is a small rule protecti
 failure. Under pressure the OS will ask for memory, and evicting a cache is correct — evicting
 the user's unsaved arrangement is the P3 violation that ends the relationship.
 
-## 14. Rejected alternatives
+## 15. Rejected alternatives
 
 | Alternative | Attraction | Why rejected |
 |---|---|---|

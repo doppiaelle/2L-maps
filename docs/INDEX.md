@@ -12,7 +12,7 @@ code.
 ## Reading paths
 
 **"I am about to write code."**
-[`../CLAUDE.md`](../CLAUDE.md) §0 → [`00`](00_PROJECT_OVERVIEW.md) §7 glossary → the document
+[`../CLAUDE.md`](../CLAUDE.md) §0 → [`00`](00_PROJECT_OVERVIEW.md) §8 glossary → the document
 owning your area (see §Areas below) → [`29`](29_DEFINITION_OF_DONE.md).
 
 **"I want to understand the product."**
@@ -155,7 +155,7 @@ twice with different values is a defect**, caught by the consolidation audit.
 | Schema, indexes, RLS policies | [`12_DATABASE.md`](12_DATABASE.md) |
 | Design tokens, type scale, contrast ratios | [`07_DESIGN_SYSTEM.md`](07_DESIGN_SYSTEM.md) |
 | Performance budgets | [`24_PERFORMANCE.md`](24_PERFORMANCE.md) |
-| Glossary | [`00_PROJECT_OVERVIEW.md`](00_PROJECT_OVERVIEW.md) §7 |
+| Glossary | [`00_PROJECT_OVERVIEW.md`](00_PROJECT_OVERVIEW.md) §8 |
 
 ---
 

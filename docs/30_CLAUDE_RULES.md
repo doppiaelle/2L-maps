@@ -144,7 +144,7 @@ the lie.
 | ID | Decision | Applies to |
 |---|---|---|
 | [0001](adr/0001-documentation-language-and-structure.md) | Documentation is English, templated, single-source | Every document and this rule system |
-| All others | Binding on the areas they govern | See [`00_PROJECT_OVERVIEW.md`](00_PROJECT_OVERVIEW.md) §6 |
+| All others | Binding on the areas they govern | See [`00_PROJECT_OVERVIEW.md`](00_PROJECT_OVERVIEW.md) §7 |
 
 This document makes one decision of its own: **the authority ordering in §4 is fixed**, and
 changing it requires an ADR.
