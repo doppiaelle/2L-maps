@@ -1,0 +1,15 @@
+node_modules/
+.expo/
+dist/
+android/
+ios/
+coverage/
+expo-env.d.ts
+package-lock.json
+
+# Documentation is hand-formatted: hard-wrapped at 100 columns with aligned
+# ASCII diagrams and tables sized for reading, not for a formatter. Prettier
+# re-pads every table and reflows the prose, which is churn rather than
+# improvement. Its structure is enforced by the 14-section template and the
+# audit in docs/INDEX.md instead.
+*.md

@@ -1,0 +1,72 @@
+name: verify
+
+# Runs on every push and pull request (docs/25_DEPLOYMENT.md §CI).
+# Builds are deliberately not triggered here: macOS runners bill minutes at 10×,
+# so the free allowance is roughly 200 effective macOS minutes a month
+# (docs/31_COST_MODEL.md). This workflow is Linux-only and therefore cheap.
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: typecheck · lint · format · test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Format
+        run: npm run format
+
+      - name: Test
+        run: npm test -- --ci
+
+  prebuild:
+    name: native config resolves (risk C6)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      # Risk C6 is a config plugin breaking `expo prebuild`, which dependency
+      # resolution cannot see: the peer range was satisfied when it last fired.
+      # Android prebuild is pure Node, so this gate runs without a Mac and
+      # catches an incompatible Expo SDK / react-native-maps pair at the commit
+      # that introduces it rather than several waves later (ADR-0005).
+      - name: Prebuild (Android)
+        run: npx expo prebuild --platform android --no-install --clean
+
+      - name: Assert the Maps key is wired from app.config.ts
+        env:
+          EXPO_PUBLIC_MAPS_API_KEY_ANDROID: AIza-CI-PLACEHOLDER
+        run: |
+          npx expo prebuild --platform android --no-install --clean
+          grep -q 'com.google.android.geo.API_KEY' android/app/src/main/AndroidManifest.xml

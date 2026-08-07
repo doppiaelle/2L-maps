@@ -48,6 +48,36 @@ never independently. The compatible pairing is recorded in
 [`25_DEPLOYMENT.md`](../25_DEPLOYMENT.md) and verified by a build on both platforms before any
 Expo SDK upgrade is merged.
 
+**The pairing is verified by running `expo prebuild`, not by reading peer ranges.** Risk C6 was
+a config plugin breaking `prebuild` by importing internal `@expo/config-plugins` paths — a
+failure dependency resolution cannot see, because the peer range was satisfied when it fired.
+Android `prebuild` is pure Node, so the check runs in CI on every commit without a Mac
+([`../36_IMPLEMENTATION_PLAN.md`](../36_IMPLEMENTATION_PLAN.md)).
+
+### Verified pairing
+
+Established 2026-08-07 by executing that gate, not by inspection:
+
+| Package | Version | Note |
+|---|---|---|
+| `expo` | 57.0.11 | |
+| `react-native` | **0.86.2** | See below — not the 0.86.0 the CLI recommends |
+| `react` | 19.2.3 | `react-dom` must be pinned to match, or it resolves ahead of it |
+| `react-native-maps` | **1.27.2** | The version Expo SDK 57 lists in `bundledNativeModules.json`, **not** the newer 1.29.0 on npm |
+| `react-native-reanimated` | 4.5.1 | Its Babel plugin now lives in `react-native-worklets` |
+| `react-native-worklets` | 0.10.1 | |
+
+Two findings from that run are worth recording, because both contradict what the obvious source
+says:
+
+1. **`react-native-maps` 1.29.0 is published and its peer range accepts this React Native, but
+   Expo SDK 57 verifies 1.27.2.** Taking the newer version means leaving the combination Expo
+   tested, which is the exact class of drift this ADR exists to prevent.
+2. **`expo prebuild` recommends `react-native@0.86.0`, and that recommendation cannot be
+   followed.** `jest-expo@57` requires `@react-native/jest-preset@^0.86.2`, while
+   `react-native@0.86.0` requires `@react-native/jest-preset@0.86.0`; the two are mutually
+   exclusive. The coherent pair is 0.86.2, so the CLI warning is stale rather than actionable.
+
 **The "paper" map style is delivered through Cloud-based Map Styling**, with one Map ID per
 theme (light and dark). Map styles are configured in the Google Cloud console, outside the
 codebase and outside the release cycle — which is both a convenience and a hazard, since a

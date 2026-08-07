@@ -100,8 +100,8 @@ and this document inherits that. No re-statement of any requirement, schema or b
 | Wave | Branch | Content | Gate | Status |
 |---|---|---|---|---|
 | — | `main` | Documentation set 00–36, ADRs 0001–0013 | Consolidation audit passed | ✅ |
-| 0 | `feat/w0-foundation` | Expo 57 scaffold, TS strict, lint, Jest + RNTL + MSW, NativeWind, CI `verify` | §6 W0 | 🔵 |
-| 1 | `feat/w1-domain` | All of `lib/` — pure domain logic | §6 W1 | ⏳ |
+| 0 | `feat/w0-foundation` | Expo 57 scaffold, TS strict, lint, Jest + RNTL + MSW, NativeWind, CI `verify` | §6 W0 | ✅ |
+| 1 | `feat/w1-domain` | All of `lib/` — pure domain logic | §6 W1 | 🔵 |
 | 2 | `feat/w2-backend` | Migrations, RLS, five Edge Functions | §6 W2 | ⏳ |
 | 3 | `feat/w3-data-layer` | Facades, React Query, Zustand, offline queue | §6 W3 | ⏳ |
 | 4 | `feat/w4-design-system` | Tokens, `<AppMap>`, components | §6 W4 | ⏳ |
@@ -115,6 +115,28 @@ and this document inherits that. No re-statement of any requirement, schema or b
 | I1 | Squash-merge directly to `main`; no pull request per wave | `main` is protected, or a second contributor joins |
 | I2 | Cloud accounts not provisioned; build against mocks and contracts | Real integration is the next blocking step, or a Mac is available |
 | I3 | Start from foundation and domain, not a walking skeleton | — |
+
+### Wave 0 outcome — recorded 2026-08-07
+
+Gate passed. `expo prebuild --platform android` completes, the Maps key is wired into the
+manifest from `app.config.ts`, and typecheck, lint, format and 12 tests are green.
+
+Two things the gate found that inspection would not have:
+
+- **`react-native-maps` 1.29.0 is published, but Expo SDK 57 verifies 1.27.2.** The peer range
+  accepts both, so dependency resolution raises nothing. Taking the newer one leaves the
+  combination Expo tested — exactly the drift
+  [ADR-0005](adr/0005-map-engine-and-route-preview.md) exists to prevent.
+- **The CLI recommends `react-native@0.86.0`, and that recommendation cannot be followed**,
+  because `jest-expo@57` requires `@react-native/jest-preset@^0.86.2` while 0.86.0 requires
+  0.86.0. The two are mutually exclusive; 0.86.2 is the coherent pair, recorded in ADR-0005.
+
+The layering of [`../CLAUDE.md`](../CLAUDE.md) §1 is now enforced by ESLint, and the rules were
+checked against deliberate violations before being trusted. Domain constants are covered by
+tests asserting each still matches the document that owns it, which makes rule 9 of §13
+enforceable rather than aspirational.
+
+**Not covered by this gate:** no iOS prebuild (no Mac), no native compilation, no device run.
 
 ## 6. Flows
 
