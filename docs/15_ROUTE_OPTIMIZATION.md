@@ -218,7 +218,9 @@ capacities, multiple vehicles). All of those except stop count are post-MVP.
 per stop, then solved by `optimizeTours`.
 
 **Synchronous or asynchronous.** Small problems return synchronously. Above a threshold the
-request becomes a job:
+request becomes a job. The two modes have materially different latencies, which is risk C13 in
+[`35_RISK_REGISTER.md`](35_RISK_REGISTER.md) and the reason the waiting experience is
+specified rather than left to a spinner:
 
 ```
   client ──▶ /optimize ──▶ creates job row ──▶ returns job id immediately

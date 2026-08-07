@@ -245,7 +245,9 @@ prompt is both a compliance failure and a trust failure.
 3. **Refetch entitlement on every foreground.**
 4. **Never block the user's own data.**
 5. **Retain access during grace.**
-6. **Apply quotas during the trial.**
+6. **Apply quotas during the trial.** An unmetered trial is risk C11 in
+   [`35_RISK_REGISTER.md`](35_RISK_REGISTER.md): seven days of unlimited optimization,
+   then a cancellation, costs more than the subscription would have earned.
 7. **Re-read Guideline 3.1.2 before every paywall change**, in every language.
 8. **Never ship a paywall without a visible restore control.**
 

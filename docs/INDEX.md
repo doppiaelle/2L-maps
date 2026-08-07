@@ -196,12 +196,34 @@ Every requirement from the originating brief, mapped to the document that satisf
 
 ## Status
 
+All waves are complete. Every document below is written, reviewed against the 14-section
+template, and pushed.
+
 | Wave | Documents | Status |
 |---|---|---|
 | 0 — Kernel | `_TEMPLATE`, `INDEX`, `00`, `CLAUDE.md`, `30`, `adr/0001–0012` | ✅ Complete |
-| 1 — Product | `01`, `02`, `03`, `04`, `28`, `35` | ⏳ Pending |
-| 2 — Core technical | `15`, `14`, `16`, `31`, `12`, `13`, `33` | ⏳ Pending |
-| 3 — Experience | `05`, `06`, `07`, `08`, `09`, `10`, `11`, `23`, `34` | ⏳ Pending |
-| 4 — Platform | `17`, `18`, `19`, `20`, `21`, `24`, `32` | ⏳ Pending |
-| 5 — Delivery | `22`, `25`, `26`, `27`, `29`, `README` | ⏳ Pending |
-| 6 — Consolidation | Cross-link and consistency audit | ⏳ Pending |
+| 1 — Product | `01`, `02`, `03`, `04`, `28`, `35` | ✅ Complete |
+| 2 — Core technical | `15`, `14`, `16`, `31`, `12`, `13`, `33` | ✅ Complete |
+| 3 — Experience | `05`, `06`, `07`, `08`, `09`, `10`, `11`, `23`, `34` | ✅ Complete |
+| 4 — Platform | `17`, `18`, `19`, `20`, `21`, `24`, `32` | ✅ Complete |
+| 5 — Delivery | `22`, `25`, `26`, `27`, `29`, `README` | ✅ Complete |
+| 6 — Consolidation | Cross-link and consistency audit | ✅ Complete |
+
+**File count.** The approved set is 41 documents: the 33 named in the brief plus 8 extensions,
+counting `adr/` as one entry. On disk that is **52 files** — 38 in `docs/`, 12 in `docs/adr/`,
+and `CLAUDE.md` and `README.md` at the root — because the single ADR entry expands to twelve
+records. Both numbers are correct; they count different things.
+
+**Audit results, wave 6.**
+
+| Check | Result |
+|---|---|
+| All 41 approved documents present, none a stub | ✅ Shortest file is well above placeholder length |
+| 14 mandatory sections in every numbered document | ✅ 5 structural gaps closed; `Flows` and `Architectural decisions` added where absent |
+| Relative links resolve | ✅ 0 broken, excluding the deliberate placeholders in `_TEMPLATE.md` |
+| Heading anchors resolve | ✅ 0 broken |
+| Section (`§N`) cross-references | ✅ 11 stale references repaired after renumbering |
+| Risks C1–C16 traced outside the register | ✅ All 16, by identifier |
+| ADRs 0001–0012 cited by an owning document | ✅ All 12 |
+| Contradictory figures across documents | ✅ None — stop caps, retention, pricing, budgets and contrast ratios agree |
+| Application source files in the repository | ✅ None, as required |

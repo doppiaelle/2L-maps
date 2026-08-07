@@ -71,7 +71,8 @@ are recorded here in a compact form.
 
 **Neutral.** Adding 8 files raises the total from 33 to 41, roughly a 24% increase in
 authoring effort, concentrated in areas that were previously unspecified rather than
-duplicating existing content.
+duplicating existing content. Note that 41 counts `adr/` as a single entry; on disk the
+repository holds 52 markdown files, because that entry expands to twelve ADRs.
 
 ## Alternatives considered
 

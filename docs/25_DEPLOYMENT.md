@@ -97,7 +97,8 @@ cost alerting are configured from day one rather than at launch.
 
 `react-native-maps` is a native module. **A development build is required from the first day**,
 and every contributor needs one before writing a line of code. This is the first step of the
-contributor guide, not a footnote.
+contributor guide, not a footnote — and it is risk C10 in
+[`35_RISK_REGISTER.md`](35_RISK_REGISTER.md), which costs onboarding time rather than money.
 
 ### EAS profiles
 

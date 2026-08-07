@@ -177,7 +177,8 @@ in [`../CLAUDE.md`](../CLAUDE.md) §6, not a suggestion.
 | **Total COGS** | **~$3.74** | **~$1.02** | |
 
 **Address entry dominates.** Routing is 6% of the total; address search is 78%. Every cost
-decision in the product follows from this single fact — which is why the address book is
+decision in the product follows from this single fact (risk C2,
+[`35_RISK_REGISTER.md`](35_RISK_REGISTER.md)) — which is why the address book is
 offered before search in every add-stop flow ([`04_FEATURES.md`](04_FEATURES.md)).
 
 ### Elena, the technician
@@ -351,7 +352,8 @@ never fire, so an occurrence is a probable defect rather than a user problem.
 This document exists because **cost is a design constraint in this product, not an operational
 concern**. The difference between the brief's proposed architecture and the one built is a
 factor of twenty-five on the dominant operation — large enough to determine whether the
-business exists.
+business exists. This is risk C1 in
+[`35_RISK_REGISTER.md`](35_RISK_REGISTER.md), and the cascade is its mitigation.
 
 Two findings shaped the architecture more than any other analysis:
 
