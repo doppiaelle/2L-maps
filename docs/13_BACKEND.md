@@ -1,0 +1,298 @@
+# 13 — Backend
+
+> **Status:** Approved
+> **Owner:** Architecture
+> **Last reviewed:** 2026-08-06
+> **Related:** [ADR-0006](adr/0006-mandatory-backend-proxy.md) · [`33_API_CONTRACTS.md`](33_API_CONTRACTS.md) · [`12_DATABASE.md`](12_DATABASE.md)
+
+---
+
+## 1. Purpose
+
+This document specifies the server side: the Supabase Edge Functions, the pipeline every one of
+them runs, and how upstream Google calls are authenticated, limited, cached and recorded.
+
+The backend exists for four reasons, in order of necessity: the Route Optimization API
+**cannot** be called from a client at all; web-service API keys cannot be safely shipped;
+quotas are unenforceable client-side; and a shared cache requires a shared server.
+
+## 2. Goals
+
+1. Keep every Google credential except the Maps SDK render key off the device.
+2. Enforce entitlement and quota where the client cannot reach.
+3. Cut upstream cost through a cross-user content-keyed cache.
+4. Make every metered call recorded and therefore auditable.
+5. Fail in a way the client can degrade from, never in a way it must guess about.
+
+**Non-goals.** No business logic that belongs on the client, no custom infrastructure beyond
+Supabase, no general-purpose API.
+
+## 3. Responsibilities
+
+| Concern | Owner | Notes |
+|---|---|---|
+| Credential custody | Supabase secrets | Never in the repo, `app.config`, or a runtime-read build secret |
+| Entitlement truth | `/revenuecat-webhook` → `user_entitlements` | Client state is UI only |
+| Tier selection | `/optimize` | Server-side only |
+| Cache | `optimization_cache`, `places_cache` | Content-keyed, shared |
+| Usage recording | Every function | Feeds [`31_COST_MODEL.md`](31_COST_MODEL.md) |
+
+---
+
+## 4. Text diagrams
+
+### Function inventory
+
+```
+  ┌──────────────────────────────────────────────────────────────┐
+  │  SUPABASE EDGE FUNCTIONS (Deno)                              │
+  │                                                              │
+  │  /places-autocomplete   Places Autocomplete    server key    │
+  │  /place-details         Place Details          server key    │
+  │  /geocode               Geocoding, batch       server key    │
+  │  /routes-compute        Routes API             server key    │
+  │  /optimize              tier selection T0-T2   server key +  │
+  │                                                SA OAuth2     │
+  │  /usage-quota           read current usage     no upstream   │
+  │  /revenuecat-webhook    entitlement writes     signature     │
+  │                                                verification  │
+  └──────────────────────────────────────────────────────────────┘
+```
+
+### The seven-step pipeline — every metered function, in this order
+
+```
+  request
+     │
+  1  ▼  verify Supabase JWT ─────────────────▶ 401 if invalid
+     │
+  2  ▼  read entitlement from DB ────────────▶ 402 if none
+     │     (never from the client)
+     │
+  3  ▼  rate limit, short window ────────────▶ 429 if exceeded
+     │
+  4  ▼  quota check, calendar month ─────────▶ 429 if exhausted
+     │
+  5  ▼  cache lookup ────────────┐
+     │                            │ hit → record(cache_hit: true) → return
+  6  ▼  upstream call ◀───────────┘ miss
+     │     with minimal field mask
+     │
+  7  ▼  cache write + usage_events insert
+     │
+     ▼  response
+```
+
+**The order is load-bearing.** Cache lookup sits *after* quota so a cache hit still counts
+against abuse limits while costing nothing upstream. Entitlement sits before rate limiting so
+an expired user gets a paywall rather than a confusing 429.
+
+### Credential topology
+
+```
+  CLIENT                          EDGE FUNCTIONS              GOOGLE
+  ──────                          ──────────────              ──────
+  Maps SDK key ────────────────────────────────────────────▶  Maps SDK
+  (restricted: bundle ID + SHA-1,
+   scoped to Maps SDK only —
+   the ONLY credential on device)
+
+  user JWT ────────▶  server API key ───────────────────────▶  Places, Routes,
+                      (Supabase secret,                        Geocoding
+                       IP-unrestricted, server-only)
+
+           ────────▶  service account OAuth2 ────────────────▶  Route Optimization
+                      (JSON credential in Supabase secrets;
+                       cannot exist on a client under any
+                       circumstances)
+```
+
+---
+
+## 5. Functions
+
+### `/optimize` — the core function
+
+Selects a tier, calls upstream, normalises the result.
+
+**Input:** route id, stop `place_id` list, origin, round-trip flag, optional departure time.
+**Output:** an `OptimizationResult` ([`15_ROUTE_OPTIMIZATION.md`](15_ROUTE_OPTIMIZATION.md)),
+or a job id when asynchronous.
+
+Additional steps beyond the standard pipeline:
+
+1. **Re-hydrate expired coordinates** before building the request — a stop with a NULL
+   coordinate cannot be sent upstream
+   ([ADR-0007](adr/0007-place-id-durable-coordinates-perishable.md)).
+2. **Select the tier** by the rule in [`15_ROUTE_OPTIMIZATION.md`](15_ROUTE_OPTIMIZATION.md).
+   Never from a client hint.
+3. **T1: two-phase call** — order with `TRAFFIC_AWARE`, then detail with
+   `TRAFFIC_AWARE_OPTIMAL`.
+4. **T2 above the async threshold:** create an `optimization_jobs` row, return its id
+   immediately, and complete the work in the background. The client subscribes via Realtime.
+5. **Normalise** every tier to one result shape.
+
+### `/places-autocomplete`
+
+The highest-frequency and highest-cost endpoint ([`31_COST_MODEL.md`](31_COST_MODEL.md)).
+
+- **Session token is mandatory.** A request without one is rejected as a client defect — it
+  would be billed outside session pricing.
+- Requests within a session are capped, matching the Places session billing cap.
+- Results are biased to the user's region and to a radius around their current location.
+- **No result caching.** Autocomplete is inherently per-keystroke and per-session; caching would
+  breach session semantics and return stale suggestions.
+
+### `/geocode`
+
+Batch address resolution for list import. Used **instead of** autocomplete for bulk entry, which
+is materially cheaper. Returns resolved and unresolved rows separately so the client can offer
+partial success ([`03_USER_JOURNEYS.md`](03_USER_JOURNEYS.md) J8).
+
+### `/revenuecat-webhook`
+
+The only writer of `user_entitlements`.
+
+1. **Verify the signature.** An unverified webhook is an open door to free entitlement.
+2. Map the RevenueCat event to an entitlement status.
+3. Write with `updated_by = 'webhook'` for traceability.
+4. Return 200 quickly; RevenueCat retries on failure, so the handler must be idempotent.
+
+### `/usage-quota`
+
+Read-only. Returns current usage against limits so the client can show quota state before an
+action fails, rather than after.
+
+---
+
+## 6. Cross-cutting behaviour
+
+**Authentication.** Every function except the webhook requires a valid Supabase JWT. The webhook
+authenticates by signature instead.
+
+**Idempotency.** `/optimize` accepts an idempotency key so a client retry after a timeout does
+not produce a second billable call. The webhook is idempotent by event id.
+
+**Timeouts and retries.** Every upstream call has a deadline shorter than the function's own
+limit, so the function always returns something rather than being killed. Retries use bounded
+exponential backoff and only for 5xx and network errors — **never for 4xx**, which indicates
+our own malformed request and must alert instead.
+
+**Field masks.** Mandatory on every Routes API call, and minimal. Field masks determine the
+billing SKU; over-requesting silently escalates the price of every call
+([`31_COST_MODEL.md`](31_COST_MODEL.md)).
+
+**Observability.** Every function emits a structured log line with user id, endpoint, tier,
+cache-hit, duration and outcome. **No addresses, no coordinates, no `place_id` tied to a user**
+([`21_ANALYTICS.md`](21_ANALYTICS.md)).
+
+---
+
+## 7. Edge cases
+
+| # | Condition | Expected behaviour |
+|---|---|---|
+| 1 | JWT valid, entitlement absent | 402 with paywall context. Read-only access to own data is unaffected |
+| 2 | Quota exhausted mid-request | Checked before upstream, never after — the call is not made |
+| 3 | Cache hit | Recorded with `cache_hit: true`; no upstream call; quota still decremented |
+| 4 | Coordinates expired for some stops | Batch re-hydration, then proceed. Invisible to the client |
+| 5 | Upstream 4xx | Generic error to the client, **full detail to Sentry** — our defect, alert |
+| 6 | Upstream 5xx | Bounded retry, then a degradation hint the client can act on |
+| 7 | Function times out | Returns before its own deadline with a partial or degraded result |
+| 8 | Webhook arrives out of order | Event timestamp compared; stale events ignored |
+| 9 | Webhook signature invalid | 401, logged as a security event, no write |
+| 10 | Concurrent optimizations, one user | Idempotency key deduplicates; the latest wins |
+| 11 | Autocomplete without a session token | 400 — a client defect that would break session billing |
+| 12 | Async job orphaned | Jobs older than a threshold are marked failed by a sweeper; the client is notified |
+
+## 8. Error handling
+
+| Status | Meaning | Client action |
+|---|---|---|
+| 200 | Success | Render |
+| 202 | Accepted as an async job | Subscribe to Realtime on the job row |
+| 400 | Malformed request | **Our defect.** Generic message, alert |
+| 401 | Invalid or missing JWT | Re-authenticate |
+| 402 | No entitlement | Paywall with restore path |
+| 429 | Rate limit or quota | Show the limit, the reset time, and what still works |
+| 500 | Unhandled | Generic message; alert |
+| 503 | Upstream unavailable after retries | **Degradation hint included** so the client can offer T0 |
+
+**Every error response carries a machine-readable code and a human-readable message.** The
+client branches on the code and never parses the message.
+
+## 9. Best practices
+
+1. **The pipeline order is fixed.** Reordering it changes cost and security properties.
+2. **Never trust the client for tier, entitlement, quota or ownership.**
+3. **Minimal field masks, reviewed on every change.**
+4. **Retry 5xx only.** A 4xx retry burns quota on a request that cannot succeed.
+5. **Record every call, cache hit or not**, or the cost model is unverifiable.
+6. **Verify webhook signatures** — always, without exception.
+7. **Never log personal data**, including inside serialised error objects.
+8. **Return a degradation hint on 503** so the client can fall back intelligently rather than
+   guessing.
+
+## 10. Checklist
+
+- [ ] Every function runs the seven steps in order.
+- [ ] No web-service key or service-account credential exists client-side.
+- [ ] Service-account JSON lives only in Supabase secrets, with a documented rotation procedure.
+- [ ] Webhook signature verification tested with an invalid signature.
+- [ ] Idempotency verified for `/optimize` and the webhook.
+- [ ] Field masks minimal and verified against the intended SKU.
+- [ ] `usage_events` written on every metered call, cache hits included.
+- [ ] No personal data in logs — verified by inspection of real log output.
+- [ ] 4xx alerts; 5xx retries with bounds.
+- [ ] Async job sweeper active for orphaned jobs.
+
+## 11. Roadmap
+
+| Phase | Scope | Trigger |
+|---|---|---|
+| MVP | All seven functions; pipeline; cache; quota; usage recording | — |
+| 1.x | Cache warming for frequently-repeated routes; hit-rate tuning | Gate D2 cache metric |
+| 2.0 | Hierarchical chunking inside `/optimize` for >25 stops | Gate D3 |
+| 3.0 | `RoutingProvider` adapter for a self-hosted Valhalla | An [ADR-0012](adr/0012-long-term-osm-exit-path.md) trigger |
+
+## 12. Decision log
+
+| Date | Change | Reason | Author |
+|---|---|---|---|
+| 2026-08-06 | All web-service calls proxied | Route Optimization requires a service account; keys cannot ship | Architecture |
+| 2026-08-06 | Cache lookup placed after quota | A cache hit should still count against abuse limits | Architecture |
+| 2026-08-06 | Autocomplete results not cached | Session semantics; stale suggestions | Architecture |
+| 2026-08-06 | 503 carries a degradation hint | The client cannot otherwise know whether T0 is appropriate | Architecture |
+
+## 13. Rationale
+
+The backend is deliberately thin. It holds no business logic that could live on the client; it
+exists to hold **secrets, limits and cache** — the three things a client cannot be trusted with.
+Every function is a proxy with a pipeline, and the pipeline is the same one every time so that
+adding an endpoint cannot accidentally omit a step.
+
+The seven-step order encodes decisions that are easy to get subtly wrong. Cache after quota
+means a user cannot bypass their limit by repeating a cached request — which matters because the
+cache is shared, so a popular route would otherwise be infinitely free to one abusive account.
+Entitlement before rate limit means an expired trial user sees a paywall, not a rate-limit
+message they cannot act on.
+
+Sharing the cache across users is the single largest cost lever available, and it is safe
+precisely because the key is content-derived: a hash of public `place_id` values and a time
+bucket, holding nothing that identifies who asked.
+
+The rule that a 4xx alerts rather than retries deserves emphasis. In this system a malformed
+upstream request is always our defect — the client cannot construct one, because it does not
+construct upstream requests at all. Retrying it would burn quota on a call that can never
+succeed, and would hide the bug.
+
+## 14. Rejected alternatives
+
+| Alternative | Attraction | Why rejected |
+|---|---|---|
+| Direct client calls with restricted keys | No backend, no latency hop | Bundle-ID restriction does not exist for web-service APIs, and the Route Optimization API cannot work this way at all |
+| Cloud Run or Cloud Functions instead of Edge Functions | Same platform as GCP; natural service-account home | A second platform, deployment pipeline and auth boundary alongside Supabase, which is already required |
+| Cache before quota | Cache hits are free, so why charge them | Lets an abusive account replay a cached popular route without limit |
+| Per-user cache | Simpler invalidation; no shared-data questions | Discards most of the saving. The key holds only public identifiers, so the privacy objection does not apply |
+| Retry all upstream errors uniformly | Simpler retry logic | Retrying 4xx burns quota on requests that cannot succeed and conceals our own defects |
+| Trusting the client's RevenueCat entitlement | No webhook; instant; simpler | A client reports what it is told to report. Entitlement is an access-control decision |
