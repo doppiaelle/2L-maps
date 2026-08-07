@@ -1,0 +1,30 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "exactOptionalPropertyTypes": true,
+    "forceConsistentCasingInFileNames": true,
+    "verbatimModuleSyntax": true,
+    "paths": {
+      "@/app/*": ["./app/*"],
+      "@/features/*": ["./features/*"],
+      "@/components/*": ["./components/*"],
+      "@/lib/*": ["./lib/*"],
+      "@/types/*": ["./types/*"],
+      "@/types": ["./types/index.ts"]
+    },
+    "types": ["jest", "node"]
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts",
+    "nativewind-env.d.ts",
+    "global.d.ts"
+  ],
+  "exclude": ["node_modules", "android", "ios", "supabase/functions"]
+}
