@@ -104,12 +104,13 @@ owning your area (see §Areas below) → [`29`](29_DEFINITION_OF_DONE.md).
 | 26 | [App Store](26_APP_STORE.md) | Review guidelines, privacy manifest, submission |
 | 27 | [Play Store](27_PLAY_STORE.md) | Data Safety, testing tracks, release |
 | 29 | [Definition of Done](29_DEFINITION_OF_DONE.md) | When a change is actually finished |
+| 36 | [Implementation Plan](36_IMPLEMENTATION_PLAN.md) | **Live status.** Wave order, branches, gates, environment limits |
 
 ### Architecture Decision Records
 
 | ID | Decision |
 |---|---|
-| [0001](adr/0001-documentation-language-and-structure.md) | English documentation, 41 files, 14-section template |
+| [0001](adr/0001-documentation-language-and-structure.md) | English documentation, 42 files, 14-section template |
 | [0002](adr/0002-target-segment-and-monetization.md) | Single professional, 5–25 stops; 7-day trial to paid |
 | [0003](adr/0003-tiered-optimization-cascade.md) | Cost-aware cascade T0–T3, not a single engine |
 | [0004](adr/0004-external-navigation-handoff.md) | No in-app navigation; multi-provider handoff |
@@ -121,6 +122,7 @@ owning your area (see §Areas below) → [`29`](29_DEFINITION_OF_DONE.md).
 | [0010](adr/0010-mobile-only-scope.md) | Mobile only; stop list is a sheet, never a sidebar |
 | [0011](adr/0011-server-side-quota-enforcement.md) | Entitlements and quotas enforced server-side only |
 | [0012](adr/0012-long-term-osm-exit-path.md) | MapLibre + Valhalla recorded as the exit path |
+| [0013](adr/0013-implementation-execution-model.md) | Implementation in waves, one branch each, status in the repository |
 
 ---
 
@@ -209,16 +211,17 @@ template, and pushed.
 | 5 — Delivery | `22`, `25`, `26`, `27`, `29`, `README` | ✅ Complete |
 | 6 — Consolidation | Cross-link and consistency audit | ✅ Complete |
 
-**File count.** The approved set is 41 documents: the 33 named in the brief plus 8 extensions,
-counting `adr/` as one entry. On disk that is **52 files** — 38 in `docs/`, 12 in `docs/adr/`,
-and `CLAUDE.md` and `README.md` at the root — because the single ADR entry expands to twelve
+**File count.** The approved set is 42 documents: the 33 named in the brief, 8 extensions, and
+`36_IMPLEMENTATION_PLAN.md` added when implementation began ([ADR-0013](adr/0013-implementation-execution-model.md)),
+counting `adr/` as one entry. On disk that is **54 files** — 39 in `docs/`, 13 in `docs/adr/`,
+and `CLAUDE.md` and `README.md` at the root — because the single ADR entry expands to thirteen
 records. Both numbers are correct; they count different things.
 
 **Audit results, wave 6.**
 
 | Check | Result |
 |---|---|
-| All 41 approved documents present, none a stub | ✅ Shortest file is well above placeholder length |
+| All approved documents present, none a stub | ✅ Shortest file is well above placeholder length |
 | 14 mandatory sections in every numbered document | ✅ 36/36 conform. 66 sections were added: `Responsibilities` ×1, `Text diagrams` ×3, `Flows` ×33, `Architectural decisions` ×29 |
 | Heading numbering contiguous | ✅ 36/36 |
 | Relative links resolve | ✅ 0 broken, excluding the deliberate placeholders in `_TEMPLATE.md` |

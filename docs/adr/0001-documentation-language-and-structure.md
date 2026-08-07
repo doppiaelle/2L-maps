@@ -71,8 +71,10 @@ are recorded here in a compact form.
 
 **Neutral.** Adding 8 files raises the total from 33 to 41, roughly a 24% increase in
 authoring effort, concentrated in areas that were previously unspecified rather than
-duplicating existing content. Note that 41 counts `adr/` as a single entry; on disk the
-repository holds 52 markdown files, because that entry expands to twelve ADRs.
+duplicating existing content. A forty-second document, `36_IMPLEMENTATION_PLAN.md`, was added
+when implementation began ([ADR-0013](0013-implementation-execution-model.md)). Note that these
+counts treat `adr/` as a single entry; on disk the repository holds 54 markdown files, because
+that entry expands to thirteen ADRs.
 
 ## Alternatives considered
 
@@ -81,7 +83,7 @@ repository holds 52 markdown files, because that entry expands to twelve ADRs.
 | All documentation in Italian | Maximum comfort for the owner; a fully Italian team could onboard faster | Mixed IT/EN terminology is unavoidable in technical sections. Higher ambiguity risk exactly where Claude Code generates code from the spec. Naming drift between spec and implementation. |
 | English with an Italian summary block per file | Readability plus precision | Roughly 15% more content and two versions to keep synchronised. Summaries drift from bodies within weeks; a stale summary is worse than none. |
 | Exactly the 33 specified files | Faithful to the original request; more compact | Cost model, legal compliance and API contracts would be distributed across existing documents, making several of them very dense and duplicating cost figures in multiple places — the precise failure mode the single-source rule exists to prevent. |
-| Free-form document structure | Less rigid, faster to write | With 41 documents and no enforced structure, coverage gaps become invisible. The 14-section template makes an omission detectable by grep. |
+| Free-form document structure | Less rigid, faster to write | With more than forty documents and no enforced structure, coverage gaps become invisible. The 14-section template makes an omission detectable by grep. |
 
 ## References
 
