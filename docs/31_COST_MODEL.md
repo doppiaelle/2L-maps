@@ -328,7 +328,8 @@ never fire, so an occurrence is a probable defect rather than a user problem.
 
 **Decided here:** cost is a design constraint in this product, not an operating expense
 reviewed quarterly. The brief's original architecture and the one specified differ by a factor
-of eighteen in monthly COGS per user — large enough to decide whether the price works at all.
+of twenty-five on the dominant operation, and the mitigations here take per-user COGS from
+~$3.74 to ~$1.02 a month — large enough to decide whether the price works at all.
 
 ## 12. Edge cases
 

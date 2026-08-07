@@ -219,11 +219,18 @@ records. Both numbers are correct; they count different things.
 | Check | Result |
 |---|---|
 | All 41 approved documents present, none a stub | ✅ Shortest file is well above placeholder length |
-| 14 mandatory sections in every numbered document | ✅ 5 structural gaps closed; `Flows` and `Architectural decisions` added where absent |
+| 14 mandatory sections in every numbered document | ✅ 36/36 conform. 66 sections were added: `Responsibilities` ×1, `Text diagrams` ×3, `Flows` ×33, `Architectural decisions` ×29 |
+| Heading numbering contiguous | ✅ 36/36 |
 | Relative links resolve | ✅ 0 broken, excluding the deliberate placeholders in `_TEMPLATE.md` |
 | Heading anchors resolve | ✅ 0 broken |
-| Section (`§N`) cross-references | ✅ 11 stale references repaired after renumbering |
+| Section (`§N`) cross-references | ✅ 0 unresolved; every reference reconciled against its pre-renumbering target |
 | Risks C1–C16 traced outside the register | ✅ All 16, by identifier |
 | ADRs 0001–0012 cited by an owning document | ✅ All 12 |
 | Contradictory figures across documents | ✅ None — stop caps, retention, pricing, budgets and contrast ratios agree |
 | Application source files in the repository | ✅ None, as required |
+
+The section check is the one that matters most in hindsight: an earlier pass matched heading
+names loosely and reported the template as satisfied while two of its fourteen sections were
+absent from most documents. A conformance check that cannot fail is not a check — which is the
+same argument [`01_PRODUCT_REQUIREMENTS.md`](01_PRODUCT_REQUIREMENTS.md) makes about
+requirements that state no verification method.

@@ -248,8 +248,8 @@ change for the decision to be revisited.
 | [0012](adr/0012-long-term-osm-exit-path.md) | OSM exit path recorded | Tier T3, deferred |
 
 **Decided here:** a feature is listed with its running cost, not only its behaviour. Most
-feature inventories record what something does; in a product where a single design choice moved
-per-user cost by a factor of eighteen, what it costs is part of what it is.
+feature inventories record what something does; in a product where a single engine choice moved
+the dominant operation's cost by a factor of twenty-five, what it costs is part of what it is.
 
 ## 10. Edge cases
 
