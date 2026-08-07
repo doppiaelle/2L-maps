@@ -80,7 +80,37 @@ Priority:  MUST    MVP blocker. No release without it.
 
 ---
 
-## 5. Functional requirements
+## 5. Flows
+
+**How a requirement enters this document.** A requirement is not written because someone wants
+the capability; it is written because a decision has been made and needs a testable statement.
+
+```
+  proposal ──▶ does it serve a persona in 02? ──no──▶ rejected, recorded in 04
+                        │ yes
+                        ▼
+              does it contradict an ADR? ──yes──▶ ADR superseded first, or proposal dies
+                        │ no
+                        ▼
+              stated here with an ID, a priority and a verification method
+                        │
+                        ▼
+              test written in 22 against that verification method
+                        │
+                        ▼
+              implemented ──▶ verified ──▶ counts toward the release
+```
+
+**How a requirement leaves.** Deletion requires the same weight as addition: the decision log
+below records what was removed and why. A requirement silently dropped is a specification that
+no longer describes the product, which is worse than no specification at all.
+
+**How a conflict is settled.** Two requirements that cannot both hold are escalated to the
+constraint list — a constraint is external and non-negotiable, so the requirement that survives
+is the one the constraint permits. If neither is constrained, the persona in
+[`02_USER_PERSONAS.md`](02_USER_PERSONAS.md) decides.
+
+## 6. Functional requirements
 
 ### Stops
 
@@ -172,7 +202,7 @@ Priority:  MUST    MVP blocker. No release without it.
 
 ---
 
-## 6. Non-functional requirements
+## 7. Non-functional requirements
 
 | ID | Requirement | Target | Verified by |
 |---|---|---|---|
@@ -191,7 +221,7 @@ Priority:  MUST    MVP blocker. No release without it.
 
 ---
 
-## 7. Constraints
+## 8. Constraints
 
 External and non-negotiable. Violating any of these is a legal or platform matter, not a
 trade-off.
@@ -211,7 +241,24 @@ trade-off.
 
 ---
 
-## 8. Edge cases
+## 9. Architectural decisions
+
+| ID | Decision | Requirements it governs |
+|---|---|---|
+| [0002](adr/0002-target-segment-and-monetization.md) | Single professional, 5–25 stops; trial to paid | Stop caps, entitlement, paywall |
+| [0003](adr/0003-tiered-optimization-cascade.md) | Cost-aware cascade T0–T3 | Every optimization requirement |
+| [0004](adr/0004-external-navigation-handoff.md) | Handoff, never in-app turn-by-turn | Navigation requirements |
+| [0005](adr/0005-map-engine-and-route-preview.md) | `react-native-maps` behind a facade | Map and preview requirements |
+| [0007](adr/0007-place-id-durable-coordinates-perishable.md) | `place_id` durable, coordinates perishable | Storage and re-hydration requirements |
+| [0008](adr/0008-offline-scope.md) | Offline is your own data | Offline requirements |
+| [0011](adr/0011-server-side-quota-enforcement.md) | Quota and entitlement server-side | Quota requirements, 402 and 429 handling |
+
+**Decided here:** every requirement carries a verification method, and a requirement that
+cannot state one is not accepted. This is what makes the document a contract rather than a wish
+list — an unverifiable requirement cannot fail, and a requirement that cannot fail cannot block
+a release.
+
+## 10. Edge cases
 
 | # | Condition | Expected behaviour | Specified in |
 |---|---|---|---|
@@ -224,7 +271,7 @@ trade-off.
 | 7 | Device clock is wrong | ETA calculations use server time, not device time | [`15`](15_ROUTE_OPTIMIZATION.md) |
 | 8 | User uninstalls their only navigation app mid-route | Provider list refreshes; the web universal link remains | [`16`](16_INTERNAL_NAVIGATION.md) |
 
-## 9. Error handling
+## 11. Error handling
 
 Requirement-level principle: **a requirement is not met unless its failure path is also met.**
 FR-18, FR-49 and FR-53 are requirements *about* failure, and are treated as first-class.
@@ -239,7 +286,7 @@ Endpoint-level handling is in [`33_API_CONTRACTS.md`](33_API_CONTRACTS.md).
 | Quota exhausted | Edge Function 429 | Limit, reset date, what still works | No | T0, saved routes |
 | Handoff target missing | Client | Provider hidden; alternatives offered | No | Web universal link |
 
-## 10. Best practices
+## 12. Best practices
 
 1. **A requirement without a verification method is a wish.** Every FR names how it is checked.
 2. **Numbers, not adjectives.** "Fast" is unverifiable; NFR-02 is.
@@ -249,18 +296,18 @@ Endpoint-level handling is in [`33_API_CONTRACTS.md`](33_API_CONTRACTS.md).
    not a quiet edit.
 5. **Constraints are not requirements.** CR items cannot be traded away for scope or schedule.
 
-## 11. Checklist
+## 13. Checklist
 
 Release readiness against this document:
 
 - [ ] Every MUST requirement implemented and verified.
 - [ ] Every NFR measured on real devices, not simulators.
 - [ ] Every CR demonstrably respected, with evidence for CR-01 through CR-03.
-- [ ] Every edge case in §8 has a test.
-- [ ] Every failure in §9 has a designed, tested state.
+- [ ] Every edge case in §10 has a test.
+- [ ] Every failure in §11 has a designed, tested state.
 - [ ] No SHOULD silently promoted to MUST without a log entry.
 
-## 12. Roadmap
+## 14. Roadmap
 
 | Phase | Scope | Trigger |
 |---|---|---|
@@ -269,14 +316,14 @@ Release readiness against this document:
 | 1.2 | COULD: Live Activity, arrival geofence, notes, snapshot export | Retention data indicates demand |
 | 2.0 | Time windows, pinned stops, priorities — requires tier T2 by default | Segment demand, see [`28`](28_ROADMAP.md) |
 
-## 13. Decision log
+## 15. Decision log
 
 | Date | Change | Reason | Author |
 |---|---|---|---|
 | 2026-08-06 | Document created; FR/NFR/CR fixed against ADR-0001…0012 | Project inception | Product owner |
 | 2026-08-06 | FR-20 time windows moved to WON'T for MVP | Requires tier T2 for every optimization, multiplying COGS by stop count | Product owner |
 
-## 14. Rationale
+## 16. Rationale
 
 The requirement set is deliberately narrow. Twenty-two MUST requirements describe an app that
 does one thing completely rather than five things partially — which is the only viable shape
@@ -294,7 +341,7 @@ non-negotiables, and because they are the requirements most likely to be violate
 who has not read them. Each is traced to its source so a future reader can verify it rather
 than trust it.
 
-## 15. Rejected alternatives
+## 17. Rejected alternatives
 
 | Alternative | Attraction | Why rejected |
 |---|---|---|

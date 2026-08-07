@@ -82,7 +82,35 @@ Used in the tables below. Full derivation in [`31_COST_MODEL.md`](31_COST_MODEL.
 
 ---
 
-## 5. Features — MVP
+## 5. Flows
+
+**How a feature moves between the three lists below.** Nothing moves on enthusiasm; each
+transition has a named trigger.
+
+```
+  excluded ──── an ADR is superseded ────▶ deferred
+                                              │
+                                    a gate in 28 passes
+                                              │
+                                              ▼
+                                            MVP  ──── shipped ────▶ maintained
+                                              │
+                                    cost or terms make it
+                                    unviable (31, 32)
+                                              │
+                                              ▼
+                                          excluded, with the reason recorded
+```
+
+**How a feature is costed before it is accepted.** Every feature that makes an upstream call
+declares it, and the declaration goes through [`31_COST_MODEL.md`](31_COST_MODEL.md) before the
+feature is listed here. A feature whose per-use cost is unknown is not accepted — this is the
+rule that prevented the brief's original single-engine design from shipping.
+
+**How exclusion is recorded.** An excluded feature keeps its reason permanently. Without it,
+the same proposal returns every few months and is re-argued from scratch.
+
+## 6. Features — MVP
 
 ### Account
 
@@ -125,7 +153,7 @@ Used in the tables below. Full derivation in [`31_COST_MODEL.md`](31_COST_MODEL.
 | Per-leg distance and duration | MUST | ○ | Included in the response |
 | Shared result cache | MUST | ○ *(saves)* | Content-keyed; the main lever against COGS |
 | Pinned stop, excluded from reordering | COULD | ◑ | Supported by T1 |
-| Time windows | WON'T | ● | Forces T2 on every route — see §7 |
+| Time windows | WON'T | ● | Forces T2 on every route — see §8 |
 
 ### Preview and map
 
@@ -170,7 +198,7 @@ Used in the tables below. Full derivation in [`31_COST_MODEL.md`](31_COST_MODEL.
 
 ---
 
-## 6. Features — deferred
+## 7. Features — deferred
 
 | Feature | Phase | Blocked by |
 |---|---|---|
@@ -186,7 +214,7 @@ Used in the tables below. Full derivation in [`31_COST_MODEL.md`](31_COST_MODEL.
 
 ---
 
-## 7. Features — excluded, with reasons
+## 8. Features — excluded, with reasons
 
 **These are not "later". They are decided against.** Each entry records what would have to
 change for the decision to be revisited.
@@ -207,7 +235,23 @@ change for the decision to be revisited.
 
 ---
 
-## 8. Edge cases
+## 9. Architectural decisions
+
+| ID | Decision | Features it governs |
+|---|---|---|
+| [0002](adr/0002-target-segment-and-monetization.md) | Trial to paid, no permanent free tier | Paywall, trial, entitlement |
+| [0004](adr/0004-external-navigation-handoff.md) | External handoff | Navigation, provider picker, chunking |
+| [0007](adr/0007-place-id-durable-coordinates-perishable.md) | Coordinates expire at 30 days | Saved routes, history, re-hydration |
+| [0008](adr/0008-offline-scope.md) | Offline is your own data | Every offline capability, and the exclusion of offline maps |
+| [0010](adr/0010-mobile-only-scope.md) | Mobile only; sheet, never sidebar | Stop list, layout |
+| [0011](adr/0011-server-side-quota-enforcement.md) | Server-side quota | Every metered feature |
+| [0012](adr/0012-long-term-osm-exit-path.md) | OSM exit path recorded | Tier T3, deferred |
+
+**Decided here:** a feature is listed with its running cost, not only its behaviour. Most
+feature inventories record what something does; in a product where a single design choice moved
+per-user cost by a factor of eighteen, what it costs is part of what it is.
+
+## 10. Edge cases
 
 | # | Condition | Expected behaviour | Specified in |
 |---|---|---|---|
@@ -219,7 +263,7 @@ change for the decision to be revisited.
 | 6 | Optimization returns the entry order unchanged | Stated positively: "already the fastest order" — not silence | [`08`](08_SCREEN_SPECIFICATIONS.md) |
 | 7 | Cache hit on optimize | Result returned without an upstream call; the user perceives only speed | [`13`](13_BACKEND.md) |
 
-## 9. Error handling
+## 11. Error handling
 
 | Failure | Feature | Result | Fallback |
 |---|---|---|---|
@@ -230,7 +274,7 @@ change for the decision to be revisited.
 | Provider scheme rejected | Handoff | Provider hidden from the list | Web universal link |
 | Snapshot fails | Export | Named error; route unaffected | Retry |
 
-## 10. Best practices
+## 12. Best practices
 
 1. **Annotate every new feature with its cost class** before it is accepted. A feature whose
    running cost is unknown at decision time is a future surprise.
@@ -239,19 +283,19 @@ change for the decision to be revisited.
 3. **Import uses Geocoding, never autocomplete.** The difference is substantial at scale.
 4. **Every metered feature passes through the Edge Function pipeline.** No exceptions.
 5. **An exclusion needs a reason precise enough to re-decide later.** "Out of scope" is not a
-   reason; §7 is the format.
+   reason; §8 is the format.
 
-## 11. Checklist
+## 13. Checklist
 
 - [ ] Every MUST feature implemented and verified against [`01`](01_PRODUCT_REQUIREMENTS.md).
 - [ ] Every metered feature has a quota check and a usage record.
 - [ ] Import verified to use Geocoding, not autocomplete.
 - [ ] Session tokens confirmed active on every autocomplete session.
 - [ ] Address book offered before search in every add-stop flow.
-- [ ] Every excluded feature in §7 still has a valid reason at release review.
+- [ ] Every excluded feature in §8 still has a valid reason at release review.
 - [ ] Shared cache hit rate measured after launch against the assumption in [`31`](31_COST_MODEL.md).
 
-## 12. Roadmap
+## 14. Roadmap
 
 Detailed in [`28_ROADMAP.md`](28_ROADMAP.md). Summary:
 
@@ -263,7 +307,7 @@ Detailed in [`28_ROADMAP.md`](28_ROADMAP.md). Summary:
 | 2.0 | Time windows, pinned stops, priorities | A pricing tier that carries T2 |
 | 3.0 | Multi-vehicle, web, T3 | Strategic decision or an [ADR-0012](adr/0012-long-term-osm-exit-path.md) trigger |
 
-## 13. Decision log
+## 15. Decision log
 
 | Date | Change | Reason | Author |
 |---|---|---|---|
@@ -271,7 +315,7 @@ Detailed in [`28_ROADMAP.md`](28_ROADMAP.md). Summary:
 | 2026-08-06 | Time windows moved from SHOULD to WON'T for MVP | Would force T2 on every optimization | Product owner |
 | 2026-08-06 | Import specified as Geocoding rather than autocomplete | Cost difference at 25 addresses is material | Architecture |
 
-## 14. Rationale
+## 16. Rationale
 
 Features are annotated with cost because in this product **cost is a design constraint, not an
 operational detail.** A feature that triples Places calls is not a small feature no matter how
@@ -290,11 +334,11 @@ highest-leverage cost decision in the product. The target segment revisits the s
 every reused `place_id` is a search that costs nothing. A flow that puts search first would
 roughly triple the dominant COGS line for no user benefit.
 
-## 15. Rejected alternatives
+## 17. Rejected alternatives
 
 | Alternative | Attraction | Why rejected |
 |---|---|---|
 | Feature list without cost annotations | Simpler table; separation of concerns | Cost is decided when a feature is accepted, not later. Separating them means deciding blind. |
 | Autocomplete for import | One code path for all address entry | Far more expensive for bulk entry, and a worse experience — the user has the addresses already and does not want to type them one at a time. |
 | Ship all SHOULD features in the MVP | More complete product at launch | Delays the only thing that matters at launch: whether anyone pays to have their stops reordered. |
-| Keep excluded features as "backlog" | Nothing is ever refused; flexible | A backlog of decided-against items gets re-litigated every planning cycle. §7 records the decision and its reopening condition instead. |
+| Keep excluded features as "backlog" | Nothing is ever refused; flexible | A backlog of decided-against items gets re-litigated every planning cycle. §8 records the decision and its reopening condition instead. |

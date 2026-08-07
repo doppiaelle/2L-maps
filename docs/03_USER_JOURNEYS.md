@@ -34,7 +34,7 @@ It does not specify screens ([`08`](08_SCREEN_SPECIFICATIONS.md)) or routing bet
 |---|---|---|
 | Journey correctness | Product owner | Revised against real usage data |
 | Tap-count enforcement | Design | J1 is measured, not estimated |
-| E2E coverage | QA | Every journey in §5 has a Maestro flow |
+| E2E coverage | QA | Every journey in §6 has a Maestro flow |
 
 ---
 
@@ -85,7 +85,30 @@ proposed feature adding a step here must remove one.
 
 ---
 
-## 5. Journeys
+## 5. Flows
+
+Every journey below shares one spine. The detail differs; the shape does not.
+
+```
+  enter ──▶ collect stops ──▶ optimize ──▶ inspect ──▶ hand off ──▶ progress ──▶ finish
+              │                  │           │            │            │
+              │                  │           │            │            └── stop marked done,
+              │                  │           │            │                manually or on return
+              │                  │           │            └── chunked or leg-by-leg (16)
+              │                  │           └── degraded results labelled, never silent
+              │                  └── tier chosen server-side; the user sees a wait, not an engine
+              └── address book first, network second
+```
+
+**Every journey can terminate early, and each termination is designed.** The exits are: quota
+exhausted, entitlement expired, network lost, upstream failure, no navigation app installed,
+and the user simply leaving. None of them is an error dialog with an OK button; each has a
+stated reason and a next action, per rule 5 of [`../CLAUDE.md`](../CLAUDE.md).
+
+**State survives every exit.** The draft route is the user's work, and no termination path —
+including process death — discards it ([`11_STATE_MANAGEMENT.md`](11_STATE_MANAGEMENT.md)).
+
+## 6. Journeys
 
 ### J0 — Onboarding and trial start
 
@@ -267,7 +290,7 @@ the likely reason stated (wrong format, wrong country, empty input).
 
 ---
 
-## 6. Architectural decisions
+## 7. Architectural decisions
 
 | ID | Decision | Applies to |
 |---|---|---|
@@ -277,7 +300,7 @@ the likely reason stated (wrong format, wrong country, empty input).
 | [0007](adr/0007-place-id-durable-coordinates-perishable.md) | J5 step 2 re-hydration | Reuse |
 | [0008](adr/0008-offline-scope.md) | J6 scope | Offline |
 
-## 7. Edge cases
+## 8. Edge cases
 
 | # | Condition | Expected behaviour | Specified in |
 |---|---|---|---|
@@ -291,7 +314,7 @@ the likely reason stated (wrong format, wrong country, empty input).
 | 8 | App killed during J2 | Progress restored to the next incomplete stop | [`11`](11_STATE_MANAGEMENT.md) |
 | 9 | Location permission denied in J0 | Origin defaults to a searched address; no journey is blocked | [`18`](18_PERMISSIONS.md) |
 
-## 8. Error handling
+## 9. Error handling
 
 | Failure | Journey | User-facing result | Recovery |
 |---|---|---|---|
@@ -302,7 +325,7 @@ the likely reason stated (wrong format, wrong country, empty input).
 | Sync conflict | J6 | Both versions shown, user chooses | Explicit resolution |
 | Quota exhausted | J7 | Limit, reset time, what still works | Wait, or contact support |
 
-## 9. Best practices
+## 10. Best practices
 
 1. **Never lose user input on failure.** The manual order, the stop list and typed labels
    survive every error path. This is the single most important rule in this document.
@@ -315,17 +338,17 @@ the likely reason stated (wrong format, wrong country, empty input).
    this context.
 6. **Count the taps in J1 on every release.** It is the one number that silently degrades.
 
-## 10. Checklist
+## 11. Checklist
 
 - [ ] J1 measured at exactly three taps on a physical device.
 - [ ] Every journey has a Maestro E2E flow.
-- [ ] Every failure branch in §8 is tested, not only the happy path.
+- [ ] Every failure branch in §9 is tested, not only the happy path.
 - [ ] Every journey survives backgrounding and process death at each step.
 - [ ] J6 verified in genuine airplane mode, not a simulated offline state.
 - [ ] J0 paywall verified against Guideline 3.1.2 before every submission.
 - [ ] Time saved in J3 verified as a true computed difference, never an estimate.
 
-## 11. Roadmap
+## 12. Roadmap
 
 | Phase | Scope | Trigger |
 |---|---|---|
@@ -334,14 +357,14 @@ the likely reason stated (wrong format, wrong country, empty input).
 | 1.2 | J2 with opt-in geofenced arrival | Permission acceptance measured |
 | 2.0 | J0 variant revealing one optimization before the paywall | Conversion baseline established |
 
-## 12. Decision log
+## 13. Decision log
 
 | Date | Change | Reason | Author |
 |---|---|---|---|
 | 2026-08-06 | Journeys defined; three-tap path fixed as J1 | Project inception | Product owner |
 | 2026-08-06 | Paywall placed after onboarding, before first value | Product owner decision; experiment recorded in roadmap | Product owner |
 
-## 13. Rationale
+## 14. Rationale
 
 The journeys are shaped by one asymmetry: **planning happens once, driving happens all day.**
 J1 is optimised for speed because it is the gate; J2 is optimised for interruption tolerance
@@ -360,7 +383,7 @@ J7's rule — never block the user's own data — is a deliberate choice against
 pattern. Holding a user's saved routes hostage after a trial converts a lapsed user into a
 hostile one, and the marginal revenue is not worth it.
 
-## 14. Rejected alternatives
+## 15. Rejected alternatives
 
 | Alternative | Attraction | Why rejected |
 |---|---|---|

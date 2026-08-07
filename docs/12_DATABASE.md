@@ -98,7 +98,38 @@ procedural.
 
 ---
 
-## 5. Schema
+## 5. Flows
+
+**A coordinate's life.** This is the flow the terms constrain, and the one the schema is shaped
+around.
+
+```
+  place_id resolved  ──▶  coordinates cached with coords_refreshed_at = now
+                                     │
+                          ≤ 30 days  │  used directly
+                                     │
+                          > 30 days  ▼
+                          purge job NULLs the coordinates, keeps the place_id
+                                     │
+                          route opened ──▶ re-hydrated from place_id, batched
+                                     │
+                                     ▼
+                          coords_refreshed_at reset; the row was never lost
+```
+
+The `place_id` survives; only the coordinates expire. That is why the durable key and the
+perishable cache are different columns rather than one nullable pair.
+
+**A migration's life.** Forward-only, versioned, reviewed as a contract change: a migration
+that alters a stored shape is a `MAJOR` version under
+[`25_DEPLOYMENT.md`](25_DEPLOYMENT.md). Types are regenerated in the same change — a
+hand-edited database type is a lie that typechecks.
+
+**A read's life.** Every read passes row-level security. A table without a policy is
+unreachable, which is the intended failure mode: a query that returns nothing is debuggable, a
+query that returns another user's rows is a breach.
+
+## 6. Schema
 
 ### `places_cache` — the durability boundary in one table
 
@@ -318,7 +349,7 @@ Realtime is enabled on this table so the client subscribes to its own job rather
 
 ---
 
-## 6. Row-level security
+## 7. Row-level security
 
 **RLS is enabled on every table without exception.** A table without a policy is unreachable by
 design rather than by accident.
@@ -360,7 +391,7 @@ shared cache.
 
 ---
 
-## 7. The coordinate purge
+## 8. The coordinate purge
 
 The mechanism that makes [ADR-0007](adr/0007-place-id-durable-coordinates-perishable.md)
 structural.
@@ -391,7 +422,7 @@ sees a brief skeleton on the affected rows and nothing else
 
 ---
 
-## 8. Migrations
+## 9. Migrations
 
 Forward-only, versioned, checked into the repository, applied by CI.
 
@@ -407,7 +438,19 @@ Forward-only, versioned, checked into the repository, applied by CI.
 migration must not break a client that is still in the field. Column removal is therefore always
 a two-release process — stop reading it, ship, then drop it in a later release.
 
-## 9. Edge cases
+## 10. Architectural decisions
+
+| ID | Decision | Applies to |
+|---|---|---|
+| [0007](adr/0007-place-id-durable-coordinates-perishable.md) | `place_id` durable, coordinates a 30-day cache | Nullable coordinate columns, `coords_refreshed_at`, the purge job |
+| [0011](adr/0011-server-side-quota-enforcement.md) | Quota and entitlement server-side | Usage and entitlement tables, and their policies |
+| [0006](adr/0006-mandatory-backend-proxy.md) | All upstream calls proxied | The shared cache table |
+
+**Decided here:** RLS is enabled on every table before any row exists in it, not added once the
+feature works. A policy written after the fact is written against the queries that happen to
+exist, which is how a table ends up permissive by accident.
+
+## 11. Edge cases
 
 | # | Condition | Expected behaviour |
 |---|---|---|
@@ -422,7 +465,7 @@ a two-release process — stop reading it, ship, then drop it in a later release
 | 9 | Cache key collision | Practically impossible with a cryptographic hash; a mismatched result would be a stale-route defect, so the stored key includes the input set for verification |
 | 10 | `usage_events` grows large | Partitioned or archived by month beyond a threshold; reporting queries use the time index |
 
-## 10. Error handling
+## 12. Error handling
 
 | Failure | Detection | Result | Fallback |
 |---|---|---|---|
@@ -433,7 +476,7 @@ a two-release process — stop reading it, ship, then drop it in a later release
 | Cache write fails | Insert error | Logged; the request still succeeds | Cache miss next time |
 | Realtime disconnects during a job | Client subscription state | Client falls back to polling the job row | Polling |
 
-## 11. Best practices
+## 13. Best practices
 
 1. **Coordinates are nullable everywhere. Handle NULL at every read.** The generated types
    enforce this; do not defeat them with `!`.
@@ -448,7 +491,7 @@ a two-release process — stop reading it, ship, then drop it in a later release
 6. **Migrations are additive by default.** Old app versions are still running.
 7. **Regenerate types after every migration**, in CI, not by hand.
 
-## 12. Checklist
+## 14. Checklist
 
 - [ ] RLS enabled and policied on every table.
 - [ ] Every coordinate column nullable in schema and in generated types.
@@ -461,7 +504,7 @@ a two-release process — stop reading it, ship, then drop it in a later release
 - [ ] Migrations verified against the previous released app version.
 - [ ] Types regenerated in CI.
 
-## 13. Roadmap
+## 15. Roadmap
 
 | Phase | Scope | Trigger |
 |---|---|---|
@@ -470,7 +513,7 @@ a two-release process — stop reading it, ship, then drop it in a later release
 | 2.0 | Time windows and priorities on `stops`; `vehicles` table prepared but unused | Gate D3 |
 | 3.0 | Partitioning of `usage_events`; read replica if reporting load requires it | Volume |
 
-## 14. Decision log
+## 16. Decision log
 
 | Date | Change | Reason | Author |
 |---|---|---|---|
@@ -480,7 +523,7 @@ a two-release process — stop reading it, ship, then drop it in a later release
 | 2026-08-06 | `entry_order` retained alongside `optimized_order` | Enables the time-saved measurement and order restoration | Architecture |
 | 2026-08-06 | Soft deletion on `routes` | Required for offline delete reconciliation | Architecture |
 
-## 15. Rationale
+## 17. Rationale
 
 The schema's organising principle is the **durability boundary**: what the user created is
 permanent, what Google provided is temporary. That single distinction resolves what would
@@ -501,7 +544,7 @@ Keeping `entry_order` permanently, rather than overwriting it on optimization, i
 "you saved 41 minutes" a measurement rather than a marketing number — and that figure is the
 product's only numeric proof of value ([`03_USER_JOURNEYS.md`](03_USER_JOURNEYS.md) J3).
 
-## 16. Rejected alternatives
+## 18. Rejected alternatives
 
 | Alternative | Attraction | Why rejected |
 |---|---|---|

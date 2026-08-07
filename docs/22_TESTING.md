@@ -79,7 +79,41 @@ mechanism.
 
 ---
 
-## 5. Levels
+## 5. Flows
+
+**A bug's life.** The order is fixed: the failing test comes first, always.
+
+```
+  defect reported
+       │
+       ▼
+  failing test that reproduces it ──── cannot reproduce ──▶ not yet a defect; investigate
+       │
+       ▼
+  fix ──▶ the test passes ──▶ it joins the suite permanently
+       │
+       ▼
+  was it a class of bug, not an instance?  ──yes──▶ a regression class is added below
+```
+
+**What runs when.**
+
+```
+  pre-commit   typecheck · lint · format
+  pull request unit · component · integration · contract
+  pre-release  E2E on the three journeys · performance on reference devices ·
+               accessibility audit · both platforms, both themes
+```
+
+**How the hard parts are tested.** Native maps are mocked at the `<AppMap>` facade, external
+handoff at the `NavigationProvider` boundary, store subscriptions at `BillingProvider`, and
+Edge Functions with MSW against the contracts in
+[`33_API_CONTRACTS.md`](33_API_CONTRACTS.md). The facades exist partly for this reason: an SDK
+imported directly into a screen is a screen that cannot be tested.
+
+**What is never mocked.** The function under test. Mocking it produces a test of the mock.
+
+## 6. Levels
 
 ### Unit — Jest
 
@@ -167,7 +201,7 @@ Pre-submission, manual, every release:
 
 ---
 
-## 6. Regression classes
+## 7. Regression classes
 
 Two kinds of regression are invisible to conventional testing and get their own mechanisms.
 
@@ -199,7 +233,21 @@ map also pass every functional test.
 
 ---
 
-## 7. Edge cases
+## 8. Architectural decisions
+
+| ID | Decision | Applies to |
+|---|---|---|
+| [0005](adr/0005-map-engine-and-route-preview.md) | `<AppMap>` facade | Why map rendering is mockable at all |
+| [0004](adr/0004-external-navigation-handoff.md) | `NavigationProvider` with a capability matrix | Handoff strategy tests, one per provider |
+| [0003](adr/0003-tiered-optimization-cascade.md) | Cascade T0–T3 | Tier-boundary tests at 8, 9, 25 and 26 stops |
+| [0007](adr/0007-place-id-durable-coordinates-perishable.md) | Coordinates expire at 30 days | Staleness tests at 29, 30 and 31 days |
+| [0011](adr/0011-server-side-quota-enforcement.md) | Server-side quota | 402 and 429 path tests |
+
+**Decided here:** the tier boundaries, the coordinate expiry boundary and every error path are
+non-negotiable coverage regardless of any global percentage. A coverage number is satisfied by
+testing what is easy; these are the cases that are hard and that break users.
+
+## 9. Edge cases
 
 | # | Condition | How it is tested |
 |---|---|---|
@@ -214,7 +262,7 @@ map also pass every functional test.
 | 9 | Long Italian addresses in a handoff | Unit test against the URL ceiling |
 | 10 | Reorder conflict on sync | Integration test with divergent orders |
 
-## 8. Error handling in tests
+## 10. Error handling in tests
 
 | Situation | Rule |
 |---|---|
@@ -224,7 +272,7 @@ map also pass every functional test.
 | Test needs a real network | Rewrite it — the suite must run offline |
 | Test needs a real store account | Confined to the manual pre-submission checklist |
 
-## 9. Best practices
+## 11. Best practices
 
 1. **A bug fix starts with a failing test** that reproduces it.
 2. **Never mock what you are testing.** Mock the network, the map, the clock — not the subject.
@@ -236,7 +284,7 @@ map also pass every functional test.
 6. **Keep the suite fast.** A slow suite gets skipped, and a skipped suite catches nothing.
 7. **Cost and compliance guards are tests**, not review items.
 
-## 10. Checklist
+## 12. Checklist
 
 - [ ] Every function in `lib/` unit tested, boundaries included.
 - [ ] Every component state in [`09`](09_COMPONENT_LIBRARY.md) rendered in a test.
@@ -251,7 +299,7 @@ map also pass every functional test.
 - [ ] Store validation checklist completed before submission.
 - [ ] No skipped tests without an issue and an owner.
 
-## 11. Roadmap
+## 13. Roadmap
 
 | Phase | Scope | Trigger |
 |---|---|---|
@@ -261,7 +309,7 @@ map also pass every functional test.
 | 1.x | Automated accessibility audit | Post-launch |
 | 2.0 | Load testing on Edge Functions | Volume |
 
-## 12. Decision log
+## 14. Decision log
 
 | Date | Change | Reason | Author |
 |---|---|---|---|
@@ -270,7 +318,7 @@ map also pass every functional test.
 | 2026-08-06 | Facades required partly for testability | Native map, handoff and billing are otherwise untestable | Architecture |
 | 2026-08-06 | Order preservation given its own E2E flow | It is the single most important rule in the product | Architecture |
 
-## 13. Rationale
+## 15. Rationale
 
 The strategy is shaped by what can actually go wrong in this product. Conventional testing catches
 functional defects, and those are the least of the risks here. The failures that would genuinely
@@ -287,9 +335,9 @@ sandbox store accounts. The architectural decision and the testing decision are 
 Refusing a coverage target is deliberate. A percentage rewards testing whatever is easiest to
 cover, which in this codebase would be presentational components, while the tier-selection rule
 and the chunking arithmetic — where the real risk lives — could remain untested and the number
-would still look healthy. The mandatory list in §5 is the actual requirement.
+would still look healthy. The mandatory list in §6 is the actual requirement.
 
-## 14. Rejected alternatives
+## 16. Rejected alternatives
 
 | Alternative | Attraction | Why rejected |
 |---|---|---|

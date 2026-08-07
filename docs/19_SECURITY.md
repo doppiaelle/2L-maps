@@ -32,14 +32,14 @@ not merely a data one.
 | Credential custody | Supabase secrets | Never in the repository |
 | Authorisation | Postgres RLS | Not application logic |
 | Rotation | Architecture | Scheduled, documented, rehearsed |
-| Incident response | Product owner | §10 |
+| Incident response | Product owner | §12 |
 
 ---
 
 ## 4. Text diagrams
 
-The credential topology is drawn in §6, beside the rotation table it constrains. The
-authorisation layering is in §7.
+The credential topology is drawn in §7, beside the rotation table it constrains. The
+authorisation layering is in §8.
 
 ```
   THREAT ORDERING — by cost, not by likelihood
@@ -51,7 +51,37 @@ authorisation layering is in §7.
   T6  personal data in logs ──▶ GDPR breach
 ```
 
-## 5. Threat model
+## 5. Flows
+
+**How a request is authorised.** Authorisation is decided entirely on the server; the client's
+copy of any of this is presentation only.
+
+```
+  client request (JWT only — no Google credential)
+            │
+            ▼
+  Edge Function verifies JWT ────────────── invalid ──▶ 401
+            │
+            ▼
+  entitlement read from the database ────── none ────▶ 402
+  (written only by a signature-verified webhook)
+            │
+            ▼
+  ownership checked by RLS ──────────────── other user ──▶ empty, never another user's row
+            │
+            ▼
+  service-account credential loaded from Supabase secrets, used, never logged
+```
+
+**How a credential is rotated.** Rotation is routine and rehearsed, not an incident response:
+issue the new credential, deploy it alongside the old, verify traffic on the new, revoke the
+old. A rotation procedure first executed during a breach is a procedure that does not exist.
+
+**How an incident proceeds.** Contain, then assess, then notify — in that order. Assessment
+before containment extends the exposure window while producing information that will be
+obsolete by the time it is complete.
+
+## 6. Threat model
 
 Ordered by expected cost, not by likelihood.
 
@@ -73,7 +103,7 @@ can generate very large charges quickly, and the damage is done before a monthly
 
 ---
 
-## 6. Credentials
+## 7. Credentials
 
 ```
   ON DEVICE                        NEVER ON DEVICE
@@ -106,7 +136,7 @@ regardless of whether the commit was pushed to a remote.
 
 ---
 
-## 7. Authorisation
+## 8. Authorisation
 
 **RLS is the authorisation mechanism.** Ownership is never checked in application code, because
 application checks can be forgotten and RLS cannot.
@@ -126,7 +156,7 @@ never in the client and never in a client-reachable configuration.
 
 ---
 
-## 8. Data handling
+## 9. Data handling
 
 ### Never logged, anywhere
 
@@ -162,7 +192,20 @@ Device storage uses the platform keychain for tokens and encrypted storage for c
 
 ---
 
-## 9. Edge cases
+## 10. Architectural decisions
+
+| ID | Decision | Applies to |
+|---|---|---|
+| [0006](adr/0006-mandatory-backend-proxy.md) | Every web-service call is proxied | The credential topology entirely |
+| [0011](adr/0011-server-side-quota-enforcement.md) | Authorisation is server-side | Entitlement, quota, ownership |
+| [0007](adr/0007-place-id-durable-coordinates-perishable.md) | Coordinates perishable | Retention as a security control, not only a terms obligation |
+
+**Decided here:** one Google credential exists in the client — the Maps SDK rendering key,
+restricted by bundle ID and SHA-1. Every other key would be extractable from the bundle within
+minutes, and a service-account credential in a mobile app is a billing incident waiting for
+someone to notice.
+
+## 11. Edge cases
 
 | # | Condition | Expected behaviour |
 |---|---|---|
@@ -177,7 +220,7 @@ Device storage uses the platform keychain for tokens and encrypted storage for c
 | 9 | Cache key collision | Content hash makes it practically impossible; stored inputs allow verification |
 | 10 | Dependency with a known vulnerability | Automated alert; assessed against actual usage before upgrading blindly |
 
-## 10. Incident response
+## 12. Incident response
 
 | Step | Action |
 |---|---|
@@ -191,7 +234,7 @@ Device storage uses the platform keychain for tokens and encrypted storage for c
 **Rotation comes before investigation.** A credential still valid while its exposure is being
 assessed is a credential still being used.
 
-## 11. Error handling
+## 13. Error handling
 
 | Failure | Detection | Response |
 |---|---|---|
@@ -202,7 +245,7 @@ assessed is a credential still being used.
 | Purge job failure | Missing success record | **Page** — an ongoing terms violation |
 | Personal data in logs | Review or automated scan | Incident procedure |
 
-## 12. Best practices
+## 14. Best practices
 
 1. **One credential ships. Everything else lives server-side.**
 2. **RLS is the authorisation layer.** Never check ownership in application code.
@@ -214,7 +257,7 @@ assessed is a credential still being used.
    otherwise.
 8. **Fail closed.** A guard that errors treats the caller as unauthorised.
 
-## 13. Checklist
+## 15. Checklist
 
 - [ ] Only the Maps SDK key present in the client bundle, verified by inspecting a build.
 - [ ] Maps key restricted to bundle ID and SHA-1, scoped to Maps SDK APIs.
@@ -228,7 +271,7 @@ assessed is a credential still being used.
 - [ ] Every credential rotated once before launch to prove the procedure.
 - [ ] Account deletion verified to cascade completely.
 
-## 14. Roadmap
+## 16. Roadmap
 
 | Phase | Scope | Trigger |
 |---|---|---|
@@ -237,7 +280,7 @@ assessed is a credential still being used.
 | 1.x | Automated personal-data scanning of log output | Post-launch |
 | 2.0 | Formal review or penetration test | Revenue justifying it |
 
-## 15. Decision log
+## 17. Decision log
 
 | Date | Change | Reason | Author |
 |---|---|---|---|
@@ -247,7 +290,7 @@ assessed is a credential still being used.
 | 2026-08-06 | Rotation rehearsed before launch | Discovering rotation breaks production during an incident is the worst case | Architecture |
 | 2026-08-06 | Cost anomalies classified as security events | Unexplained spend is the primary symptom of T1 | Architecture |
 
-## 16. Rationale
+## 18. Rationale
 
 The threat model is ordered by cost rather than likelihood, which is unusual and deliberate. A
 leaked service account is not the most probable event, but it is the only one that can generate
@@ -270,7 +313,7 @@ Rejecting certificate pinning is worth recording because it is a common default.
 against an attacker with a trusted CA — not a threat in this model — while introducing a failure
 mode where an expired pin bricks the app for every user until a release ships.
 
-## 17. Rejected alternatives
+## 19. Rejected alternatives
 
 | Alternative | Attraction | Why rejected |
 |---|---|---|

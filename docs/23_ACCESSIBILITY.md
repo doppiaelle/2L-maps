@@ -78,7 +78,39 @@ and designing for a driver produce the same interface.**
 
 ---
 
-## 5. Requirements
+## 5. Flows
+
+**How a component is verified.** Accessibility is checked before visual polish, because a
+label added afterwards is a label written from the implementation rather than from what the
+user is about to do.
+
+```
+  component built
+        │
+        ▼
+  automated: label present? target ≥ 44 pt? contrast in both themes?
+        │                    │
+      fails                passes
+        │                    │
+        ▼                    ▼
+   build blocked      manual: VoiceOver traversal · TalkBack traversal ·
+                              Dynamic Type at 200% · Reduce Motion ·
+                              outdoors, in sunlight, on a real device
+                                          │
+                                          ▼
+                                        done
+```
+
+**How a state change reaches a screen-reader user.** Optimization complete, stop marked done,
+quota reached, offline entered and left — each fires an announcement. The flow is the same in
+every case: the state changes, the announcement describes the new state and its consequence,
+and the user is never left reasoning from a stale model of the screen.
+
+**How a gesture gets its alternative.** Every gesture is specified together with its
+non-gesture equivalent, in the same table, at the same time. Adding the equivalent later means
+shipping a release in which the action is unreachable for some users.
+
+## 6. Requirements
 
 ### Contrast
 
@@ -166,7 +198,7 @@ Every gesture has a visible, non-gesture equivalent
 
 ---
 
-## 6. Architectural decisions
+## 7. Architectural decisions
 
 | ID | Decision | Applies to |
 |---|---|---|
@@ -175,10 +207,10 @@ Every gesture has a visible, non-gesture equivalent
 | [0010](adr/0010-mobile-only-scope.md) | Sheet rather than sidebar — thumb reach serves motor impairment too | Layout |
 
 **Decided here:** the map is a single accessibility element, with the stop list as its
-traversable equivalent (§13). This is a departure from exposing every marker, and it is
+traversable equivalent (§14). This is a departure from exposing every marker, and it is
 deliberate.
 
-## 7. Edge cases
+## 8. Edge cases
 
 | # | Condition | Expected behaviour |
 |---|---|---|
@@ -193,7 +225,7 @@ deliberate.
 | 9 | Landscape with Dynamic Type at maximum | Sheet detents recompute; the primary action stays reachable |
 | 10 | Colour filters active | All states remain distinguishable by glyph and shape |
 
-## 8. Error handling
+## 9. Error handling
 
 | Failure | Result |
 |---|---|
@@ -203,7 +235,7 @@ deliberate.
 | Announcement not fired on a state change | Manual QA finding; treated as a defect, not a polish item |
 | Layout truncates at 200% | Defect; the layout is fixed rather than the limit lowered |
 
-## 9. Best practices
+## 10. Best practices
 
 1. **Compose labels at the component**, once, rather than exposing four sub-elements per row.
 2. **Label outcomes, not element types.**
@@ -216,7 +248,7 @@ deliberate.
 8. **Prefer the better equivalent to more elements.** The stop list serves screen-reader users
    better than 25 traversable markers.
 
-## 10. Checklist
+## 11. Checklist
 
 - [ ] Contrast verified: 4.5:1 text, 3:1 UI, both themes, including over map imagery.
 - [ ] Light-theme accent verified at 4.5:1 against `surface`.
@@ -230,7 +262,7 @@ deliberate.
 - [ ] State-change announcements verified.
 - [ ] Outdoor sunlight legibility verified on a physical device.
 
-## 11. Roadmap
+## 12. Roadmap
 
 | Phase | Scope | Trigger |
 |---|---|---|
@@ -239,7 +271,7 @@ deliberate.
 | 1.2 | High-contrast variant for extreme sunlight | User feedback |
 | 2.0 | Voice input for adding stops | Demand from the driving context |
 
-## 12. Decision log
+## 13. Decision log
 
 | Date | Change | Reason | Author |
 |---|---|---|---|
@@ -248,7 +280,7 @@ deliberate.
 | 2026-08-06 | Reorder remains perceptible under Reduce Motion | The reorder is information, not decoration | Design |
 | 2026-08-06 | Outdoor legibility added to the release checklist | Sunlight is this product's defining situational impairment | Design |
 
-## 13. Rationale
+## 14. Rationale
 
 The situational-impairment overlap is the core argument of this document. A driver in sunlight
 wearing gloves, holding a parcel, glancing at a phone for two seconds has, temporarily, reduced
@@ -268,7 +300,7 @@ against fidelity to the source images. The reference's mint was chosen against a
 on paper-white it falls below 4.5:1. Shipping it unchanged would have put an accessibility
 failure on the most-tapped control in the product.
 
-## 14. Rejected alternatives
+## 15. Rejected alternatives
 
 | Alternative | Attraction | Why rejected |
 |---|---|---|

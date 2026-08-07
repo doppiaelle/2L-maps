@@ -73,7 +73,34 @@ carry compliance weight.
 
 ---
 
-## 5. Languages
+## 5. Flows
+
+**How a string is added.** Compliance-bearing copy takes a different path from ordinary UI copy,
+and conflating the two is how a translated paywall stops being compliant.
+
+```
+  new string
+      │
+      ▼
+  does it state a price, a duration, a renewal or a cancellation right?
+      │                                   │
+     yes                                  no
+      │                                   │
+      ▼                                   ▼
+  translated, then re-checked      translated; verified at 200% Dynamic
+  against 20 and 32 in every       Type in the longest language
+  language before release
+```
+
+**How layout survives translation.** German and Italian run materially longer than English.
+Layouts are verified in the longest supported language at the largest supported type size — the
+two worst cases together, because they occur together on a real device.
+
+**How units follow the region.** Metric for the launch market, imperial where the locale calls
+for it, and the unit is never inferred from the language. A user with an English interface in
+Italy expects kilometres.
+
+## 6. Languages
 
 | Language | Status | Notes |
 |---|---|---|
@@ -89,7 +116,7 @@ would ship a mixed-language interface that looks broken.
 
 ---
 
-## 6. Units and formats
+## 7. Units and formats
 
 Units follow the **locale**, not the chosen language, because units describe the physical world
 the user is driving through. An English-speaking user in Italy sees kilometres.
@@ -123,7 +150,7 @@ it ([`09_COMPONENT_LIBRARY.md`](09_COMPONENT_LIBRARY.md)).
 
 ---
 
-## 7. Compliance-bearing copy
+## 8. Compliance-bearing copy
 
 Two areas are **not** ordinary interface copy and are reviewed as legal text.
 
@@ -148,7 +175,7 @@ copy in one language requires reviewing all languages together.
 
 ---
 
-## 8. Layout under translation
+## 9. Layout under translation
 
 Italian runs roughly **15–25% longer than English** for interface copy. Two places in this
 product are tight enough to break:
@@ -163,7 +190,19 @@ variation and type scaling compound.
 
 ---
 
-## 9. Edge cases
+## 10. Architectural decisions
+
+| ID | Decision | Applies to |
+|---|---|---|
+| [0001](adr/0001-documentation-language-and-structure.md) | Documentation is English; the product is not | The separation of specification language from interface language |
+| [0002](adr/0002-target-segment-and-monetization.md) | Trial to paid | Compliance-bearing paywall copy, in every language |
+| [0009](adr/0009-visual-direction.md) | Condensed uppercase for metrics only | Why the type voices constrain which strings may be uppercased |
+
+**Decided here:** compliance-bearing copy is treated as a legal artefact rather than as UI text.
+A translation that reads well but omits the renewal date is a Guideline 3.1.2 rejection in that
+market, and the market where it is discovered is the one where it was never reviewed.
+
+## 11. Edge cases
 
 | # | Condition | Expected behaviour |
 |---|---|---|
@@ -178,7 +217,7 @@ variation and type scaling compound.
 | 9 | Distance exactly 1,000 m | Displayed as `1,0 km`, not `1000 m` |
 | 10 | Store listing language versus app language | Independent; both maintained |
 
-## 10. Error handling
+## 12. Error handling
 
 | Failure | Result | Fallback |
 |---|---|---|
@@ -187,7 +226,7 @@ variation and type scaling compound.
 | Legal copy differs between languages | **Release blocked** | None — must be resolved |
 | Text overflows in one language | Layout test failure | Shortened copy, never truncation |
 
-## 11. Best practices
+## 13. Best practices
 
 1. **No user-facing string in a component**, from the first commit. Retrofitting is far more
    expensive.
@@ -199,7 +238,7 @@ variation and type scaling compound.
 7. **ICU plurals**, never hand-written conditionals.
 8. **Review compliance copy in all languages together**, as one change.
 
-## 12. Checklist
+## 14. Checklist
 
 - [ ] No literal user-facing strings in components.
 - [ ] Every key present in both catalogues; missing keys fail CI.
@@ -212,7 +251,7 @@ variation and type scaling compound.
 - [ ] ICU plurals used throughout.
 - [ ] Store listings prepared in both languages.
 
-## 13. Roadmap
+## 15. Roadmap
 
 | Phase | Scope | Trigger |
 |---|---|---|
@@ -221,7 +260,7 @@ variation and type scaling compound.
 | 2.0 | Localised store screenshots per market | Market expansion |
 | 3.0 | RTL support | A market requiring it |
 
-## 14. Decision log
+## 16. Decision log
 
 | Date | Change | Reason | Author |
 |---|---|---|---|
@@ -230,7 +269,7 @@ variation and type scaling compound.
 | 2026-08-06 | Google addresses displayed verbatim | Reassembly introduces errors in the data users most rely on | Architecture |
 | 2026-08-06 | Paywall and legal copy treated as compliance artefacts | C12 and C16 are review and consumer-law risks, not copy quality issues | Product owner |
 
-## 15. Rationale
+## 17. Rationale
 
 Localization is specified from the first commit rather than retrofitted because the cost curve
 is steep and one-directional. Extracting strings from a finished codebase is mechanical but
@@ -251,7 +290,7 @@ conventions vary in ways that are easy to get subtly wrong — Italian street nu
 street name, and an app that reversed them would look broken to every Italian user while
 appearing fine in testing to anyone else.
 
-## 16. Rejected alternatives
+## 18. Rejected alternatives
 
 | Alternative | Attraction | Why rejected |
 |---|---|---|

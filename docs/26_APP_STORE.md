@@ -62,7 +62,36 @@ subscription apps (risk C12).
 
 ---
 
-## 5. Guideline 3.1.2 — the primary risk
+## 5. Flows
+
+**Submission to approval.**
+
+```
+  build ──▶ metadata · screenshots · privacy manifest · demo account · review notes
+                        │
+                        ▼
+               App Review ──── approved ──▶ release (manual, not automatic)
+                        │
+                     rejected
+                        │
+                        ▼
+      which guideline? ──▶ 3.1.2 (trial disclosure) ──▶ paywall copy, prepared below
+                       ──▶ 5.1.1 (permissions)      ──▶ purpose strings, prepared below
+                       ──▶ other                    ──▶ addressed, then resubmitted
+                        │
+                        ▼
+              response drafted in advance, not improvised under time pressure
+```
+
+**Why the response is written before the rejection.** The two most likely rejections are known,
+and both are arguments about intent rather than defects. Writing the justification while
+building the feature produces a better argument than writing it days into a stalled release.
+
+**Any paywall change re-enters this flow.** Copy touching duration, price, renewal or
+cancellation is re-read against Guideline 3.1.2 before it ships — this is the single most likely
+cause of rejection for this product (risk C12).
+
+## 6. Guideline 3.1.2 — the primary risk
 
 Everything here must be visible **in the purchase flow itself**, without scrolling and without
 following a link:
@@ -93,7 +122,7 @@ Italian, and Italian compliance is separately required by consumer law
 
 ---
 
-## 6. Permissions — Guideline 5.1.1
+## 7. Permissions — Guideline 5.1.1
 
 | Permission | Usage string | Review note |
 |---|---|---|
@@ -115,7 +144,7 @@ justification becomes false and the submission posture changes fundamentally.
 
 ---
 
-## 7. Review notes and demo account
+## 8. Review notes and demo account
 
 App Review must be able to use the product fully. The notes accompanying every submission:
 
@@ -140,7 +169,7 @@ empty app cannot assess it and may reject under Guideline 2.1 for incompleteness
 
 ---
 
-## 8. Metadata and listing
+## 9. Metadata and listing
 
 | Field | Notes |
 |---|---|
@@ -158,7 +187,7 @@ the kind of false claim that produces a rejection *and* a terms complaint.
 
 ---
 
-## 9. Technical requirements
+## 10. Technical requirements
 
 | Requirement | Status |
 |---|---|
@@ -175,7 +204,20 @@ when missing, and both are easy to overlook because neither is a product decisio
 
 ---
 
-## 10. Edge cases
+## 11. Architectural decisions
+
+| ID | Decision | Applies to |
+|---|---|---|
+| [0002](adr/0002-target-segment-and-monetization.md) | 7-day trial converting to paid | Guideline 3.1.2 exposure, the primary review risk |
+| [0008](adr/0008-offline-scope.md) | No offline maps | Why no storage justification is needed |
+| [0010](adr/0010-mobile-only-scope.md) | Mobile only | Device family and screenshot requirements |
+| [0004](adr/0004-external-navigation-handoff.md) | External handoff | The `LSApplicationQueriesSchemes` entries, which reviewers question |
+
+**Decided here:** the demo account is seeded with a route that demonstrates the product end to
+end, including a handoff. A reviewer who cannot reach the core value in the first minute is a
+reviewer who evaluates the paywall in isolation, which is the worst possible framing for it.
+
+## 12. Edge cases
 
 | # | Condition | Response |
 |---|---|---|
@@ -188,7 +230,7 @@ when missing, and both are easy to overlook because neither is a product decisio
 | 7 | Reviewer declines location | The app must work fully — verified in the pre-submission checklist |
 | 8 | Expedited review needed | Reserved for a genuine critical defect, never for schedule |
 
-## 11. Error handling
+## 13. Error handling
 
 | Failure | Response |
 |---|---|
@@ -197,7 +239,7 @@ when missing, and both are easy to overlook because neither is a product decisio
 | Metadata rejected | Correct and resubmit; metadata does not require a new build |
 | Build rejected after release | Halt phased rollout; fix forward |
 
-## 12. Best practices
+## 14. Best practices
 
 1. **Re-verify Guideline 3.1.2 before every submission**, in both languages, by screenshot.
 2. **Pre-seed the demo account** with a route and history.
@@ -207,7 +249,7 @@ when missing, and both are easy to overlook because neither is a product decisio
 6. **Never argue a first rejection.** Comply, ship, and revisit later if it matters.
 7. **Resolve the naming question before submitting**, not after a rejection.
 
-## 13. Checklist
+## 15. Checklist
 
 Before every submission:
 
@@ -227,7 +269,7 @@ Before every submission:
 - [ ] Naming decision (C9) resolved.
 - [ ] Screenshots current, both languages.
 
-## 14. Roadmap
+## 16. Roadmap
 
 | Phase | Scope | Trigger |
 |---|---|---|
@@ -236,7 +278,7 @@ Before every submission:
 | 1.3 | Background location justification submitted | Release 1.3 |
 | 1.x | Localised screenshots per market | Market expansion |
 
-## 15. Decision log
+## 17. Decision log
 
 | Date | Change | Reason | Author |
 |---|---|---|---|
@@ -245,7 +287,7 @@ Before every submission:
 | 2026-08-06 | Demo account pre-seeded with data | An empty app cannot be assessed and risks a 2.1 rejection | Product owner |
 | 2026-08-06 | Listing prohibited from claiming offline maps | Would be false and would breach the platform terms | Product owner |
 
-## 16. Rationale
+## 18. Rationale
 
 The document concentrates on Guideline 3.1.2 because that is where the risk actually is. The app
 itself is unlikely to be rejected — it does something clearly useful that Google Maps does not, it
@@ -266,7 +308,7 @@ Deferring background location to release 1.3 is a scheduling decision made for r
 is the only element likely to attract sustained scrutiny, and concentrating it in a release that
 carries nothing else critical means a rejection costs a feature rather than a launch.
 
-## 17. Rejected alternatives
+## 19. Rejected alternatives
 
 | Alternative | Attraction | Why rejected |
 |---|---|---|

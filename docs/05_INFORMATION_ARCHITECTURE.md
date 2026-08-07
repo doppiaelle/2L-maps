@@ -32,7 +32,7 @@ occasionally.
 |---|---|---|
 | Structure | This document | Changes require a decision-log entry |
 | Route implementation | [`10_NAVIGATION_FLOW.md`](10_NAVIGATION_FLOW.md) | Expo Router file structure |
-| Content placement | This document | One home per item, §6 |
+| Content placement | This document | One home per item, §7 |
 
 ---
 
@@ -94,7 +94,37 @@ The stop list is not a screen. It is a mode of the Plan surface.
 
 ---
 
-## 5. The three destinations
+## 5. Flows
+
+**How a user reaches anything.** The structure is flat enough that this diagram is complete —
+there is no fourth level, and adding one requires an ADR.
+
+```
+  Plan (the product)
+    ├── sheet: peek ──▶ half ──▶ full        stops, in order
+    │      └── stop detail                   sheet within sheet
+    ├── add stop        modal                search · favourites · recents
+    ├── import list     modal                paste · CSV
+    └── summary         after handoff        completion, time saved
+
+  History          saved and past routes ──▶ opens into Plan
+  Settings         account · preferences · legal
+```
+
+**How new information finds its home.** The question is answered in one pass:
+
+```
+  is it about the route being planned?   ──yes──▶  Plan, in the sheet
+  is it about a route already run?       ──yes──▶  History
+  is it about the account or the app?    ──yes──▶  Settings
+  none of the three                      ────────▶  it does not belong in the product yet
+```
+
+That last branch is the point of the structure. A place for everything is how an app grows a
+fourth tab and loses the three-tap guarantee in
+[`06_UX_GUIDELINES.md`](06_UX_GUIDELINES.md).
+
+## 6. The three destinations
 
 ### Plan — the primary surface
 
@@ -126,7 +156,7 @@ changes.
 
 ---
 
-## 6. Where information lives
+## 7. Where information lives
 
 **One home per item.** Duplication in the interface has the same failure mode as duplication in
 the specification: the copies diverge.
@@ -151,7 +181,7 @@ persistent banner would be noise every day to prevent a rare event.
 
 ---
 
-## 7. Structural rules
+## 8. Structural rules
 
 1. **The critical path involves no navigation.** Add, optimize and start all happen on one
    surface ([`06_UX_GUIDELINES.md`](06_UX_GUIDELINES.md) P1).
@@ -165,7 +195,18 @@ persistent banner would be noise every day to prevent a rare event.
 7. **New features extend an existing destination** or justify a fourth. There is no fourth
    today, and the bar for one is high.
 
-## 8. Edge cases
+## 9. Architectural decisions
+
+| ID | Decision | Applies to |
+|---|---|---|
+| [0002](adr/0002-target-segment-and-monetization.md) | Single professional, one vehicle | Why there is no fleet or dispatcher level |
+| [0010](adr/0010-mobile-only-scope.md) | Mobile only; the stop list is a sheet | The absence of a persistent panel at any width |
+
+**Decided here:** three destinations, and a new one costs an existing one. The structure is
+deliberately too small for what the product might become, because a hierarchy that anticipates
+growth is a hierarchy the user navigates today for a feature that does not exist yet.
+
+## 10. Edge cases
 
 | # | Condition | Expected behaviour |
 |---|---|---|
@@ -178,7 +219,7 @@ persistent banner would be noise every day to prevent a rare event.
 | 7 | Settings opened, subscription changed | Returning to Plan reflects the new entitlement without a reload |
 | 8 | 25 stops in the sheet | Full detent scrolls; the header and primary action stay pinned |
 
-## 9. Error handling
+## 11. Error handling
 
 | Failure | Where it appears | Rationale |
 |---|---|---|
@@ -191,7 +232,7 @@ persistent banner would be noise every day to prevent a rare event.
 
 **Errors appear where the thing that failed lives**, never in a global error area.
 
-## 10. Best practices
+## 12. Best practices
 
 1. **Do not add a destination.** Three is enough; a fourth needs an ADR.
 2. **Extend the sheet before adding a screen.** Its detents absorb most new information.
@@ -200,18 +241,18 @@ persistent banner would be noise every day to prevent a rare event.
 5. **Keep the primary action pinned across every detent** so its position is learned once.
 6. **Deep links land on Plan**, because that is where work happens.
 
-## 11. Checklist
+## 13. Checklist
 
 - [ ] The app opens on Plan in every launch scenario.
 - [ ] The critical path requires no navigation.
 - [ ] Maximum depth is three, verified across every flow.
-- [ ] Each item in §6 has exactly one home, or a recorded reason for two.
+- [ ] Each item in §7 has exactly one home, or a recorded reason for two.
 - [ ] Settings is unreachable during a route.
 - [ ] Deep links resolve to Plan.
 - [ ] The primary action stays fixed across detent changes.
 - [ ] Errors appear attached to their subject.
 
-## 12. Roadmap
+## 14. Roadmap
 
 | Phase | Scope | Trigger |
 |---|---|---|
@@ -221,7 +262,7 @@ persistent banner would be noise every day to prevent a rare event.
 | 2.0 | Time-window editing inside stop detail — no new destination | Gate D3 |
 | 3.0 | Multi-vehicle would require restructuring | [ADR-0002](adr/0002-target-segment-and-monetization.md) |
 
-## 13. Decision log
+## 15. Decision log
 
 | Date | Change | Reason | Author |
 |---|---|---|---|
@@ -230,7 +271,7 @@ persistent banner would be noise every day to prevent a rare event.
 | 2026-08-06 | History replaces Plan rather than pushing detail | The user wants to work on the route, not view it | Design |
 | 2026-08-06 | Degraded warning duplicated in header and polyline | Either may be seen without the other | Design |
 
-## 14. Rationale
+## 16. Rationale
 
 The structure is flat because the product does one thing. A tab bar with five sections would
 imply five equally important activities; this product has one activity and two places you
@@ -251,7 +292,7 @@ The one-home rule for information is a direct transfer of the single-source-of-t
 from the specification set. Two places showing a stop count will eventually show different
 numbers, and the user will trust neither.
 
-## 15. Rejected alternatives
+## 17. Rejected alternatives
 
 | Alternative | Attraction | Why rejected |
 |---|---|---|

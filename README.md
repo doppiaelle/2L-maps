@@ -35,7 +35,7 @@ authoritative for the implementation that follows. Start with
 | Offline for **your own data** — saved routes, address book, last result | An offline map. Tile caching is prohibited by the platform terms |
 
 Each exclusion is a decision with a recorded reason, not an omission. See
-[`docs/04_FEATURES.md`](docs/04_FEATURES.md) §7.
+[`docs/04_FEATURES.md`](docs/04_FEATURES.md) §8.
 
 ---
 
@@ -107,7 +107,7 @@ matrix from every requirement to the document that covers it.
 gathered from secondary sources because `developers.google.com` was unreachable from the
 authoring environment. They are marked with a confidence level and must be verified against the
 official pages before any pricing decision. See
-[`docs/33_API_CONTRACTS.md`](docs/33_API_CONTRACTS.md) §7.
+[`docs/33_API_CONTRACTS.md`](docs/33_API_CONTRACTS.md) §8.
 
 ---
 

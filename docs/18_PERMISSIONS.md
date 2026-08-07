@@ -67,7 +67,38 @@ is refused far more often, and iOS gives no second chance.
 
 ---
 
-## 5. Permissions
+## 5. Flows
+
+**How a permission is requested.** Never on launch, always at the moment the user asked for the
+thing that needs it.
+
+```
+  user takes an action that needs a capability
+            │
+            ▼
+  in-context explanation: what it enables, stated in the user's terms
+            │
+            ▼
+  system prompt ──── granted ────▶ action proceeds
+            │
+         denied
+            │
+            ▼
+  the action still completes by another route, or its absence is explained
+  — never a dead end, never a re-prompt loop
+```
+
+**Denial is a supported state, not a failure.** Location denied means the user types a start
+address instead of tapping "current location". Notifications denied means stop progress is
+manual. Every capability in this document has a path that works without it, because a permission
+prompt on launch is the single most reliable way to lose a user before they see the product.
+
+**Build-time capabilities follow a different flow.** `LSApplicationQueriesSchemes` and the
+Android `<queries>` element are declared at build time and cannot be requested later: adding a
+navigation provider is therefore a release, not a setting
+([`16_INTERNAL_NAVIGATION.md`](16_INTERNAL_NAVIGATION.md)).
+
+## 6. Permissions
 
 ### Location — when in use · **MVP**
 
@@ -140,7 +171,7 @@ an active route. This is both a product decision and what makes the request defe
 
 ---
 
-## 6. Build-time capabilities
+## 7. Build-time capabilities
 
 These are **not** runtime permissions. They are declarations that must be correct at build time,
 and their absence produces silent failure rather than a prompt.
@@ -178,7 +209,20 @@ asked for.
 
 ---
 
-## 7. Edge cases
+## 8. Architectural decisions
+
+| ID | Decision | Applies to |
+|---|---|---|
+| [0004](adr/0004-external-navigation-handoff.md) | External handoff | Why the query schemes list exists, and why it stays short |
+| [0008](adr/0008-offline-scope.md) | Offline is your own data | Why no storage permission is needed for map data |
+| [0002](adr/0002-target-segment-and-monetization.md) | Single professional | Why background location is opt-in and deferred, not core |
+
+**Decided here:** background location is not requested in the MVP. It would enable automatic
+stop completion, and it is the permission most likely to draw a rejection under Guideline 5.1.1
+([`26_APP_STORE.md`](26_APP_STORE.md)). The manual and notification-based paths deliver most of
+the value at none of the risk.
+
+## 9. Edge cases
 
 | # | Condition | Expected behaviour |
 |---|---|---|
@@ -188,12 +232,12 @@ asked for.
 | 4 | Background location denied after foreground granted | Manual progression continues; feature reported as unavailable, not broken |
 | 5 | Notifications denied | In-app progress only |
 | 6 | Provisional notification authorisation (iOS) | Accepted; notifications deliver quietly |
-| 7 | Navigation app installed but scheme undeclared | **Build-time defect.** Provider invisible with no error — caught only by the §9 checklist |
+| 7 | Navigation app installed but scheme undeclared | **Build-time defect.** Provider invisible with no error — caught only by the §12 checklist |
 | 8 | User has no navigation app installed | Web universal link, which needs no declaration |
 | 9 | Permission changed while backgrounded | Re-evaluated on foreground, not cached across sessions |
 | 10 | Android 13 notification permission on upgrade | Requested at the same in-context moment as a fresh install |
 
-## 8. Error handling
+## 10. Error handling
 
 | Failure | Result | Fallback |
 |---|---|---|
@@ -206,7 +250,7 @@ asked for.
 **No permission failure produces a blocking error.** Every one degrades to a working alternative,
 which is why the app can honestly claim each permission is optional.
 
-## 9. Best practices
+## 11. Best practices
 
 1. **Request nothing at launch.**
 2. **Explain in context before the system prompt.** The system prompt is a one-shot resource on
@@ -219,7 +263,7 @@ which is why the app can honestly claim each permission is optional.
 7. **Keep the background-location justification true.** If data ever leaves the device, rewrite it.
 8. **Re-evaluate permissions on foreground**, never cache across sessions.
 
-## 10. Checklist
+## 12. Checklist
 
 - [ ] Nothing requested at first launch.
 - [ ] Every request preceded by an in-context explanation.
@@ -233,7 +277,7 @@ which is why the app can honestly claim each permission is optional.
 - [ ] No unused permission or scheme declared.
 - [ ] Permissions re-evaluated on foreground.
 
-## 11. Roadmap
+## 13. Roadmap
 
 | Phase | Scope | Trigger |
 |---|---|---|
@@ -242,7 +286,7 @@ which is why the app can honestly claim each permission is optional.
 | 1.3 | Background location, opt-in | Permission-acceptance data; review preparation |
 | 1.2+ | Camera and photos **only if** stop photos ship | Feature demand |
 
-## 12. Decision log
+## 14. Decision log
 
 | Date | Change | Reason | Author |
 |---|---|---|---|
@@ -251,7 +295,7 @@ which is why the app can honestly claim each permission is optional.
 | 2026-08-06 | Notifications requested after the first completed route | The user has experienced the problem it solves | Design |
 | 2026-08-06 | Scheme list restricted to the three providers offered | Every extra entry is a review question | Architecture |
 
-## 13. Rationale
+## 15. Rationale
 
 Permissions are requested late and sparingly because each one is a one-shot resource with a
 declining success rate the earlier it is asked. A prompt at first launch, before the user has
@@ -273,7 +317,7 @@ Deferring background location to release 1.3 concentrates the highest review ris
 that ships nothing else critical. If it is rejected, the release ships without it and nothing is
 lost.
 
-## 14. Rejected alternatives
+## 16. Rejected alternatives
 
 | Alternative | Attraction | Why rejected |
 |---|---|---|

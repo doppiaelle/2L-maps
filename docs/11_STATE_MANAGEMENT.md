@@ -87,7 +87,47 @@ ever been sent to the server.
 
 ---
 
-## 5. Server state — React Query
+## 5. Flows
+
+**Where a new piece of state goes.** One question, four homes, and the answer is never "both".
+
+```
+  does the server own the truth?   ──yes──▶  React Query
+            │ no
+            ▼
+  do unrelated screens need it?    ──yes──▶  Zustand, in a feature-scoped store
+            │ no
+            ▼
+  is it which screen is showing?   ──yes──▶  Expo Router
+            │ no
+            ▼
+                                             useState, local to the component
+```
+
+**An offline mutation's life.**
+
+```
+  user acts ──▶ optimistic local update ──▶ queued with an idempotency key
+                                                  │
+                          network returns ────────┤
+                                                  ▼
+                                    replayed in order ──▶ server accepts ──▶ queue entry cleared
+                                                  │
+                                                  └──▶ server rejects ──▶ local state reconciled
+                                                                          to the server's truth,
+                                                                          user told what changed
+```
+
+**Process death.** The draft route persists; server caches do not need to. Rehydration restores
+the user's unsaved arrangement first, then refetches — in that order, so the user never sees an
+empty list while a query is in flight.
+
+**Why copying is forbidden.** A query result written into a store creates a second source of
+truth that will disagree with the first the moment one of them refetches. The disagreement is
+silent, and silent disagreement about the user's route is the most expensive bug this product
+can have.
+
+## 6. Server state — React Query
 
 | Query | Stale time | Cache time | Notes |
 |---|---|---|---|
@@ -116,7 +156,7 @@ order. During optimization the list is unchanged; only the action control shows 
 
 ---
 
-## 6. Client state — Zustand
+## 7. Client state — Zustand
 
 Small, feature-scoped stores. No single global store.
 
@@ -141,7 +181,7 @@ exactly when the user has invested the most.
 
 ---
 
-## 7. Offline mutations
+## 8. Offline mutations
 
 ### Queue
 
@@ -182,7 +222,18 @@ can safely replay without duplicating server-side effects
 
 ---
 
-## 8. Edge cases
+## 9. Architectural decisions
+
+| ID | Decision | Applies to |
+|---|---|---|
+| [0011](adr/0011-server-side-quota-enforcement.md) | Entitlement and quota are server state | Why they live in React Query and never in Zustand |
+| [0008](adr/0008-offline-scope.md) | Offline means your own data | The mutation queue and what it may contain |
+| [0007](adr/0007-place-id-durable-coordinates-perishable.md) | Coordinates expire | Why persisted state stores `place_id` and treats coordinates as cache |
+
+**Decided here:** the draft route is the only client state that is persisted eagerly and never
+evicted. Everything else can be refetched; the user's unsaved arrangement cannot.
+
+## 10. Edge cases
 
 | # | Condition | Expected behaviour |
 |---|---|---|
@@ -197,7 +248,7 @@ can safely replay without duplicating server-side effects
 | 9 | Persisted state from an older app version | Migrated by a versioned schema; unmigratable state is discarded with an explanation |
 | 10 | Storage full | Write fails; the user is told; in-memory state continues to work |
 
-## 9. Error handling
+## 11. Error handling
 
 | Failure | Detection | Result | Fallback |
 |---|---|---|---|
@@ -211,7 +262,7 @@ can safely replay without duplicating server-side effects
 **Rollback restores the exact prior state**, not a recomputed approximation. A partial rollback
 is indistinguishable from data loss.
 
-## 10. Best practices
+## 12. Best practices
 
 1. **Server data never enters Zustand.**
 2. **Stores expose actions, not setters** — invariants stay inside.
@@ -222,7 +273,7 @@ is indistinguishable from data loss.
 7. **Surface conflicts only when genuine.** Everything else resolves silently.
 8. **Test process death routinely**, not as an edge case.
 
-## 11. Checklist
+## 13. Checklist
 
 - [ ] No server data duplicated into Zustand.
 - [ ] Route progress written before every handoff, verified by test.
@@ -235,7 +286,7 @@ is indistinguishable from data loss.
 - [ ] Reorder conflict surfaces; all others resolve silently.
 - [ ] Offline read verified in genuine airplane mode.
 
-## 12. Roadmap
+## 14. Roadmap
 
 | Phase | Scope | Trigger |
 |---|---|---|
@@ -244,7 +295,7 @@ is indistinguishable from data loss.
 | 1.2 | Live Activity state mirroring | Release 1.2 |
 | 2.0 | Multi-device real-time route sync | User demand |
 
-## 13. Decision log
+## 15. Decision log
 
 | Date | Change | Reason | Author |
 |---|---|---|---|
@@ -254,7 +305,7 @@ is indistinguishable from data loss.
 | 2026-08-06 | Only reorder conflicts surfaced | Everything else resolves deterministically; a dialog would be noise | Architecture |
 | 2026-08-06 | Progress written before handoff | The app may never be resumed | Architecture |
 
-## 14. Rationale
+## 16. Rationale
 
 The four-homes rule addresses the most common architectural failure in this stack: copying
 server data into a client store "so it is easier to access". The copy immediately becomes a
@@ -276,7 +327,7 @@ Writing progress before the handoff rather than after is a one-line ordering dec
 determines whether the product loses a user's day. Between launching Google Maps and the user
 returning, the OS may kill the app at any point; a write scheduled for "after" never happens.
 
-## 15. Rejected alternatives
+## 17. Rejected alternatives
 
 | Alternative | Attraction | Why rejected |
 |---|---|---|

@@ -91,7 +91,34 @@ failure.
 
 ---
 
-## 5. Behaviour
+## 5. Flows
+
+**Entering and leaving offline.**
+
+```
+  online ──── connectivity lost ────▶ offline
+     ▲                                   │
+     │                    address book still searchable
+     │                    saved routes still readable
+     │                    mutations queued locally
+     │                    T0 offered if ≤ 8 stops, labelled
+     │                    search and optimization above 8 disabled, with a reason
+     │                                   │
+     └──── connectivity returns ─────────┘
+                     │
+                     ▼
+        queue replayed in order, then state reconciled
+```
+
+**What offline is not.** There are no downloadable maps and no pre-fetched tiles: caching map
+imagery is a terms violation, not a missing feature ([ADR-0008](adr/0008-offline-scope.md)).
+The offline map state says so plainly rather than showing a grey rectangle that reads as a bug.
+
+**How a disabled capability is communicated.** Every unavailable action states the cause and
+what still works. "Search needs a connection — your saved addresses are still here" is a
+different product from a greyed-out button.
+
+## 6. Behaviour
 
 ### Detection
 
@@ -158,7 +185,20 @@ or a queued item that failed permanently.
 
 ---
 
-## 6. Edge cases
+## 7. Architectural decisions
+
+| ID | Decision | Applies to |
+|---|---|---|
+| [0008](adr/0008-offline-scope.md) | Offline is your own data, never offline maps | The entire scope of this document |
+| [0003](adr/0003-tiered-optimization-cascade.md) | Cascade T0–T3 | T0 as the offline optimization path |
+| [0007](adr/0007-place-id-durable-coordinates-perishable.md) | Coordinates perishable | A route opened offline after 30 days cannot re-hydrate, and says so |
+| [0012](adr/0012-long-term-osm-exit-path.md) | OSM exit path | The only route by which offline maps could ever become legal |
+
+**Decided here:** offline is a designed state, not a degraded one. The user in a basement or a
+rural delivery round is not an edge case in this product — they are the normal case for part of
+every working day.
+
+## 8. Edge cases
 
 | # | Condition | Expected behaviour |
 |---|---|---|
@@ -178,7 +218,7 @@ Case 11 matters more than it appears: hotel and service-station Wi-Fi report "co
 blocking traffic, and a connectivity flag alone would leave the app waiting on requests that can
 never complete.
 
-## 7. Error handling
+## 9. Error handling
 
 | Failure | User-facing result | Fallback |
 |---|---|---|
@@ -189,7 +229,7 @@ never complete.
 | Reorder conflict on sync | Both versions presented; user chooses | Explicit resolution |
 | Purchase attempted offline | Clear message that a connection is required | Retry when online |
 
-## 8. Best practices
+## 10. Best practices
 
 1. **Persist continuously**, never on a timer. The network vanishes without warning.
 2. **Debounce connectivity changes.**
@@ -201,7 +241,7 @@ never complete.
    problems.
 8. **Never imply offline maps** in the product, the store listing, or a screenshot.
 
-## 9. Checklist
+## 11. Checklist
 
 - [ ] All items in the "available offline" list verified in genuine airplane mode.
 - [ ] Every unavailable capability has a designed state, verified.
@@ -214,7 +254,7 @@ never complete.
 - [ ] Handoff verified to work offline.
 - [ ] No product or store copy implies offline maps.
 
-## 10. Roadmap
+## 12. Roadmap
 
 | Phase | Scope | Trigger |
 |---|---|---|
@@ -223,7 +263,7 @@ never complete.
 | 1.x | Pre-emptive coordinate refresh when a route is likely to be used offline | Usage patterns |
 | 3.0 | Genuine offline maps — **only** under the OSM stack | An [ADR-0012](adr/0012-long-term-osm-exit-path.md) trigger |
 
-## 11. Decision log
+## 13. Decision log
 
 | Date | Change | Reason | Author |
 |---|---|---|---|
@@ -232,7 +272,7 @@ never complete.
 | 2026-08-06 | T0 ceiling of 8 stops applies offline too | Quality boundary, not a performance one | Architecture |
 | 2026-08-06 | Captive portals detected by request failure | A connectivity flag reports "connected" on blocked networks | Architecture |
 
-## 12. Rationale
+## 14. Rationale
 
 The honesty constraint drives this entire document. Every capability the product cannot deliver
 offline is stated plainly, because the alternative — a spinner that never resolves, a blank map,
@@ -250,7 +290,7 @@ downloadable maps, which for a courier in a rural area is a genuine advantage. R
 honestly here — rather than pretending the limitation is a design choice — is what makes the
 trigger meaningful when it fires.
 
-## 13. Rejected alternatives
+## 15. Rejected alternatives
 
 | Alternative | Attraction | Why rejected |
 |---|---|---|

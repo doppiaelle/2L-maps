@@ -9,7 +9,7 @@
 
 > **Not legal advice.** This document records the obligations identified during design and how
 > the product satisfies them. It is written to make a lawyer's review efficient, not to replace
-> it. Independent review is recommended before first submission, particularly on §6.
+> it. Independent review is recommended before first submission, particularly on §7.
 
 ---
 
@@ -73,7 +73,39 @@ the offline scope and the map engine choice are all consequences of obligations 
 
 ---
 
-## 5. Google Maps Platform terms
+## 5. Flows
+
+**How an obligation becomes a control.** Nothing here is satisfied by a policy document alone.
+
+```
+  obligation identified (terms · GDPR · consumer law · store policy)
+            │
+            ▼
+  which control enforces it, in code or in schema?
+            │
+   ┌────────┴──────────────────────────┐
+   ▼                                   ▼
+  a structural control            only a procedure
+  (nullable column, purge job,    (a rule someone must remember)
+   RLS policy, signed webhook)          │
+            │                           ▼
+            ▼                    escalated — procedures fail silently
+  verified by a test in 22 and
+  re-checked before each submission
+```
+
+**Subject rights.** Export and deletion run the same path: identify every table holding the
+subject's rows, act on all of them, confirm to the user. A deletion that leaves analytics or
+cache rows behind has not been performed.
+
+**Breach.** Contain, assess, then notify the supervisory authority within 72 hours where the
+risk warrants ([`19_SECURITY.md`](19_SECURITY.md)).
+
+**Terms changes.** A Google terms or pricing change updates this document and
+[`31_COST_MODEL.md`](31_COST_MODEL.md) with the new value, its source and the date, before any
+dependent code changes. This has happened before and will happen again (risk S1).
+
+## 6. Google Maps Platform terms
 
 | Obligation | Our compliance | Where |
 |---|---|---|
@@ -92,7 +124,7 @@ coordinate stored indefinitely compiles perfectly.
 
 ---
 
-## 6. GDPR
+## 7. GDPR
 
 ### Roles
 
@@ -143,11 +175,11 @@ published in the privacy policy and kept current.
 
 Notification to the supervisory authority within **72 hours** where the breach is likely to
 result in a risk to rights and freedoms; affected individuals notified where the risk is high.
-Containment precedes assessment ([`19_SECURITY.md`](19_SECURITY.md) §10).
+Containment precedes assessment ([`19_SECURITY.md`](19_SECURITY.md) §12).
 
 ---
 
-## 7. EU consumer law — auto-renewal
+## 8. EU consumer law — auto-renewal
 
 Applies alongside, not instead of, Apple's and Google's rules. Risk C16.
 
@@ -166,7 +198,7 @@ what a consumer complaint would rest on.
 
 ---
 
-## 8. Store declarations
+## 9. Store declarations
 
 **These must match actual behaviour.** A declaration that overstates collection is a false
 statement; one that understates it is a violation.
@@ -193,7 +225,21 @@ declared and functional — Play verifies the deletion path exists.
 
 ---
 
-## 9. Edge cases
+## 10. Architectural decisions
+
+| ID | Decision | Applies to |
+|---|---|---|
+| [0007](adr/0007-place-id-durable-coordinates-perishable.md) | Coordinates expire at 30 days | The central Google terms obligation, enforced structurally |
+| [0008](adr/0008-offline-scope.md) | No offline maps, no tile caching | Terms compliance for map data |
+| [0004](adr/0004-external-navigation-handoff.md) | External handoff | Why no Google content is rendered on a third-party map |
+| [0005](adr/0005-map-engine-and-route-preview.md) | Google map for Google-derived content | The "No Use With Non-Google Maps" clause |
+| [0012](adr/0012-long-term-osm-exit-path.md) | OSM exit path | The response if terms become unworkable |
+
+**Decided here:** compliance is enforced by structure wherever structure can carry it — a
+nullable column and a scheduled purge, not a reminder to delete coordinates. A rule that depends
+on someone remembering is a rule that is already broken on the day everyone is busy.
+
+## 11. Edge cases
 
 | # | Condition | Expected behaviour |
 |---|---|---|
@@ -208,7 +254,7 @@ declared and functional — Play verifies the deletion path exists.
 | 9 | A new sub-processor is added | DPA required and privacy policy updated before release |
 | 10 | Analytics consent refused | Analytics disabled; crash reporting continues |
 
-## 10. Error handling
+## 12. Error handling
 
 | Failure | Detection | Response |
 |---|---|---|
@@ -219,7 +265,7 @@ declared and functional — Play verifies the deletion path exists.
 | Store declaration mismatch | Pre-submission review | Blocks release |
 | Deletion request unfulfilled | Monitoring | Escalate; a GDPR deadline is not negotiable |
 
-## 11. Best practices
+## 13. Best practices
 
 1. **Compliance structurally, not procedurally.** A nullable column beats a remembered rule.
 2. **Monitor the purge job as a compliance control**, not as a background task.
@@ -230,7 +276,7 @@ declared and functional — Play verifies the deletion path exists.
 7. **Treat stop addresses as third-party personal data**, held to a stricter standard than the
    user's own.
 
-## 12. Checklist
+## 14. Checklist
 
 Before first submission and every release:
 
@@ -248,7 +294,7 @@ Before first submission and every release:
 - [ ] Play Data Safety matches actual collection.
 - [ ] No tracking; no advertising identifier; no ATT prompt.
 
-## 13. Roadmap
+## 15. Roadmap
 
 | Phase | Scope | Trigger |
 |---|---|---|
@@ -257,7 +303,7 @@ Before first submission and every release:
 | 1.x | Automated audit query for coordinate age | Post-launch |
 | 2.0 | Re-review on entering a new market | Market expansion |
 
-## 14. Decision log
+## 16. Decision log
 
 | Date | Change | Reason | Author |
 |---|---|---|---|
@@ -266,7 +312,7 @@ Before first submission and every release:
 | 2026-08-06 | Stop addresses classified as third-party personal data | The user's customers never consented and do not know the app exists | Product owner |
 | 2026-08-06 | C9 naming decision flagged as blocking submission | Trademark implication of "Maps" | Product owner |
 
-## 15. Rationale
+## 17. Rationale
 
 Compliance is designed structurally because these particular obligations are invisible at review
 time. A coordinate cached for six months compiles, passes tests, and behaves correctly — the
@@ -285,7 +331,7 @@ because the two overlap without being identical. Apple cares about disclosure in
 flow; EU law adds pre-contractual information, a withdrawal right and confirmation on a durable
 medium. Satisfying Apple does not automatically satisfy Italy, and the reverse is also true.
 
-## 16. Rejected alternatives
+## 18. Rejected alternatives
 
 | Alternative | Attraction | Why rejected |
 |---|---|---|

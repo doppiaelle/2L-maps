@@ -63,7 +63,32 @@ A component is not finished until every state listed for it exists and is tested
 
 ---
 
-## 5. Map components
+## 5. Flows
+
+**How a component is added.** The library grows on the third occurrence, never the first —
+premature abstraction costs more than duplication ([`../CLAUDE.md`](../CLAUDE.md) §12).
+
+```
+  a pattern appears once   ──▶  build it locally in the feature
+  it appears twice         ──▶  note it; still local
+  it appears a third time  ──▶  extract to components/, with every state
+                                     │
+                                     ▼
+                          tokens only, no fetching, no navigation
+                                     │
+                                     ▼
+                          state tests + accessibility labels + contrast in both themes
+```
+
+**How a component receives data.** Components render and never fetch. Data arrives as props
+from a hook; a component that calls React Query directly has taken on a second reason to
+change and is refactored ([`11_STATE_MANAGEMENT.md`](11_STATE_MANAGEMENT.md)).
+
+**How a component fails.** Each component owns its own error and empty states rather than
+delegating to a page-level banner. An error attached to its subject tells the user which thing
+broke; a global banner tells them only that something did.
+
+## 6. Map components
 
 ### `<AppMap>`
 
@@ -110,7 +135,7 @@ Always visible, never covered by the sheet at any detent, never dismissible. A t
 
 ---
 
-## 6. Sheet components
+## 7. Sheet components
 
 ### `<RouteSheet>`
 
@@ -191,7 +216,7 @@ Minimum height 56 pt; full width within `screen-padding`; `radius-lg`.
 
 ---
 
-## 7. Shared components
+## 8. Shared components
 
 ### `<StateView>`
 
@@ -223,7 +248,20 @@ glyph as well as colour.
 
 ---
 
-## 8. Edge cases
+## 9. Architectural decisions
+
+| ID | Decision | Applies to |
+|---|---|---|
+| [0005](adr/0005-map-engine-and-route-preview.md) | `react-native-maps` sits behind an `<AppMap>` facade | Every map component |
+| [0009](adr/0009-visual-direction.md) | Tokens only; single mint accent; red for alerts | Every component |
+| [0010](adr/0010-mobile-only-scope.md) | Sheet with detents | Sheet components |
+| [0012](adr/0012-long-term-osm-exit-path.md) | Provider-agnostic seams | Why map components take product types, not SDK types |
+
+**Decided here:** components expose the product's vocabulary — stops, legs, detents — never the
+SDK's. A prop named after a `react-native-maps` concept is a leak that makes
+[ADR-0012](adr/0012-long-term-osm-exit-path.md) unaffordable later.
+
+## 10. Edge cases
 
 | # | Condition | Expected behaviour |
 |---|---|---|
@@ -238,7 +276,7 @@ glyph as well as colour.
 | 9 | Screen reader traversing the map | Map is one element; the list is the traversable equivalent |
 | 10 | Reduce Motion enabled | Reorder is instant but the number change is still perceptible |
 
-## 9. Error handling
+## 11. Error handling
 
 | Component | Failure | Presentation | Fallback |
 |---|---|---|---|
@@ -249,7 +287,7 @@ glyph as well as colour.
 | `<PrimaryAction>` | Blocked | Disabled with a stated reason | Alternative action offered |
 | `<StopList>` | Empty after a filter | `<StateView>` with a clear action | — |
 
-## 10. Best practices
+## 12. Best practices
 
 1. **Tokens only.** A literal value is review-blocking.
 2. **Memoise markers and rows** by id and state.
@@ -260,7 +298,7 @@ glyph as well as colour.
 7. **Compose accessibility labels once, at the row**, rather than exposing four sub-elements.
 8. **`<StateView>` always carries an action.**
 
-## 11. Checklist
+## 13. Checklist
 
 - [ ] `<AppMap>` is the only importer of `react-native-maps`.
 - [ ] Every component implements every state listed for it.
@@ -274,7 +312,7 @@ glyph as well as colour.
 - [ ] Reduce Motion verified on every animated component.
 - [ ] No literal design values anywhere.
 
-## 12. Roadmap
+## 14. Roadmap
 
 | Phase | Scope | Trigger |
 |---|---|---|
@@ -284,7 +322,7 @@ glyph as well as colour.
 | 2.0 | `<TimeWindowPicker>` in stop detail | Gate D3 |
 | 3.0 | `<AppMap>` MapLibre adapter behind the same contract | [ADR-0012](adr/0012-long-term-osm-exit-path.md) |
 
-## 13. Decision log
+## 15. Decision log
 
 | Date | Change | Reason | Author |
 |---|---|---|---|
@@ -294,7 +332,7 @@ glyph as well as colour.
 | 2026-08-06 | Undo timer pauses on background | An interruption otherwise consumes the window silently | Design |
 | 2026-08-06 | Marker numbers update live during a drag | The feedback is the purpose of the interaction | Design |
 
-## 14. Rationale
+## 16. Rationale
 
 Components are specified state-first rather than appearance-first because the states are what
 gets skipped. Every developer builds the success state; error, offline, degraded and blocked
@@ -317,7 +355,7 @@ The `<StateView>` action requirement is the clearest example of encoding a princ
 signature. "Never leave a dead end" is a rule people forget under deadline pressure; a required
 prop is a rule the compiler remembers.
 
-## 15. Rejected alternatives
+## 17. Rejected alternatives
 
 | Alternative | Attraction | Why rejected |
 |---|---|---|

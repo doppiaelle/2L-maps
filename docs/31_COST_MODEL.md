@@ -99,7 +99,41 @@ what point the business closes.
 
 ---
 
-## 5. Fixed costs
+## 5. Flows
+
+**How a new upstream call is approved.** No metered call reaches production without passing
+through here.
+
+```
+  proposed call
+        │
+        ▼
+  what does it cost per invocation, and how often is it invoked?
+        │
+        ▼
+  can it be avoided?  ──▶ address book · shared cache · debounce · session token
+        │  no, not entirely
+        ▼
+  modelled against the target profile in this document
+        │
+   ┌────┴─────────────────────────┐
+   ▼                              ▼
+  within the COGS envelope     outside it
+   │                              │
+   ▼                              ▼
+  quota set here,           redesigned or dropped — the price is fixed,
+  enforced in 13            so cost is the variable that must move
+```
+
+**How a figure is updated.** An external price change updates this document first, with the
+source and the date, and only then the code that depends on it. Every other document cites this
+one and never restates a number ([`../CLAUDE.md`](../CLAUDE.md) §13).
+
+**How the price is defended.** Margin is recomputed whenever COGS or commission changes. A
+subscription price set once and never re-examined is how a product with healthy unit economics
+becomes an unprofitable one without anybody noticing.
+
+## 6. Fixed costs
 
 What we pay regardless of users.
 
@@ -133,7 +167,7 @@ required from day one ([`25_DEPLOYMENT.md`](25_DEPLOYMENT.md)).
 
 ---
 
-## 6. Variable costs
+## 7. Variable costs
 
 ### Unit prices
 
@@ -162,7 +196,7 @@ in [`../CLAUDE.md`](../CLAUDE.md) §6, not a suggestion.
 
 ---
 
-## 7. Per-user cost
+## 8. Per-user cost
 
 ### Target profile — Marco, the sales agent
 
@@ -218,7 +252,7 @@ $0.30–0.80 **every month, indefinitely**.
 
 ---
 
-## 8. Pricing and margin
+## 9. Pricing and margin
 
 ### Market comparables
 
@@ -262,7 +296,7 @@ improves cash flow and materially reduces churn, at a margin still well above co
 
 ---
 
-## 9. Quota values
+## 10. Quota values
 
 Derived from the usage profiles above with generous headroom. **Quotas exist to catch abuse and
 defects, not to inconvenience a professional using the product as intended**
@@ -282,7 +316,21 @@ never fire, so an occurrence is a probable defect rather than a user problem.
 
 ---
 
-## 10. Edge cases
+## 11. Architectural decisions
+
+| ID | Decision | Applies to |
+|---|---|---|
+| [0003](adr/0003-tiered-optimization-cascade.md) | Cascade T0–T3 | The routing cost line, and the 25× difference that motivated it |
+| [0002](adr/0002-target-segment-and-monetization.md) | Trial to paid, no permanent free tier | Trial COGS, acquisition cost, margin |
+| [0011](adr/0011-server-side-quota-enforcement.md) | Server-side quota | Why the quota values here are enforceable at all |
+| [0006](adr/0006-mandatory-backend-proxy.md) | Backend proxy | The shared cache, the single largest cost lever after the address book |
+| [0012](adr/0012-long-term-osm-exit-path.md) | OSM exit path | The long-term ceiling on per-route cost |
+
+**Decided here:** cost is a design constraint in this product, not an operating expense
+reviewed quarterly. The brief's original architecture and the one specified differ by a factor
+of eighteen in monthly COGS per user — large enough to decide whether the price works at all.
+
+## 12. Edge cases
 
 | # | Condition | Cost impact | Handling |
 |---|---|---|---|
@@ -295,7 +343,7 @@ never fire, so an occurrence is a probable defect rather than a user problem.
 | 7 | Google free tier exhausted mid-month | Costs begin at the metered rate | Expected at scale; the model assumes no free tier |
 | 8 | Field mask widened by a change | Silent SKU escalation, up to 2× | Review rule; field masks are reviewed on every Routes change |
 
-## 11. Error handling
+## 13. Error handling
 
 | Failure of the model | Detection | Response |
 |---|---|---|
@@ -305,7 +353,7 @@ never fire, so an occurrence is a probable defect rather than a user problem.
 | Cache hit rate below assumption | Gate D2 metric | Investigate key construction; the cache is the main cost lever |
 | A quota fires in normal use | Alert | Probable defect; investigate before raising the limit |
 
-## 12. Best practices
+## 14. Best practices
 
 1. **Attribute every cost to a user action.** A cost line nobody can trace to a tap cannot be
    optimised.
@@ -317,7 +365,7 @@ never fire, so an occurrence is a probable defect rather than a user problem.
 6. **Re-verify every figure at each phase gate.** These numbers have a shelf life.
 7. **Record cache hits.** Without the flag, the cache's value is unmeasurable.
 
-## 13. Checklist
+## 15. Checklist
 
 - [ ] Every figure re-verified against the primary source, with date recorded.
 - [ ] `usage_events` records endpoint, tier, cache-hit status and estimated cost.
@@ -329,7 +377,7 @@ never fire, so an occurrence is a probable defect rather than a user problem.
 - [ ] Alerting confirmed on every quota event.
 - [ ] Gate D1 COGS threshold (≤$1.50/user/month) measured, not assumed.
 
-## 14. Roadmap
+## 16. Roadmap
 
 | Phase | Cost work | Trigger |
 |---|---|---|
@@ -338,7 +386,7 @@ never fire, so an occurrence is a probable defect rather than a user problem.
 | 2.0 | Hierarchical chunking to keep >25-stop routes affordable | Gate D3 |
 | 3.0 | Tier T3 self-hosted matrix, near-zero marginal cost | An [ADR-0012](adr/0012-long-term-osm-exit-path.md) trigger |
 
-## 15. Decision log
+## 17. Decision log
 
 | Date | Change | Reason | Author |
 |---|---|---|---|
@@ -347,7 +395,7 @@ never fire, so an occurrence is a probable defect rather than a user problem.
 | 2026-08-06 | Sofia's segment excluded on cost grounds | ~$19.25/month COGS against a €9.99 price | Product owner |
 | 2026-08-06 | Quota values set with 7–13× headroom | Quotas target abuse and defects, not normal use | Architecture |
 
-## 16. Rationale
+## 18. Rationale
 
 This document exists because **cost is a design constraint in this product, not an operational
 concern**. The difference between the brief's proposed architecture and the one built is a
@@ -372,7 +420,7 @@ user is a perpetual liability of $0.30–0.80 a month. A trial user is a bounded
 $0.25 total. At any realistic free-to-paid ratio the freemium model consumes the margin of the
 paying base.
 
-## 17. Rejected alternatives
+## 19. Rejected alternatives
 
 | Alternative | Attraction | Why rejected |
 |---|---|---|

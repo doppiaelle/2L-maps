@@ -91,7 +91,40 @@ cost alerting are configured from day one rather than at launch.
 
 ---
 
-## 5. Builds
+## 5. Flows
+
+**Commit to store.**
+
+```
+  commit ──▶ CI: typecheck · lint · test ──── red ──▶ stops here, always
+                        │ green
+                        ▼
+              EAS build (dev · preview · production)
+                        │
+                        ▼
+              internal testing ──▶ TestFlight / Play internal track
+                        │
+                        ▼
+              store review ──── rejected ──▶ 26 / 27 hold the prepared justifications
+                        │ approved
+                        ▼
+              staged rollout ──▶ monitored against 21 and 24 ──▶ full release
+```
+
+**Rollback.** A JS-only defect is rolled back with EAS Update within minutes; a native defect
+requires halting the staged rollout and submitting a build. The distinction is decided before
+release, not during an incident, because the two have very different clocks.
+
+**Version increment.** `MAJOR` on a breaking change to a stored data shape or an Edge Function
+contract, `MINOR` on a feature, `PATCH` on a fix. Build numbers increase monotonically and never
+reset — a reused build number is rejected by both stores and costs a submission cycle.
+
+**Work is pushed, not merely committed.** Development happens in ephemeral containers, so a
+commit that exists only locally is not saved work. This is risk S4 in
+[`35_RISK_REGISTER.md`](35_RISK_REGISTER.md), and it is rated High because it has already
+fired.
+
+## 6. Builds
 
 ### Expo Go is not usable
 
@@ -139,7 +172,7 @@ Config plugins own everything that must be correct at build time:
 
 ---
 
-## 6. CI — GitHub Actions
+## 7. CI — GitHub Actions
 
 | Workflow | Trigger | Runs |
 |---|---|---|
@@ -160,7 +193,7 @@ promotion, code signing via `match`, and release notes from the changelog.
 
 ---
 
-## 7. Versioning
+## 8. Versioning
 
 **Semantic versioning**, with a mobile-specific interpretation:
 
@@ -179,7 +212,7 @@ changes additive by default ([`12_DATABASE.md`](12_DATABASE.md)).
 
 ---
 
-## 8. Release and rollback
+## 9. Release and rollback
 
 ### Channels
 
@@ -220,7 +253,19 @@ a store-review matter, not a hotfix.
 
 ---
 
-## 9. Edge cases
+## 10. Architectural decisions
+
+| ID | Decision | Applies to |
+|---|---|---|
+| [0005](adr/0005-map-engine-and-route-preview.md) | `react-native-maps`, pinned with the Expo SDK | Why Expo Go is unusable and upgrades are paired |
+| [0006](adr/0006-mandatory-backend-proxy.md) | Backend proxy | Edge Function deployment and secret management |
+| [0002](adr/0002-target-segment-and-monetization.md) | Trial to paid | Store configuration and release gating on billing |
+
+**Decided here:** the Expo SDK and `react-native-maps` are upgraded together, never separately,
+and an upgrade requires a verified build on both platforms before merge. They have broken as a
+pair before (risk C6); treating them as one dependency is the only version of this that holds.
+
+## 11. Edge cases
 
 | # | Condition | Expected behaviour |
 |---|---|---|
@@ -234,7 +279,7 @@ a store-review matter, not a hotfix.
 | 8 | E2E fails on one platform only | Release blocked. Both platforms ship together |
 | 9 | macOS minutes exhausted | E2E deferred to a nightly run; releases still gated on it |
 
-## 10. Error handling
+## 12. Error handling
 
 | Failure | Detection | Response |
 |---|---|---|
@@ -245,7 +290,7 @@ a store-review matter, not a hotfix.
 | Migration fails | Migration workflow | Deployment blocked; fix forward |
 | EAS Update breaks the app | Crash spike | Republish the previous bundle — minutes |
 
-## 11. Best practices
+## 13. Best practices
 
 1. **Never upgrade Expo SDK and `react-native-maps` separately.**
 2. **Never release without phased or staged rollout.**
@@ -258,7 +303,7 @@ a store-review matter, not a hotfix.
 9. **Push after every meaningful unit of work.** Development happens in ephemeral containers; a
    commit that exists only locally is not saved work ([`30_CLAUDE_RULES.md`](30_CLAUDE_RULES.md) §9).
 
-## 12. Checklist
+## 14. Checklist
 
 Before every production release:
 
@@ -275,7 +320,7 @@ Before every production release:
 - [ ] Rollback path confirmed for each layer touched.
 - [ ] No secret in the repository or the client bundle.
 
-## 13. Roadmap
+## 15. Roadmap
 
 | Phase | Scope | Trigger |
 |---|---|---|
@@ -284,7 +329,7 @@ Before every production release:
 | 1.x | Automated release notes from conventional commits | Post-launch |
 | 2.0 | Paid EAS tier if build cadence exceeds the free allowance | Build volume |
 
-## 14. Decision log
+## 16. Decision log
 
 | Date | Change | Reason | Author |
 |---|---|---|---|
@@ -295,7 +340,7 @@ Before every production release:
 | 2026-08-06 | Both platforms ship together | A platform-specific release doubles the support surface | Product owner |
 | 2026-08-06 | Push-after-every-unit added to best practices | An ephemeral container destroyed a full set of committed-but-unpushed work | Architecture |
 
-## 15. Rationale
+## 17. Rationale
 
 The pipeline is shaped by an asymmetry that is easy to underestimate: **server-side mistakes are
 correctable in minutes, and native mistakes are not.** An Edge Function bug is a redeploy; a
@@ -314,7 +359,7 @@ both alternatives are excluded — `expo-maps` renders Apple Maps on iOS, which 
 Google content, and the Navigation SDK cannot coexist with the Maps SDK. Remaining on a known-good
 pair indefinitely is a legitimate outcome, not a failure to maintain.
 
-## 16. Rejected alternatives
+## 18. Rejected alternatives
 
 | Alternative | Attraction | Why rejected |
 |---|---|---|

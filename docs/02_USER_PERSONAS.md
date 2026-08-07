@@ -34,7 +34,7 @@ talking to real users.
 |---|---|---|
 | Persona accuracy | Product owner | Revised when contradicted by real usage data |
 | Design decisions traced to personas | Design | A decision serving no persona is unjustified |
-| Scope arbitration | Product owner | The decisive questions in §5 |
+| Scope arbitration | Product owner | The decisive questions in §6 |
 
 ---
 
@@ -68,7 +68,34 @@ Every persona uses the app under most of these simultaneously. This is the real 
 
 ---
 
-## 5. Personas
+## 5. Flows
+
+**How a persona settles a contested decision.** This is the document's only operational
+purpose, and it works in one direction:
+
+```
+  contested design or scope decision
+            │
+            ▼
+  which persona does it serve?  ──── none ────▶  it is not built
+            │
+            ▼
+  does it serve them in their actual conditions —
+  one hand, sunlight, a moving vehicle, divided attention?
+            │                          │
+           yes                         no
+            │                          │
+            ▼                          ▼
+     accepted                 redesigned for those conditions,
+                              not accepted with a caveat
+```
+
+**How a persona is revised.** Personas are updated from evidence — support conversations,
+analytics against the gates in [`28_ROADMAP.md`](28_ROADMAP.md), interviews — never from
+intuition about who *should* be using the product. A persona changed to justify a feature
+already decided on is no longer evidence, and the decision log records that distinction.
+
+## 6. Personas
 
 ### Marco — the sales agent · **primary**
 
@@ -172,7 +199,7 @@ so, it does not belong in this release.*
 
 ---
 
-## 6. Architectural decisions
+## 7. Architectural decisions
 
 | ID | Decision | Applies to |
 |---|---|---|
@@ -180,7 +207,7 @@ so, it does not belong in this release.*
 | [0008](adr/0008-offline-scope.md) | Offline covers own data — driven by Elena's basements | Offline behaviour |
 | [0010](adr/0010-mobile-only-scope.md) | Mobile only, one-handed — driven by Marco's car | Layout, controls |
 
-## 7. Edge cases
+## 8. Edge cases
 
 | # | Condition | Expected behaviour | Specified in |
 |---|---|---|---|
@@ -192,7 +219,7 @@ so, it does not belong in this release.*
 | 6 | A Luca-shaped request arrives in support | Recognised as out of scope; declined with the reason, not queued as a feature | This document |
 | 7 | Screen in direct sunlight | Contrast verified outdoors, not only on a desk | [`23`](23_ACCESSIBILITY.md) |
 
-## 8. Error handling
+## 9. Error handling
 
 Persona-level failure principle: **the user is driving, so an error must never require
 sustained attention.** Every error state is readable in a glance and dismissible with one
@@ -205,7 +232,7 @@ thumb. No modal dialog blocks a route in progress ([`../CLAUDE.md`](../CLAUDE.md
 | Stop limit exceeded | Sofia | Limit explained with a split-route offer |
 | Signal lost mid-route | Elena | Silent degradation to cached data, with a persistent but unobtrusive indicator |
 
-## 9. Best practices
+## 10. Best practices
 
 1. **Design for Marco's car, not your desk.** Every interaction is validated one-handed, on a
    real device, ideally in a vehicle.
@@ -217,7 +244,7 @@ thumb. No modal dialog blocks a route in progress ([`../CLAUDE.md`](../CLAUDE.md
 5. **Test with gloves, in sunlight, with one hand.** These conditions are the brief, not edge
    cases.
 
-## 10. Checklist
+## 11. Checklist
 
 - [ ] Every screen validated one-handed on a physical device.
 - [ ] Every flow works with the phone mounted in a vehicle.
@@ -227,7 +254,7 @@ thumb. No modal dialog blocks a route in progress ([`../CLAUDE.md`](../CLAUDE.md
 - [ ] The 25-stop limit communicated as a boundary, never as an error.
 - [ ] No feature in the release exists solely for Luca.
 
-## 11. Roadmap
+## 12. Roadmap
 
 | Phase | Scope | Trigger |
 |---|---|---|
@@ -236,13 +263,13 @@ thumb. No modal dialog blocks a route in progress ([`../CLAUDE.md`](../CLAUDE.md
 | 2.0 | Sofia becomes a target via a higher tier with hierarchical chunking | Demonstrated willingness to pay above €20/month |
 | 3.0 | Luca reconsidered as a separate product, never as a feature of this one | Strategic decision, not a roadmap item |
 
-## 12. Decision log
+## 13. Decision log
 
 | Date | Change | Reason | Author |
 |---|---|---|---|
 | 2026-08-06 | Personas defined; Sofia set as tertiary, Luca as anti-persona | Cost modelling showed Sofia unprofitable at consumer pricing and Luca a different product | Product owner |
 
-## 13. Rationale
+## 14. Rationale
 
 Three personas and one anti-persona, rather than a broad market description, because the
 product's viability depends on a narrow bet: that a single professional will pay roughly €10 a
@@ -262,7 +289,7 @@ The operating conditions in §4 do more design work than the personas themselves
 sunlight, gloves and lost signal are the actual constraints; the personas are how those
 constraints are remembered.
 
-## 14. Rejected alternatives
+## 15. Rejected alternatives
 
 | Alternative | Attraction | Why rejected |
 |---|---|---|

@@ -73,7 +73,36 @@ this file holds the definition, so a risk cannot be described two different ways
 
 ---
 
-## 5. The register
+## 5. Flows
+
+**A risk's life.** The register is only useful if entries move; a static register is a document
+nobody reads twice.
+
+```
+  identified ──▶ rated (impact × likelihood) ──▶ owner assigned ──▶ trigger stated
+                                                                        │
+                                     ┌──────────────────────────────────┤
+                                     ▼                                  ▼
+                              trigger fires                     mitigated structurally
+                                     │                                  │
+                                     ▼                                  ▼
+                        prepared response executed              re-rated; may close
+                                     │
+                                     ▼
+                        recorded in the decision log — including
+                        whether the prepared response actually worked
+```
+
+**How a risk is accepted rather than mitigated.** Some risks have no mitigation: S2 (nobody
+pays) and S3 (Google adds this feature) are real and unmanageable. They are recorded as accepted
+so the register stays honest. A register claiming everything is under control is a register
+whose ratings mean nothing.
+
+**How a risk is reviewed.** Compliance risks are re-verified before every store submission,
+cost risks monthly against actuals, and strategic risks whenever the relevant provider makes an
+announcement. A risk reviewed only when it fires was never being managed.
+
+## 6. The register
 
 ### Economic risks
 
@@ -318,7 +347,7 @@ account termination or a blocked release.*
 
 ---
 
-## 6. Architectural decisions
+## 7. Architectural decisions
 
 Every mitigated risk traces to an ADR. A risk mitigated by intention rather than by structure
 is not mitigated.
@@ -333,7 +362,7 @@ is not mitigated.
 | C12, C16, S2 | [ADR-0002](adr/0002-target-segment-and-monetization.md) |
 | S1 | [ADR-0012](adr/0012-long-term-osm-exit-path.md) |
 
-## 7. Edge cases
+## 8. Edge cases
 
 | # | Condition | Expected behaviour |
 |---|---|---|
@@ -343,7 +372,7 @@ is not mitigated.
 | 4 | A new risk emerges | Added here with an identifier, an owner and a trigger before the pull request that introduced it merges |
 | 5 | A trigger has no metric behind it | The trigger is unusable; instrument it or remove the pretence |
 
-## 8. Error handling
+## 9. Error handling
 
 | Failure of the register itself | Detection | Response |
 |---|---|---|
@@ -351,7 +380,7 @@ is not mitigated.
 | A mitigation exists only in prose | Gate review | Trace it to an ADR or to code, or reclassify the risk as accepted |
 | The register goes stale | Phase gate review | Review is a gate requirement; a stale register fails the gate |
 
-## 9. Best practices
+## 10. Best practices
 
 1. **Every risk has a trigger with a metric behind it.** Without one, the risk is being hoped
    away.
@@ -365,7 +394,7 @@ is not mitigated.
    control.
 6. **A risk that has already fired is not theoretical.** S4 is rated High because it happened.
 
-## 10. Checklist
+## 11. Checklist
 
 - [ ] Every risk has an owner, a trigger and a prepared response.
 - [ ] Every trigger has an instrumented metric or a concrete detection event.
@@ -376,7 +405,7 @@ is not mitigated.
 - [ ] S4: no unpushed commits at the end of any working session.
 - [ ] No risk has been silently closed without evidence.
 
-## 11. Roadmap
+## 12. Roadmap
 
 | Phase | Register activity | Trigger |
 |---|---|---|
@@ -385,7 +414,7 @@ is not mitigated.
 | 2.0 | C1 reassessed — time windows move every optimization to T2 | Gate D3 |
 | Continuous | S1 reassessed on every Google announcement | Event-driven |
 
-## 12. Decision log
+## 13. Decision log
 
 | Date | Change | Reason | Author |
 |---|---|---|---|
@@ -394,7 +423,7 @@ is not mitigated.
 | 2026-08-06 | S2 and S3 recorded as accepted, not mitigated | No mitigation exists; recording them as managed would be false | Product owner |
 | 2026-08-06 | S4 added after the risk fired | A container reclaim destroyed a full set of committed-but-unpushed documentation | Product owner |
 
-## 13. Rationale
+## 14. Rationale
 
 The register is organised by category rather than by score because the categories behave
 differently. Economic risks degrade slowly and silently, and are caught by monitoring. Terms
@@ -415,7 +444,7 @@ production of this very documentation set: a full day of committed work was lost
 push had been deferred to the end. It is recorded at High likelihood rather than Medium
 precisely because it is not a hypothesis.
 
-## 14. Rejected alternatives
+## 15. Rejected alternatives
 
 | Alternative | Attraction | Why rejected |
 |---|---|---|

@@ -94,7 +94,36 @@ a restored route produces a visible flash that reads as a bug.
 
 ---
 
-## 5. Structure
+## 5. Flows
+
+**Cold start to the first interactive frame.** The splash is held deliberately rather than
+showing an empty Plan that fills in afterwards.
+
+```
+  launch ──▶ restore persisted state ──▶ resolve session ──▶ resolve entitlement
+                                              │                     │
+                                    no session│                     │no entitlement
+                                              ▼                     ▼
+                                        (auth)/sign-in         (app)/paywall
+                                              │                     │
+                                              └────────┬────────────┘
+                                                       ▼
+                                                  (app)/index — Plan
+```
+
+**Deep link resolution.** A link is validated before it navigates: an unparsed deep link is
+untrusted input ([`../CLAUDE.md`](../CLAUDE.md) §3). Invalid links land on Plan with a stated
+reason rather than a blank screen.
+
+**Return from an external navigation app.** The app resumes into the route it left, at the stop
+it left, with progress intact — the handoff is a departure, not a reset
+([`16_INTERNAL_NAVIGATION.md`](16_INTERNAL_NAVIGATION.md)).
+
+**Process death.** Navigation state and the draft route are restored together. Restoring one
+without the other puts the user on the right screen with the wrong contents, which reads as
+data loss.
+
+## 6. Structure
 
 ### Groups
 
@@ -142,7 +171,7 @@ afterwards rather than being discarded.
 
 ---
 
-## 6. State across navigation
+## 7. State across navigation
 
 | State | Survives | Mechanism |
 |---|---|---|
@@ -157,7 +186,20 @@ afterwards rather than being discarded.
 Sheet detent and camera are deliberately not persisted: after a cold start, fitting the camera
 to the route is more useful than restoring where the user last panned.
 
-## 7. Edge cases
+## 8. Architectural decisions
+
+| ID | Decision | Applies to |
+|---|---|---|
+| [0010](adr/0010-mobile-only-scope.md) | Mobile only; three destinations | Route structure and the absence of a web router |
+| [0004](adr/0004-external-navigation-handoff.md) | Handoff to an external app | Why no navigation route exists here |
+| [0002](adr/0002-target-segment-and-monetization.md) | Trial before use | The paywall guard on `(app)` |
+| [0011](adr/0011-server-side-quota-enforcement.md) | Entitlement resolved server-side | Why the guard reads server state, never the local RevenueCat cache |
+
+**Decided here:** guards resolve before the first render rather than redirecting after it. A
+visible flash of a screen the user is not entitled to see is both a quality defect and a
+disclosure of the thing the guard exists to protect.
+
+## 9. Edge cases
 
 | # | Condition | Expected behaviour |
 |---|---|---|
@@ -172,7 +214,7 @@ to the route is more useful than restoring where the user last panned.
 | 9 | Session expires while the app is open | Token refresh attempted silently; only a hard failure returns to sign-in |
 | 10 | Notification tap during a route | Opens Plan in progress mode, not a new screen |
 
-## 8. Error handling
+## 10. Error handling
 
 | Failure | Result | Fallback |
 |---|---|---|
@@ -184,7 +226,7 @@ to the route is more useful than restoring where the user last panned.
 
 **Guards fail closed.** An error evaluating authentication is treated as unauthenticated.
 
-## 9. Best practices
+## 11. Best practices
 
 1. **Hold the splash until restoration completes.**
 2. **Replace groups, never push across them.**
@@ -195,7 +237,7 @@ to the route is more useful than restoring where the user last panned.
 6. **Modals never stack.** Opening one from another dismisses the first.
 7. **Guards fail closed.**
 
-## 10. Checklist
+## 12. Checklist
 
 - [ ] Critical path involves no navigation transition.
 - [ ] Every launch scenario verified with no intermediate render.
@@ -206,7 +248,7 @@ to the route is more useful than restoring where the user last panned.
 - [ ] Android back verified on every screen.
 - [ ] Modals verified not to stack.
 
-## 11. Roadmap
+## 13. Roadmap
 
 | Phase | Scope | Trigger |
 |---|---|---|
@@ -215,7 +257,7 @@ to the route is more useful than restoring where the user last panned.
 | 1.x | Universal links for shared routes | Sharing feature |
 | 2.0 | No structural change expected | — |
 
-## 12. Decision log
+## 14. Decision log
 
 | Date | Change | Reason | Author |
 |---|---|---|---|
@@ -224,7 +266,7 @@ to the route is more useful than restoring where the user last panned.
 | 2026-08-06 | Splash held until restoration | Avoids a flash that reads as a bug | Architecture |
 | 2026-08-06 | Camera and detent not persisted | Fitting the route beats restoring a stale pan | Design |
 
-## 13. Rationale
+## 15. Rationale
 
 The structure exists to make navigation invisible. The critical path — add, optimize, start —
 happens entirely on one route, so the fastest interaction in the product involves no transition
@@ -239,7 +281,7 @@ Holding the splash until restoration is a small detail with outsized perceptual 
 that renders empty and then fills in looks broken, and this app restores state on nearly every
 launch because routes span days.
 
-## 14. Rejected alternatives
+## 16. Rejected alternatives
 
 | Alternative | Attraction | Why rejected |
 |---|---|---|

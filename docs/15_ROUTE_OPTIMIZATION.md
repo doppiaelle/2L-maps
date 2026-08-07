@@ -161,7 +161,38 @@ degraded label.
 
 ---
 
-## 6. The tiers
+## 6. Flows
+
+**Tier selection, end to end.** This runs on the server; the client never chooses an engine.
+
+```
+  request ──▶ constraints present? ──yes──▶ T2  (Route Optimization, per-stop billing)
+                    │ no
+                    ▼
+              stops > 25? ──yes──▶ T2
+                    │ no
+                    ▼
+              upstream reachable? ──no──▶ stops ≤ 8? ──yes──▶ T0, labelled degraded
+                    │ yes                      │ no
+                    ▼                          ▼
+                   T1                    named failure + retry, order preserved
+```
+
+**The two-phase T1 pattern.** `optimizeWaypointOrder` is incompatible with
+`TRAFFIC_AWARE_OPTIMAL`, so one call cannot both order the stops and produce an accurate ETA:
+
+```
+  phase 1  computeRoutes, TRAFFIC_AWARE, optimizeWaypointOrder: true   ──▶ the order
+  phase 2  computeRoutes on that fixed order, TRAFFIC_AWARE_OPTIMAL    ──▶ the ETA
+```
+
+Skipping phase 2 ships an order that is right and a time that is wrong, which the user
+discovers only by being late.
+
+**Failure never reorders.** Every failure path preserves the stop order the user entered.
+An optimization that fails and also scrambles the list has destroyed work while doing nothing.
+
+## 7. The tiers
 
 ### T0 — local heuristic
 
@@ -254,7 +285,7 @@ TSP over it. Conditions in [ADR-0012](adr/0012-long-term-osm-exit-path.md).
 
 ---
 
-## 7. Behaviour
+## 8. Behaviour
 
 ### Round trip and one way
 
@@ -324,7 +355,21 @@ with `cacheHit: true` so the cost model can be verified.
 
 ---
 
-## 8. Edge cases
+## 9. Architectural decisions
+
+| ID | Decision | Applies to |
+|---|---|---|
+| [0003](adr/0003-tiered-optimization-cascade.md) | Cost-aware cascade T0–T3 | Everything in this document |
+| [0011](adr/0011-server-side-quota-enforcement.md) | Quota server-side | Why tier selection cannot live in the client |
+| [0007](adr/0007-place-id-durable-coordinates-perishable.md) | Coordinates perishable | Re-hydration before an optimization request |
+| [0012](adr/0012-long-term-osm-exit-path.md) | OSM exit path | Tier T3, and why the tier boundary is an interface |
+
+**Decided here:** a degraded T0 result is always labelled, and never presented as equivalent to
+T1. A heuristic on straight-line distances is genuinely useful when the network is gone and
+genuinely worse when it is not; hiding the difference would make the good result
+indistinguishable from the compromise.
+
+## 10. Edge cases
 
 | # | Condition | Expected behaviour |
 |---|---|---|
@@ -343,7 +388,7 @@ with `cacheHit: true` so the cost model can be verified.
 | 13 | Two optimizations requested concurrently | The earlier is cancelled; only the latest result is applied |
 | 14 | Stops span an implausible distance (e.g. two countries) | Optimization proceeds — it may be intentional — but the UI notes the unusual total |
 
-## 9. Error handling
+## 11. Error handling
 
 | Failure | Detection | User-facing result | Retry | Fallback |
 |---|---|---|---|---|
@@ -361,7 +406,7 @@ with `cacheHit: true` so the cost model can be verified.
 also destroys the user's manual arrangement is the worst outcome available and is treated as a
 severity-one defect.
 
-## 10. Best practices
+## 12. Best practices
 
 1. **Never let the client choose a tier.** Tier selection is a cost decision and belongs where
    cost is controlled.
@@ -377,7 +422,7 @@ severity-one defect.
 7. **Treat an upstream 4xx as our bug.** A malformed request is never the user's fault and must
    alert.
 
-## 11. Checklist
+## 13. Checklist
 
 - [ ] Tier selection tested at every boundary: 8, 9, 25, 26 stops; online and offline; with and
       without constraints.
@@ -391,7 +436,7 @@ severity-one defect.
 - [ ] ETA computed from server time.
 - [ ] Every optimization recorded in `usage_events`.
 
-## 12. Roadmap
+## 14. Roadmap
 
 | Phase | Scope | Trigger |
 |---|---|---|
@@ -400,7 +445,7 @@ severity-one defect.
 | 2.0 | Time windows and priorities (forces T2); hierarchical chunking above 25 stops | Gate D3 in [`28_ROADMAP.md`](28_ROADMAP.md) |
 | 3.0 | T3 self-hosted matrix with OR-Tools | An [ADR-0012](adr/0012-long-term-osm-exit-path.md) trigger |
 
-## 13. Decision log
+## 15. Decision log
 
 | Date | Change | Reason | Author |
 |---|---|---|---|
@@ -409,7 +454,7 @@ severity-one defect.
 | 2026-08-06 | Two-phase T1 pattern adopted | `optimizeWaypointOrder` is incompatible with `TRAFFIC_AWARE_OPTIMAL` | Architecture |
 | 2026-08-06 | Automatic re-optimization on edit rejected | Multiplies cost by stop count; reorders the list under the user's finger | Architecture |
 
-## 14. Rationale
+## 16. Rationale
 
 The cascade exists because **engine selection is a cost decision disguised as a technical one**.
 Both T1 and T2 solve the user's problem correctly; they differ by a factor of twenty-five in
@@ -430,7 +475,7 @@ The order-preservation rule is stated in three places in this document because i
 failure that would most damage trust. A user who has spent two minutes arranging stops by hand
 and loses that work to a network error will not spend two minutes again.
 
-## 15. Rejected alternatives
+## 17. Rejected alternatives
 
 | Alternative | Attraction | Why rejected |
 |---|---|---|

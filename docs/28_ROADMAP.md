@@ -61,7 +61,33 @@ wrong thing: the problem there is the product or the paywall, not missing featur
 
 ---
 
-## 5. Phases
+## 5. Flows
+
+**How an item moves from later to now.** Gates, not dates.
+
+```
+  phase N ships
+       │
+       ▼
+  instrumented gate measured over its stated window (21)
+       │
+   ┌───┴────────────────────────┐
+   ▼                            ▼
+  passed                     not passed
+   │                            │
+   ▼                            ▼
+  phase N+1 begins    the phase does not begin; the gate is re-examined —
+                      either the trigger was wrong, or the evidence says no
+```
+
+**Why dates are absent after the MVP.** A solo-developer roadmap with dates is a work of
+fiction that everyone learns to discount, and a discounted plan cannot coordinate anything. A
+gate is falsifiable: either the number was reached or it was not.
+
+**How an experiment ends.** Every experiment names in advance what result would change the
+product. An experiment whose outcomes all lead to the same decision is not run.
+
+## 6. Phases
 
 ### MVP — prove someone pays to have their stops reordered
 
@@ -152,7 +178,7 @@ already exists.
 
 ---
 
-## 6. Experiments
+## 7. Experiments
 
 Distinct from features: these change nothing structural and are run to answer a question.
 
@@ -169,7 +195,19 @@ recorded as a decision rather than a conclusion
 
 ---
 
-## 7. Edge cases
+## 8. Architectural decisions
+
+| ID | Decision | Applies to |
+|---|---|---|
+| [0002](adr/0002-target-segment-and-monetization.md) | Single professional, trial to paid | Gate D1, the conversion gate |
+| [0004](adr/0004-external-navigation-handoff.md) | External handoff | Conditions that would reopen in-app navigation |
+| [0010](adr/0010-mobile-only-scope.md) | Mobile only | The conditions under which web would be reconsidered |
+| [0012](adr/0012-long-term-osm-exit-path.md) | OSM exit path | Phase 3, and the cost trigger that starts it |
+
+**Decided here:** every phase after the MVP is gated by a measurable trigger rather than a
+date. This makes the roadmap shorter and less impressive, and it makes it true.
+
+## 9. Edge cases
 
 | # | Condition | Expected behaviour |
 |---|---|---|
@@ -180,7 +218,7 @@ recorded as a decision rather than a conclusion
 | 5 | App Review rejects the geofence justification in 1.3 | Ship 1.x without it; the feature is opt-in and nothing depends on it. |
 | 6 | Retention is strong but conversion is weak | The product works and the paywall does not. Experiment before building. |
 
-## 8. Error handling
+## 10. Error handling
 
 Roadmap-level failure modes.
 
@@ -191,7 +229,7 @@ Roadmap-level failure modes.
 | A trigger fires but capacity is unavailable | Gate review | Record the fired trigger; do not silently drop it |
 | Cost assumptions diverge from actuals | Monthly review against [`31`](31_COST_MODEL.md) | Correct the model, then reassess D1 |
 
-## 9. Best practices
+## 11. Best practices
 
 1. **Triggers, not dates.** A date creates pressure to ship something; a trigger creates
    pressure to learn something.
@@ -205,7 +243,7 @@ Roadmap-level failure modes.
 5. **Record fired triggers even when nothing is done.** The record is what makes the next
    decision informed.
 
-## 10. Checklist
+## 12. Checklist
 
 Before beginning any phase:
 
@@ -216,7 +254,7 @@ Before beginning any phase:
 - [ ] The phase scope matches this document; additions are logged, not assumed.
 - [ ] [`35_RISK_REGISTER.md`](35_RISK_REGISTER.md) reviewed for newly-active risks.
 
-## 11. Roadmap
+## 13. Roadmap
 
 *(This document is the roadmap; the section is retained for template conformance.)*
 
@@ -224,7 +262,7 @@ The roadmap of the roadmap: this document is reviewed at every phase gate and wh
 trigger fires. Thresholds are revised only with a decision-log entry — a threshold quietly
 lowered to pass a gate is worse than no gate.
 
-## 12. Decision log
+## 14. Decision log
 
 | Date | Change | Reason | Author |
 |---|---|---|---|
@@ -232,7 +270,7 @@ lowered to pass a gate is worse than no gate.
 | 2026-08-06 | Time windows placed in 2.0 behind a pricing gate | Forces tier T2 on every optimization; unaffordable on the €9.99 tier | Product owner |
 | 2026-08-06 | Paywall-placement experiment recorded rather than implemented | Product owner chose paywall-first for the MVP; the experiment tests it later | Product owner |
 
-## 13. Rationale
+## 15. Rationale
 
 The roadmap is gated rather than scheduled because the MVP asks a question that has not yet
 been answered: **will a single professional pay roughly €10 a month to stop guessing the order
@@ -254,7 +292,7 @@ Time windows in particular move every optimization to tier T2, changing the cost
 from per-route to per-stop. That is a pricing decision wearing a feature costume, and it is
 treated as one.
 
-## 14. Rejected alternatives
+## 16. Rejected alternatives
 
 | Alternative | Attraction | Why rejected |
 |---|---|---|

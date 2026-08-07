@@ -89,7 +89,36 @@ rules governing their use. It translates the visual direction of
 
 ---
 
-## 5. Colour tokens
+## 5. Flows
+
+**How a token is added.** Components never define values, so every visual change enters here
+first and propagates outward.
+
+```
+  need for a value that no token expresses
+            │
+            ▼
+  can an existing token serve?  ──yes──▶  use it; no token added
+            │ no
+            ▼
+  add the token here, in both themes, with its contrast measured
+            │
+            ▼
+  verified against 23_ACCESSIBILITY thresholds  ──fails──▶  value adjusted, not the threshold
+            │ passes
+            ▼
+  referenced by 08 and 09; never redefined there
+```
+
+**How a theme is verified.** Light and dark are not variants of one another — each token is
+checked against its own background in its own theme, because an inverted palette produces
+contrast failures that a single-theme check cannot see.
+
+**How the accent stays single.** Mint is claimed by the active route, the primary action, the
+selected marker and the completed stop. A proposal for a second accent is a proposal to change
+[ADR-0009](adr/0009-visual-direction.md), and is handled as one.
+
+## 6. Colour tokens
 
 ### Neutral ramp
 
@@ -144,7 +173,7 @@ an error — it is a lower-confidence result, and colouring it red would misrepr
 
 ---
 
-## 6. Typography
+## 7. Typography
 
 Two voices, from [ADR-0009](adr/0009-visual-direction.md).
 
@@ -183,7 +212,7 @@ goes below 13.
 
 ---
 
-## 7. Spacing, radius, elevation
+## 8. Spacing, radius, elevation
 
 **4 pt base grid.** Every spacing value is a multiple of 4.
 
@@ -215,7 +244,7 @@ surface lightness rather than shadow, since shadows are invisible on near-black.
 
 ---
 
-## 8. Motion
+## 9. Motion
 
 | Token | Duration | Curve | Use |
 |---|---|---|---|
@@ -235,7 +264,20 @@ understood.
 
 ---
 
-## 9. Edge cases
+## 10. Architectural decisions
+
+| ID | Decision | Applies to |
+|---|---|---|
+| [0009](adr/0009-visual-direction.md) | Quiet monochrome base, single mint accent, red reserved for alerts | Every colour token |
+| [0009](adr/0009-visual-direction.md) | Two type voices: condensed uppercase for metrics, geometric sans for everything else | Typography |
+| [0010](adr/0010-mobile-only-scope.md) | Mobile only | Spacing scale and touch-target minimums |
+
+**Decided here:** the light-theme mint is darker than the visual reference, because the
+reference value fails 4.5:1 against `surface`. Fidelity to the source images lost to contrast,
+and the trade is recorded rather than quietly made — see
+[`23_ACCESSIBILITY.md`](23_ACCESSIBILITY.md).
+
+## 11. Edge cases
 
 | # | Condition | Expected behaviour |
 |---|---|---|
@@ -248,7 +290,7 @@ understood.
 | 7 | Direct sunlight | Verified outdoors; the neutral ramp holds because contrast is high by construction |
 | 8 | Numerals changing rapidly (live ETA) | Tabular figures prevent layout shift |
 
-## 10. Error handling
+## 12. Error handling
 
 | Failure | Result | Fallback |
 |---|---|---|
@@ -257,7 +299,7 @@ understood.
 | Contrast check fails in CI | Build blocked | Fix the token |
 | Map style unavailable | Default Google style; interface tokens unaffected | Default map |
 
-## 11. Best practices
+## 13. Best practices
 
 1. **Tokens only.** A literal value in a component is a review-blocking defect.
 2. **Red is never decorative.** If something needs emphasis and is not an error, it is
@@ -271,7 +313,7 @@ understood.
 6. **Uppercase for labels only**, at most three words.
 7. **Tabular numerals in every metric.**
 
-## 12. Checklist
+## 14. Checklist
 
 - [ ] Every token defined in both themes; a missing token fails the build.
 - [ ] Contrast verified: 4.5:1 text, 3:1 UI, both themes, including over the map.
@@ -283,7 +325,7 @@ understood.
 - [ ] No literal colour, spacing, radius or duration anywhere in components.
 - [ ] Sunlight legibility verified on a physical device outdoors.
 
-## 13. Roadmap
+## 15. Roadmap
 
 | Phase | Scope | Trigger |
 |---|---|---|
@@ -292,7 +334,7 @@ understood.
 | 1.2 | High-contrast variant for extreme sunlight | User feedback |
 | 2.0 | Token export for a web companion | [ADR-0010](adr/0010-mobile-only-scope.md) reopened |
 
-## 14. Decision log
+## 16. Decision log
 
 | Date | Change | Reason | Author |
 |---|---|---|---|
@@ -302,7 +344,7 @@ understood.
 | 2026-08-06 | Route casing added in light theme only | Mint on paper-white is the system's weakest contrast pairing | Design |
 | 2026-08-06 | `motion-deliberate` reserved for marker reorder | The reorder is the product's proof moment and deserves to be seen | Design |
 
-## 15. Rationale
+## 17. Rationale
 
 The system is small on purpose. One accent, one reserved semantic colour, two type voices, a
 4 pt grid. A driver glancing at a phone between stops cannot decode a rich visual hierarchy,
@@ -324,7 +366,7 @@ reference's mint sits on a dark dashboard where it reads well; on paper-white it
 4.5:1. Preserving the reference exactly would have shipped an accessibility failure on the
 product's most-used surface.
 
-## 16. Rejected alternatives
+## 18. Rejected alternatives
 
 | Alternative | Attraction | Why rejected |
 |---|---|---|

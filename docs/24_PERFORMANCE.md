@@ -57,7 +57,35 @@ in the sun.
   cool plugged-in flagship, which is nobody's actual condition.
 ```
 
-## 5. Reference devices
+## 5. Flows
+
+**How a regression is caught.** The budget is the test; there is no separate judgement about
+whether a number feels acceptable.
+
+```
+  change ──▶ measured on reference devices, on battery, warm
+                       │
+          within budget│              over budget
+                       ▼                    ▼
+                    merged          investigated before release
+                                            │
+                              ┌─────────────┴─────────────┐
+                              ▼                           ▼
+                    the change is fixed          the budget was wrong:
+                                                 changed here first, with
+                                                 the reason, then everywhere
+```
+
+**How an optimization is accepted.** Measure, change, measure again, and record both numbers in
+the pull request. An optimization without a before-and-after is a guess that has added
+complexity — and complexity that did not buy speed is the most expensive kind.
+
+**How work is removed rather than accelerated.** The first question about a slow path is
+whether it needs to happen. The local address book is faster than any achievable autocomplete
+because it makes no request at all — which is also why it is the largest cost saving in
+[`31_COST_MODEL.md`](31_COST_MODEL.md).
+
+## 6. Reference devices
 
 **Budgets are met on these, not on the newest hardware.**
 
@@ -73,7 +101,7 @@ August is thermally throttled, and that is the condition that matters.
 
 ---
 
-## 6. Budgets
+## 7. Budgets
 
 ### Startup
 
@@ -126,7 +154,7 @@ user is between charges for a working day.
 
 ---
 
-## 7. Techniques
+## 8. Techniques
 
 ### Rendering
 
@@ -165,7 +193,20 @@ user is between charges for a working day.
 
 ---
 
-## 8. Edge cases
+## 9. Architectural decisions
+
+| ID | Decision | Applies to |
+|---|---|---|
+| [0005](adr/0005-map-engine-and-route-preview.md) | `react-native-maps` behind `<AppMap>` | Marker and polyline rendering budgets |
+| [0010](adr/0010-mobile-only-scope.md) | Sheet with gesture-driven detents | The no-JS-thread-work-during-a-gesture rule |
+| [0003](adr/0003-tiered-optimization-cascade.md) | Cascade T0–T3 | The T1 and T2 latency budgets, and the async threshold |
+| [0007](adr/0007-place-id-durable-coordinates-perishable.md) | Coordinates perishable | The batched re-hydration budget |
+
+**Decided here:** budgets are met on three-year-old hardware, on battery, warm. Measuring on a
+cool, plugged-in, current flagship produces numbers that are true and useless — nobody uses this
+product in that condition.
+
+## 10. Edge cases
 
 | # | Condition | Expected behaviour |
 |---|---|---|
@@ -179,7 +220,7 @@ user is between charges for a working day.
 | 8 | Backgrounded during optimization | Request continues; the result applies on return |
 | 9 | Map and list both rendering 25 items | Shared memoised data; markers and rows derive from one source |
 
-## 9. Error handling
+## 11. Error handling
 
 | Failure | Detection | Result |
 |---|---|---|
@@ -189,7 +230,7 @@ user is between charges for a working day.
 | Optimization exceeds p95 | Server metrics | Async threshold lowered, or waiting UX strengthened |
 | Battery drain over budget | Manual testing | Investigated; background work is the usual cause |
 
-## 10. Best practices
+## 12. Best practices
 
 1. **Measure before optimising, and record the measurement in the pull request.** An unmeasured
    optimisation is a guess that adds complexity.
@@ -200,7 +241,7 @@ user is between charges for a working day.
 6. **Prefer removing work to making work faster.** The address book beats a faster autocomplete.
 7. **Never evict the draft route** under memory pressure — it is the user's unsaved work.
 
-## 11. Checklist
+## 13. Checklist
 
 - [ ] Cold start measured on both reference devices, on battery, warm.
 - [ ] 60 fps verified with 25 stops on the low-tier Android device.
@@ -214,7 +255,7 @@ user is between charges for a working day.
 - [ ] Download size measured against the 60 MB budget.
 - [ ] Dynamic Type 200% verified at 60 fps on the densest screen.
 
-## 12. Roadmap
+## 14. Roadmap
 
 | Phase | Scope | Trigger |
 |---|---|---|
@@ -223,7 +264,7 @@ user is between charges for a working day.
 | 1.x | Startup profiling and deferred-initialisation tuning | If cold start approaches budget |
 | 2.0 | Budgets revisited if stop counts rise above 25 | Gate D3 |
 
-## 13. Decision log
+## 15. Decision log
 
 | Date | Change | Reason | Author |
 |---|---|---|---|
@@ -232,7 +273,7 @@ user is between charges for a working day.
 | 2026-08-06 | Perceived latency budgeted rather than request time | The debounce is deliberate; the address book answers instantly | Architecture |
 | 2026-08-06 | Draft route exempt from memory-pressure eviction | It is unsaved user work | Architecture |
 
-## 14. Rationale
+## 16. Rationale
 
 The budgets are set against old, warm devices because that is the population. A professional who
 bought a phone three years ago and mounts it on a windscreen in August is the modal user, not the
@@ -254,7 +295,7 @@ Exempting the draft route from memory-pressure eviction is a small rule protecti
 failure. Under pressure the OS will ask for memory, and evicting a cache is correct — evicting
 the user's unsaved arrangement is the P3 violation that ends the relationship.
 
-## 15. Rejected alternatives
+## 17. Rejected alternatives
 
 | Alternative | Attraction | Why rejected |
 |---|---|---|

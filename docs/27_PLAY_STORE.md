@@ -63,7 +63,35 @@ behaviour produces enforcement without a conversation.
 
 ---
 
-## 5. Policies
+## 5. Flows
+
+**Track promotion.** Play's model is a ladder, and each rung answers a different question.
+
+```
+  internal    does it install and run?                      minutes
+     │
+     ▼
+  closed      does it work for real users on real devices?  days
+     │
+     ▼
+  open        does it survive scale and device variety?     optional
+     │
+     ▼
+  production  staged: 5% ──▶ 20% ──▶ 50% ──▶ 100%
+                     │
+          crash rate or ANR above threshold ──▶ rollout halted, not rolled forward
+```
+
+**Data Safety.** The declaration is generated from what the app actually collects
+([`21_ANALYTICS.md`](21_ANALYTICS.md)), not from what seems safe to declare. A declaration that
+disagrees with observed behaviour is treated as a policy violation rather than a mistake.
+
+**Where Play differs from Apple, and it is easy to miss.** Staged rollout can be halted but not
+reversed; the Data Safety form is stricter about location than the App Store's manifest; and
+package visibility for navigation apps requires the `<queries>` element at build time
+([`18_PERMISSIONS.md`](18_PERMISSIONS.md)).
+
+## 6. Policies
 
 | Policy | Relevance | Compliance |
 |---|---|---|
@@ -81,7 +109,7 @@ the app must exist and be declared.
 
 ---
 
-## 6. Data Safety
+## 7. Data Safety
 
 The declaration is verified against actual behaviour, not against intent. Play cross-checks it,
 and a mismatch is an enforcement matter rather than a review conversation.
@@ -110,7 +138,7 @@ That claim is verified in the pre-submission checklist rather than assumed.
 
 ---
 
-## 7. Billing
+## 8. Billing
 
 Google Play Billing via RevenueCat, with the same products and the same 7-day trial as iOS
 ([`20_SUBSCRIPTIONS.md`](20_SUBSCRIPTIONS.md)).
@@ -131,7 +159,7 @@ retains entitlement indefinitely.
 
 ---
 
-## 8. Release management
+## 9. Release management
 
 **Staged rollout is mandatory**, never a full release. Progression is manual at each step, gated
 on the crash-free rate holding above the threshold in
@@ -154,7 +182,20 @@ a fix must still ship forward.
 
 ---
 
-## 9. Edge cases
+## 10. Architectural decisions
+
+| ID | Decision | Applies to |
+|---|---|---|
+| [0002](adr/0002-target-segment-and-monetization.md) | Trial to paid | Billing configuration, base plan offers |
+| [0004](adr/0004-external-navigation-handoff.md) | External handoff | The `<queries>` declaration and package visibility |
+| [0010](adr/0010-mobile-only-scope.md) | Mobile only | Form factor declarations |
+| [0007](adr/0007-place-id-durable-coordinates-perishable.md) | Coordinates perishable | Data Safety retention answers |
+
+**Decided here:** rollout is always staged, never full on day one. Play cannot reverse a
+rollout — it can only halt it — so the percentage ladder is the only rollback that exists
+before a new build is live.
+
+## 11. Edge cases
 
 | # | Condition | Response |
 |---|---|---|
@@ -168,7 +209,7 @@ a fix must still ship forward.
 | 8 | Play rejects the listing | Correct; a metadata change does not need a new build |
 | 9 | Testers cannot install from Internal Testing | Verify the tester list and licence testing configuration |
 
-## 10. Error handling
+## 12. Error handling
 
 | Failure | Response |
 |---|---|
@@ -178,7 +219,7 @@ a fix must still ship forward.
 | Billing misconfiguration | Verify products in the Console against RevenueCat |
 | ANR rate elevated | Investigate main-thread blocking — usually gesture or map work |
 
-## 11. Best practices
+## 13. Best practices
 
 1. **Declare Data Safety from actual behaviour**, verified against code, never from intent.
 2. **Always stage the rollout**; never release to 100% directly.
@@ -188,7 +229,7 @@ a fix must still ship forward.
 6. **Test on real low-end Android hardware**, not only on emulators.
 7. **Keep the Play and App Store paywalls identical in substance**, so compliance is verified once.
 
-## 12. Checklist
+## 14. Checklist
 
 Before every submission:
 
@@ -206,7 +247,7 @@ Before every submission:
 - [ ] Screenshots current, both languages.
 - [ ] Tested on a physical low-tier Android device.
 
-## 13. Roadmap
+## 15. Roadmap
 
 | Phase | Scope | Trigger |
 |---|---|---|
@@ -215,7 +256,7 @@ Before every submission:
 | 1.3 | Background location declaration and demonstration video | Release 1.3 |
 | 1.x | Open Testing track for a wider beta | User base growth |
 
-## 14. Decision log
+## 16. Decision log
 
 | Date | Change | Reason | Author |
 |---|---|---|---|
@@ -224,7 +265,7 @@ Before every submission:
 | 2026-08-06 | Account hold mapped explicitly | No Apple equivalent; unmapped means entitlement retained wrongly | Architecture |
 | 2026-08-06 | Web deletion path treated as a submission blocker | Play requires it; Apple does not | Product owner |
 
-## 15. Rationale
+## 17. Rationale
 
 Play's risk profile is the inverse of Apple's. Apple scrutinises subscription presentation and
 reviews with human judgement; Play is more permissive there but cross-checks data declarations
@@ -243,7 +284,7 @@ most likely omission when porting an iOS-first subscription implementation. A us
 whose state is unmapped keeps full entitlement without paying, and nothing surfaces the error
 because the app behaves correctly from the user's perspective.
 
-## 16. Rejected alternatives
+## 18. Rejected alternatives
 
 | Alternative | Attraction | Why rejected |
 |---|---|---|

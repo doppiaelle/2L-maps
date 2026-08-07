@@ -88,7 +88,43 @@ automatically to a paid subscription is the single most common cause of App Stor
 
 ---
 
-## 5. Products
+## 5. Flows
+
+**Trial to entitlement.** The client never writes entitlement; it only reads it.
+
+```
+  paywall (discloses duration, price, renewal date, how to cancel — Guideline 3.1.2)
+            │
+       user starts trial
+            │
+            ▼
+  StoreKit / Play Billing ──▶ RevenueCat ──▶ webhook (signature verified)
+                                                  │
+                                                  ▼
+                                        entitlement row written server-side
+                                                  │
+                                                  ▼
+                          client reads entitlement ──▶ full access, quotas applied
+```
+
+**Renewal and lapse.**
+
+```
+  day 7 ──── not cancelled ────▶ charged ──▶ entitlement continues
+     │
+  cancelled ──▶ access until period end ──▶ entitlement lapses ──▶ paywall
+                                                  │
+                                    saved routes remain readable; nothing is deleted
+```
+
+**Restore.** Restoring purchases re-reads entitlement from the server rather than trusting the
+local receipt cache. A device that has been offline, reinstalled or handed over must converge on
+the same answer as the server, and only the server can be right.
+
+**Why quotas apply during the trial.** Seven days of unmetered optimization followed by a
+cancellation costs more than the subscription would ever have earned (risk C11).
+
+## 6. Products
 
 | Product | Price | Trial | Notes |
 |---|---|---|---|
@@ -104,7 +140,7 @@ There is no free tier and no one-time purchase
 
 ---
 
-## 6. The paywall
+## 7. The paywall
 
 ### Required elements, all visible without scrolling
 
@@ -145,7 +181,7 @@ thing that determines whether the user proceeds.
 
 ---
 
-## 7. Entitlement
+## 8. Entitlement
 
 | Status | Meaning | Metered features | Own data |
 |---|---|---|---|
@@ -169,7 +205,7 @@ unmetered one.
 
 ---
 
-## 8. RevenueCat integration
+## 9. RevenueCat integration
 
 ### Webhook — the only writer of entitlement
 
@@ -205,7 +241,19 @@ server-side entitlement refresh rather than trusting the SDK result.
 
 ---
 
-## 9. Edge cases
+## 10. Architectural decisions
+
+| ID | Decision | Applies to |
+|---|---|---|
+| [0002](adr/0002-target-segment-and-monetization.md) | 7-day trial converting to paid; no permanent free tier | Products, paywall, trial economics |
+| [0011](adr/0011-server-side-quota-enforcement.md) | Entitlement written server-side by verified webhook only | Entitlement resolution, restore, quota during trial |
+
+**Decided here:** the client's RevenueCat state drives the interface and never access. The two
+can legitimately disagree — after an offline period, a refund, or a family-sharing change — and
+when they do, the server is right. An app that gates on the local cache is an app whose
+paywall can be removed by turning off the network.
+
+## 11. Edge cases
 
 | # | Condition | Expected behaviour |
 |---|---|---|
@@ -223,7 +271,7 @@ server-side entitlement refresh rather than trusting the SDK result.
 | 12 | Subscription managed on another platform | Entitlement is cross-platform via RevenueCat |
 | 13 | Purchase during a network failure | Store completes it; the webhook arrives later; foreground refetch resolves it |
 
-## 10. Error handling
+## 12. Error handling
 
 | Failure | Detection | User-facing result | Fallback |
 |---|---|---|---|
@@ -238,7 +286,7 @@ server-side entitlement refresh rather than trusting the SDK result.
 **A paywall that cannot show its price must not show a subscribe control.** An unpriced purchase
 prompt is both a compliance failure and a trust failure.
 
-## 11. Best practices
+## 13. Best practices
 
 1. **The client never grants access.** UI only.
 2. **Verify every webhook signature.**
@@ -251,7 +299,7 @@ prompt is both a compliance failure and a trust failure.
 7. **Re-read Guideline 3.1.2 before every paywall change**, in every language.
 8. **Never ship a paywall without a visible restore control.**
 
-## 12. Checklist
+## 14. Checklist
 
 Before every submission:
 
@@ -268,7 +316,7 @@ Before every submission:
 - [ ] Grace period verified to retain metered access.
 - [ ] Quotas verified active during the trial.
 
-## 13. Roadmap
+## 15. Roadmap
 
 | Phase | Scope | Trigger |
 |---|---|---|
@@ -277,7 +325,7 @@ Before every submission:
 | 1.x | Annual plan prominence experiment | Same |
 | 2.0 | A higher tier carrying time windows and >25 stops | Gate D3 |
 
-## 14. Decision log
+## 16. Decision log
 
 | Date | Change | Reason | Author |
 |---|---|---|---|
@@ -287,7 +335,7 @@ Before every submission:
 | 2026-08-06 | Quotas apply during the trial | Seven days of unmetered access is an open liability | Architecture |
 | 2026-08-06 | Paywall copy treated as a compliance artefact | C12 rejection risk and C16 consumer-law exposure | Product owner |
 
-## 15. Rationale
+## 17. Rationale
 
 The architecture's central decision is that **entitlement is a server fact**. RevenueCat's client
 SDK is convenient and reports accurately in normal conditions, but it runs on a device the user
@@ -305,7 +353,7 @@ downside is asymmetric. A slightly less persuasive paywall costs some percentage
 a non-compliant one costs the release, and repeated rejections cost weeks. The required elements
 are stated as a checklist precisely so they are not eroded by well-intentioned optimisation.
 
-## 16. Rejected alternatives
+## 18. Rejected alternatives
 
 | Alternative | Attraction | Why rejected |
 |---|---|---|

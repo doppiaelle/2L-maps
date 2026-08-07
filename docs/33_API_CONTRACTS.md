@@ -44,11 +44,11 @@ records inputs, outputs, errors, timeouts, retry policy, caching and rate limits
 ### Contract layers
 
 ```
-  CLIENT  ──── internal contracts (§6) ────▶  EDGE FUNCTIONS
+  CLIENT  ──── internal contracts (§7) ────▶  EDGE FUNCTIONS
                  stable, ours to change              │
                  versioned with the app              │
                                                      │
-                                          external contracts (§7)
+                                          external contracts (§8)
                                           Google's, can change
                                           without notice
                                                      │
@@ -62,7 +62,36 @@ without an app release, which is the practical benefit of the proxy
 
 ---
 
-## 5. Error taxonomy
+## 5. Flows
+
+**How a contract changes.** The contract is the interface; changing it is a versioned event.
+
+```
+  proposed change
+        │
+        ▼
+  additive?  ──yes──▶ MINOR; clients unaffected; contract test extended
+        │ no
+        ▼
+  breaking ──▶ MAJOR (25) ──▶ both shapes served during the transition
+                                       │
+                                       ▼
+                          clients migrated ──▶ old shape removed
+```
+
+**How a response is trusted.** It is not. Every payload crossing a boundary is `unknown` until
+parsed by a schema — network, storage and deep links alike. A response shape assumed rather
+than validated is how a provider's silent change becomes a crash in the field
+([`../CLAUDE.md`](../CLAUDE.md) §3).
+
+**How a failure is classified.** Every error maps to exactly one taxonomy entry, and every
+taxonomy entry names a user-visible outcome and a next action. An error with no entry is a
+gap in this document, not an unexpected condition.
+
+**Retry policy.** 5xx and timeouts are retried with bounded exponential backoff; 4xx never is.
+Retrying a rejected request spends quota to receive the same rejection.
+
+## 6. Error taxonomy
 
 Every internal response carries a machine-readable `code`. **The client branches on `code`,
 never on `message`.**
@@ -99,7 +128,7 @@ never on `message`.**
 
 ---
 
-## 6. Internal contracts
+## 7. Internal contracts
 
 ### `POST /optimize`
 
@@ -210,7 +239,7 @@ Read-only, no upstream call, no quota consumption.
 
 ---
 
-## 7. External contracts — Google
+## 8. External contracts — Google
 
 > **Verification status: unverified against primary sources.** `developers.google.com` was
 > unreachable from this environment (403 from the egress proxy). Values below come from web
@@ -274,7 +303,7 @@ Enterprise, since March 2025. Confidence: medium. Cost implications in
 
 ---
 
-## 8. Timeout and retry summary
+## 9. Timeout and retry summary
 
 | Endpoint | Client timeout | Upstream timeout | Retry | Backoff |
 |---|---|---|---|---|
@@ -289,7 +318,7 @@ Enterprise, since March 2025. Confidence: medium. Cost implications in
 **4xx is never retried.** In this architecture the client does not construct upstream requests,
 so a malformed one is always our defect. Retrying burns quota and hides the bug.
 
-## 9. Rate limits and quotas
+## 10. Rate limits and quotas
 
 | Limit | Window | Value | Purpose |
 |---|---|---|---|
@@ -304,7 +333,20 @@ Values are **server configuration**, adjustable without an app release
 ([ADR-0011](adr/0011-server-side-quota-enforcement.md)). Derivation in
 [`31_COST_MODEL.md`](31_COST_MODEL.md).
 
-## 10. Edge cases
+## 11. Architectural decisions
+
+| ID | Decision | Applies to |
+|---|---|---|
+| [0006](adr/0006-mandatory-backend-proxy.md) | Every web-service call is proxied | The split between internal and external contracts |
+| [0011](adr/0011-server-side-quota-enforcement.md) | Server-side quota | The 402 and 429 contracts |
+| [0003](adr/0003-tiered-optimization-cascade.md) | Cascade T0–T3 | Why the optimization contract never names a tier |
+| [0012](adr/0012-long-term-osm-exit-path.md) | OSM exit path | Why internal contracts are expressed in the product's vocabulary |
+
+**Decided here:** the internal contract is ours and stable; the external contract is Google's
+and may change without notice. Keeping them separate is what makes
+[ADR-0012](adr/0012-long-term-osm-exit-path.md) a migration rather than a rewrite.
+
+## 12. Edge cases
 
 | # | Condition | Expected behaviour |
 |---|---|---|
@@ -319,7 +361,7 @@ Values are **server configuration**, adjustable without an app release
 | 9 | Async job never completes | Sweeper marks it failed; the client is notified via Realtime |
 | 10 | Client retries after a 504 | Idempotency key prevents a second billable call |
 
-## 11. Error handling
+## 13. Error handling
 
 | Failure | Response | `degradationHint` |
 |---|---|---|
@@ -330,7 +372,7 @@ Values are **server configuration**, adjustable without an app release
 | No entitlement | 402 `NO_ENTITLEMENT` | `NONE` |
 | Some stops unreachable | 200 `PARTIAL_RESULT` | — |
 
-## 12. Best practices
+## 14. Best practices
 
 1. **Branch on `code`, never on `message`.** Messages are localised and may change.
 2. **Always send an idempotency key** on `/optimize`. A retry without one is a double charge.
@@ -338,21 +380,21 @@ Values are **server configuration**, adjustable without an app release
 4. **Always send a session token** on autocomplete. Its absence is a 400 by design.
 5. **Keep field masks minimal** and review them on every Routes change — they select the SKU.
 6. **Act on `degradationHint`** rather than inferring how to degrade.
-7. **Re-verify §7 at every phase gate.** These are Google's numbers, not ours.
+7. **Re-verify §8 at every phase gate.** These are Google's numbers, not ours.
 
-## 13. Checklist
+## 15. Checklist
 
 - [ ] Every endpoint has a contract test asserting the shapes here.
 - [ ] Error codes exhaustively enumerated in a client-side type.
 - [ ] Idempotency verified for `/optimize` and the webhook.
 - [ ] Session token enforcement verified by a negative test.
 - [ ] Field masks verified minimal for both T1 phases.
-- [ ] Timeout and retry values match §8 in code.
+- [ ] Timeout and retry values match §9 in code.
 - [ ] Rate limits and quotas loaded from configuration, not compiled in.
-- [ ] §7 re-verified against primary Google documentation, with dates recorded.
+- [ ] §8 re-verified against primary Google documentation, with dates recorded.
 - [ ] No limit in this document contradicts any other document.
 
-## 14. Roadmap
+## 16. Roadmap
 
 | Phase | Scope | Trigger |
 |---|---|---|
@@ -361,7 +403,7 @@ Values are **server configuration**, adjustable without an app release
 | 2.0 | `/optimize` extended with time windows and priorities | Gate D3 |
 | 3.0 | `RoutingProvider` contract abstracted so a Valhalla adapter satisfies it unchanged | [ADR-0012](adr/0012-long-term-osm-exit-path.md) |
 
-## 15. Decision log
+## 17. Decision log
 
 | Date | Change | Reason | Author |
 |---|---|---|---|
@@ -369,9 +411,9 @@ Values are **server configuration**, adjustable without an app release
 | 2026-08-06 | Idempotency key made mandatory on `/optimize` | A retry after timeout would otherwise double-charge | Architecture |
 | 2026-08-06 | Autocomplete retry set to none | The user is typing; a retry lands after the input changed | Architecture |
 | 2026-08-06 | `degradationHint` added to error responses | The client cannot otherwise know whether T0 is appropriate | Architecture |
-| 2026-08-06 | §7 marked unverified pending primary-source access | Honesty about sourcing; these values drive pricing | Architecture |
+| 2026-08-06 | §8 marked unverified pending primary-source access | Honesty about sourcing; these values drive pricing | Architecture |
 
-## 16. Rationale
+## 18. Rationale
 
 Centralising every limit in one document is the main decision here. With 41 documents, a
 timeout mentioned in three places will diverge within weeks, and the divergence surfaces as a
@@ -392,7 +434,7 @@ because the primary documentation was unreachable, and they drive both the archi
 subscription price. Presenting them as confirmed would be the kind of quiet inaccuracy that
 becomes a costly surprise.
 
-## 17. Rejected alternatives
+## 19. Rejected alternatives
 
 | Alternative | Attraction | Why rejected |
 |---|---|---|

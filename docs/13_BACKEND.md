@@ -109,7 +109,34 @@ an expired user gets a paywall rather than a confusing 429.
 
 ---
 
-## 5. Functions
+## 5. Flows
+
+**The seven-step pipeline every function runs.** The order is load-bearing and is not a
+suggestion.
+
+```
+  1  verify JWT           ──▶ 401   the caller is who they claim
+  2  check entitlement    ──▶ 402   an expired trial sees a paywall, not a rate limit
+  3  check rate limit     ──▶ 429   burst protection
+  4  check quota          ──▶ 429   calendar-month allowance
+  5  cache lookup                   after quota, so a hit still counts
+  6  upstream call        ──▶ 5xx   the only step that costs money
+  7  record usage                   always, hit or miss
+```
+
+**Why entitlement precedes rate limiting.** Reversing 2 and 3 tells a lapsed user they are
+going too fast, when the truth is they are not subscribed. The error the user sees must name
+the real cause, or the next action they take cannot fix it.
+
+**Why the cache sits after the quota check.** A cache hit costs us nothing and still consumes
+allowance. Free cache hits would let a user with a recurring route consume unlimited value
+while the quota reports them as idle — and recurring routes are exactly what this segment has.
+
+**A failed upstream call.** Retried with bounded exponential backoff on 5xx only; a 4xx is
+never retried, because retrying a request that cannot succeed burns quota to reach the same
+answer.
+
+## 6. Functions
 
 ### `/optimize` — the core function
 
@@ -165,7 +192,7 @@ action fails, rather than after.
 
 ---
 
-## 6. Cross-cutting behaviour
+## 7. Cross-cutting behaviour
 
 **Authentication.** Every function except the webhook requires a valid Supabase JWT. The webhook
 authenticates by signature instead.
@@ -188,7 +215,21 @@ cache-hit, duration and outcome. **No addresses, no coordinates, no `place_id` t
 
 ---
 
-## 7. Edge cases
+## 8. Architectural decisions
+
+| ID | Decision | Applies to |
+|---|---|---|
+| [0006](adr/0006-mandatory-backend-proxy.md) | Every web-service call is proxied | The existence of every function here |
+| [0011](adr/0011-server-side-quota-enforcement.md) | Quota and entitlement server-side | Steps 2–4 and 7 of the pipeline |
+| [0007](adr/0007-place-id-durable-coordinates-perishable.md) | Coordinates perishable | Re-hydration endpoints and the purge job |
+| [0003](adr/0003-tiered-optimization-cascade.md) | Cascade T0–T3 | Tier selection, which happens here and not in the client |
+| [0012](adr/0012-long-term-osm-exit-path.md) | OSM exit path | Why the contract is ours, not Google's, at the boundary |
+
+**Decided here:** the tier is chosen server-side and never named in the response contract. The
+client shows a wait and a result; if it knew which engine ran, migrating engines would become a
+client release.
+
+## 9. Edge cases
 
 | # | Condition | Expected behaviour |
 |---|---|---|
@@ -205,7 +246,7 @@ cache-hit, duration and outcome. **No addresses, no coordinates, no `place_id` t
 | 11 | Autocomplete without a session token | 400 — a client defect that would break session billing |
 | 12 | Async job orphaned | Jobs older than a threshold are marked failed by a sweeper; the client is notified |
 
-## 8. Error handling
+## 10. Error handling
 
 | Status | Meaning | Client action |
 |---|---|---|
@@ -221,7 +262,7 @@ cache-hit, duration and outcome. **No addresses, no coordinates, no `place_id` t
 **Every error response carries a machine-readable code and a human-readable message.** The
 client branches on the code and never parses the message.
 
-## 9. Best practices
+## 11. Best practices
 
 1. **The pipeline order is fixed.** Reordering it changes cost and security properties.
 2. **Never trust the client for tier, entitlement, quota or ownership.**
@@ -233,7 +274,7 @@ client branches on the code and never parses the message.
 8. **Return a degradation hint on 503** so the client can fall back intelligently rather than
    guessing.
 
-## 10. Checklist
+## 12. Checklist
 
 - [ ] Every function runs the seven steps in order.
 - [ ] No web-service key or service-account credential exists client-side.
@@ -246,7 +287,7 @@ client branches on the code and never parses the message.
 - [ ] 4xx alerts; 5xx retries with bounds.
 - [ ] Async job sweeper active for orphaned jobs.
 
-## 11. Roadmap
+## 13. Roadmap
 
 | Phase | Scope | Trigger |
 |---|---|---|
@@ -255,7 +296,7 @@ client branches on the code and never parses the message.
 | 2.0 | Hierarchical chunking inside `/optimize` for >25 stops | Gate D3 |
 | 3.0 | `RoutingProvider` adapter for a self-hosted Valhalla | An [ADR-0012](adr/0012-long-term-osm-exit-path.md) trigger |
 
-## 12. Decision log
+## 14. Decision log
 
 | Date | Change | Reason | Author |
 |---|---|---|---|
@@ -264,7 +305,7 @@ client branches on the code and never parses the message.
 | 2026-08-06 | Autocomplete results not cached | Session semantics; stale suggestions | Architecture |
 | 2026-08-06 | 503 carries a degradation hint | The client cannot otherwise know whether T0 is appropriate | Architecture |
 
-## 13. Rationale
+## 15. Rationale
 
 The backend is deliberately thin. It holds no business logic that could live on the client; it
 exists to hold **secrets, limits and cache** — the three things a client cannot be trusted with.
@@ -286,7 +327,7 @@ upstream request is always our defect — the client cannot construct one, becau
 construct upstream requests at all. Retrying it would burn quota on a call that can never
 succeed, and would hide the bug.
 
-## 14. Rejected alternatives
+## 16. Rejected alternatives
 
 | Alternative | Attraction | Why rejected |
 |---|---|---|

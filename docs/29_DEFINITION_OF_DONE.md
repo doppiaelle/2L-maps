@@ -28,9 +28,9 @@ is the most expensive kind of work, because the remaining 10% is discovered by a
 
 | Concern | Owner | Notes |
 |---|---|---|
-| Change-level criteria | Author, verified by reviewer | §5 |
-| Feature-level criteria | Author + product owner | §6 |
-| Release-level criteria | Product owner | §7 |
+| Change-level criteria | Author, verified by reviewer | §6 |
+| Feature-level criteria | Author + product owner | §7 |
+| Release-level criteria | Product owner | §8 |
 | Criteria maintenance | Architecture | Changes require a decision-log entry |
 
 ---
@@ -71,13 +71,36 @@ is the most expensive kind of work, because the remaining 10% is discovered by a
                        DEGRADED STATE   ← unlabelled T0 is dishonest
                        DARK THEME       ← half the users
 
-  These four are listed explicitly in §5 because good intentions
+  These four are listed explicitly in §6 because good intentions
   do not survive a deadline.
 ```
 
 ---
 
-## 5. A change is done when
+## 5. Flows
+
+**The three gates, and what each one stops.**
+
+```
+  a change is done   ──▶ typecheck · lint · tests · states · a11y · tokens · docs
+        │                 stops: work that compiles but is unfinished
+        ▼
+  a feature is done  ──▶ every journey path · every error path · analytics · both platforms
+        │                 stops: a feature that works only on the happy path
+        ▼
+  a release is done  ──▶ E2E · performance measured · store metadata · rollback rehearsed
+                          stops: a build that is shippable but not supportable
+```
+
+**Why "done" is defined three times.** The word is used at three scales, and a single
+definition is either too strict to finish a change or too loose to release. Naming all three
+removes the most common disagreement in the project — two people agreeing something is done
+while meaning different gates.
+
+**Nothing here is a majority vote.** A checklist with most items ticked is a checklist that has
+identified exactly what is missing.
+
+## 6. A change is done when
 
 Verified by the **reviewer**, not asserted by the author.
 
@@ -139,9 +162,9 @@ Verified by the **reviewer**, not asserted by the author.
 
 ---
 
-## 6. A feature is done when
+## 7. A feature is done when
 
-Everything in §5 for every change, plus:
+Everything in §6 for every change, plus:
 
 - [ ] Every functional requirement it implements passes, verified against
       [`01_PRODUCT_REQUIREMENTS.md`](01_PRODUCT_REQUIREMENTS.md).
@@ -161,9 +184,9 @@ Everything in §5 for every change, plus:
 
 ---
 
-## 7. A release is done when
+## 8. A release is done when
 
-Everything in §6 for every feature, plus:
+Everything in §7 for every feature, plus:
 
 ### Verification
 
@@ -195,7 +218,20 @@ Everything in §6 for every feature, plus:
 
 ---
 
-## 8. Edge cases
+## 9. Architectural decisions
+
+| ID | Decision | Applies to |
+|---|---|---|
+| [0001](adr/0001-documentation-language-and-structure.md) | Documentation is single-source and templated | The "documentation updated" gate |
+| [0011](adr/0011-server-side-quota-enforcement.md) | Server-side quota and entitlement | The requirement that 402 and 429 paths are tested before done |
+| [0007](adr/0007-place-id-durable-coordinates-perishable.md) | Coordinates perishable | The null-coordinate handling gate |
+| [0005](adr/0005-map-engine-and-route-preview.md) | Facades mandatory | The "no direct SDK import" gate |
+
+**Decided here:** verification on a physical device, on both platforms, in both themes, is part
+of done rather than part of QA. A simulator does not reproduce thermal throttling, sunlight,
+gloved touch or a real network — and those are this product's operating conditions.
+
+## 10. Edge cases
 
 | # | Condition | Expected behaviour |
 |---|---|---|
@@ -203,12 +239,12 @@ Everything in §6 for every feature, plus:
 | 2 | A criterion blocks urgent work | Raise it; decide explicitly; record the exception |
 | 3 | A reviewer cannot verify a criterion | The author supplies evidence — a screenshot, a measurement, a test name |
 | 4 | Documentation was not updated | The change is not done. Documentation is part of the change, not follow-up |
-| 5 | Tests exist but the error state was not implemented | Not done. §5's four-that-get-skipped are explicit for this reason |
+| 5 | Tests exist but the error state was not implemented | Not done. §6's four-that-get-skipped are explicit for this reason |
 | 6 | Performance measured on a simulator | Not done. Physical reference devices only |
 | 7 | Feature complete but its cost class is unrecorded | Not done. Cost is decided at acceptance, not discovered in a bill |
 | 8 | Work complete but unpushed at the end of a session | Not done. An unpushed commit is not saved work |
 
-## 9. Error handling
+## 11. Error handling
 
 | Failure of this process | Detection | Response |
 |---|---|---|
@@ -216,7 +252,7 @@ Everything in §6 for every feature, plus:
 | Criteria routinely skipped | Review pattern | The criterion is wrong or unclear — fix or remove it, never keep a fiction |
 | Checklist applied mechanically without judgement | Review quality drops | Criteria state their reason so they can be applied thoughtfully |
 
-## 10. Best practices
+## 12. Best practices
 
 1. **Verified by someone else.** Self-certified completion is not completion.
 2. **State what you did not do**, and why. Partial work honestly reported is manageable; partial
@@ -228,7 +264,7 @@ Everything in §6 for every feature, plus:
 6. **The four that get skipped are listed for a reason.** Check them explicitly.
 7. **Push before you stop.** The container is ephemeral.
 
-## 11. Checklist
+## 13. Checklist
 
 *(This document is the checklist; the section is retained for template conformance.)*
 
@@ -239,16 +275,16 @@ Meta-checklist for the criteria themselves, reviewed at each phase gate:
 - [ ] Criteria added in response to real defects, not hypothetical ones.
 - [ ] The list is short enough to be used every time.
 
-## 12. Roadmap
+## 14. Roadmap
 
 | Phase | Scope | Trigger |
 |---|---|---|
 | MVP | All three levels enforced manually in review | — |
 | 1.x | Automated enforcement of layering, SDK imports and hardcoded values | First repeated violation of the same rule |
-| 1.x | Pull request template embedding §5 | Post-launch |
+| 1.x | Pull request template embedding §6 | Post-launch |
 | 2.0 | Automated check that documentation numbers match code constants | First observed drift |
 
-## 13. Decision log
+## 15. Decision log
 
 | Date | Change | Reason | Author |
 |---|---|---|---|
@@ -258,7 +294,7 @@ Meta-checklist for the criteria themselves, reviewed at each phase gate:
 | 2026-08-06 | Documentation defined as part of the change | Follow-up documentation does not happen | Architecture |
 | 2026-08-06 | "Committed and pushed" added as a change-level criterion | An ephemeral container destroyed a full set of committed-but-unpushed work | Architecture |
 
-## 14. Rationale
+## 16. Rationale
 
 The criteria are grouped by **how they fail**, not by category. The four-that-get-skipped grouping
 exists because error, offline, degraded and dark-theme states are not forgotten out of ignorance —
@@ -283,7 +319,7 @@ The instruction to delete criteria that are always skipped is deliberate. A chec
 nobody honours teaches everyone that the checklist is optional, which costs more than the items
 themselves were worth.
 
-## 15. Rejected alternatives
+## 17. Rejected alternatives
 
 | Alternative | Attraction | Why rejected |
 |---|---|---|

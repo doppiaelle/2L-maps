@@ -82,7 +82,38 @@ pressure, constant interruption — rather than from general design taste.
 
 ---
 
-## 5. Principles
+## 5. Flows
+
+**How a design proposal is judged.** The principles are ordered, and the order is what makes
+them usable when two conflict.
+
+```
+  proposal
+     │
+     ▼
+  does it break the three-tap path to an optimized route?  ──yes──▶ rejected
+     │ no
+     ▼
+  does it put a primary control outside the lower third?   ──yes──▶ rejected
+     │ no
+     ▼
+  does it leave any state undesigned?                      ──yes──▶ returned, not rejected
+     │ no
+     ▼
+  does it rely on a gesture with no visible alternative?    ──yes──▶ returned
+     │ no
+     ▼
+  accepted
+```
+
+The distinction between *rejected* and *returned* matters: the first two are structural and
+cannot be patched, the last two are omissions that a revision fixes.
+
+**How a principle changes.** A principle blocking something clearly correct is raised, decided
+and recorded as an ADR in the same change that edits it — never worked around silently. This is
+the escalation path in [`../CLAUDE.md`](../CLAUDE.md) §15, applied to design.
+
+## 6. Principles
 
 ### P1 — Three taps, permanently
 
@@ -161,7 +192,7 @@ route appear as dismissible, non-blocking surfaces at the bottom of the screen.
 
 ---
 
-## 6. Architectural decisions
+## 7. Architectural decisions
 
 | ID | Decision | Applies to |
 |---|---|---|
@@ -171,7 +202,7 @@ route appear as dismissible, non-blocking surfaces at the bottom of the screen.
 
 **Decided here:** P8 — undo over confirmation — and the 1-second progress delay in P4.
 
-## 7. Edge cases
+## 8. Edge cases
 
 | # | Condition | Expected behaviour |
 |---|---|---|
@@ -185,7 +216,7 @@ route appear as dismissible, non-blocking surfaces at the bottom of the screen.
 | 8 | Optimization returns the entry order | Stated positively: "already the fastest order" |
 | 9 | Sheet dragged mid-animation | Gesture takes over; animation is interruptible |
 
-## 8. Error handling
+## 9. Error handling
 
 | Situation | Presentation | Rationale |
 |---|---|---|
@@ -197,7 +228,7 @@ route appear as dismissible, non-blocking surfaces at the bottom of the screen.
 
 **No error message ever ends without a next action.** "Something went wrong" is a defect.
 
-## 9. Best practices
+## 10. Best practices
 
 1. **Count the taps on every release.** It is the only number that degrades without anyone
    noticing.
@@ -210,7 +241,7 @@ route appear as dismissible, non-blocking surfaces at the bottom of the screen.
 6. **When a limit exists, say so before the user reaches it.**
 7. **Label degraded results everywhere they appear**, including in history weeks later.
 
-## 10. Checklist
+## 11. Checklist
 
 - [ ] Critical path measured at three taps or fewer.
 - [ ] Every primary control within the thumb zone, verified one-handed.
@@ -223,7 +254,7 @@ route appear as dismissible, non-blocking surfaces at the bottom of the screen.
 - [ ] Process death tested at every step of every journey.
 - [ ] Every error message ends with a next action.
 
-## 11. Roadmap
+## 12. Roadmap
 
 | Phase | Scope | Trigger |
 |---|---|---|
@@ -232,7 +263,7 @@ route appear as dismissible, non-blocking surfaces at the bottom of the screen.
 | 1.2 | Optional larger-touch mode for glove use | User feedback from Elena's segment |
 | 2.0 | Principles revisited if multi-stop constraints add unavoidable steps | Gate D3 |
 
-## 12. Decision log
+## 13. Decision log
 
 | Date | Change | Reason | Author |
 |---|---|---|---|
@@ -241,7 +272,7 @@ route appear as dismissible, non-blocking surfaces at the bottom of the screen.
 | 2026-08-06 | 1-second progress delay | A flashing spinner reads as a glitch | Design |
 | 2026-08-06 | Blocking dialogs forbidden during a route | The user is driving | Design |
 
-## 13. Rationale
+## 14. Rationale
 
 Every principle here traces to a physical fact about how the product is used. The three-tap
 constraint exists because Marco is in a car with the engine running. The thumb zone exists
@@ -262,7 +293,7 @@ every user on every action to protect against a mistake that is both rare and �
 recoverable anyway. Account deletion is exempted because it is the one action undo cannot
 reverse.
 
-## 14. Rejected alternatives
+## 15. Rejected alternatives
 
 | Alternative | Attraction | Why rejected |
 |---|---|---|

@@ -70,7 +70,40 @@ rather than pragmatically.
 
 ---
 
-## 5. Tools
+## 5. Flows
+
+**How an event is added.** The privacy question is asked before the usefulness question,
+because a useful event carrying an address is not a trade-off to weigh.
+
+```
+  proposed event
+       │
+       ▼
+  does it carry an address, a coordinate, or a place_id tied to a user?
+       │                                          │
+      yes                                         no
+       │                                          │
+       ▼                                          ▼
+  redesigned or dropped                which decision does it inform?
+                                                  │
+                                        none ─────┴────▶ not added
+                                                  │
+                                                  ▼
+                                    added, declared in the store privacy
+                                    manifests (26, 27), and reviewed at
+                                    the gate it feeds (28)
+```
+
+**How a gate is measured.** Each gate in [`28_ROADMAP.md`](28_ROADMAP.md) names the events that
+decide it, and those events are instrumented before the phase begins. A gate measured
+retroactively is a gate argued about rather than passed.
+
+**What is deliberately not measured.** No addresses, no coordinates, no `place_id` tied to a
+user, in analytics, logs, crash reports or breadcrumbs. A crash breadcrumb containing a
+coordinate is both a privacy exposure and a 30-day retention violation
+([ADR-0007](adr/0007-place-id-durable-coordinates-perishable.md)).
+
+## 6. Tools
 
 | Tool | Purpose | Data |
 |---|---|---|
@@ -85,7 +118,7 @@ auditable, and because it must survive an analytics outage
 
 ---
 
-## 6. Events
+## 7. Events
 
 ### Activation — gate D1
 
@@ -137,7 +170,7 @@ instead — and lower is better.
 
 ---
 
-## 7. Gate instrumentation
+## 8. Gate instrumentation
 
 Every threshold in [`28_ROADMAP.md`](28_ROADMAP.md), mapped to its source. **A gate whose metric
 is not instrumented cannot be assessed, and is never passed by assumption.**
@@ -155,7 +188,7 @@ is not instrumented cannot be assessed, and is never passed by assumption.**
 
 ---
 
-## 8. Privacy implementation
+## 9. Privacy implementation
 
 **Scrubbing happens at the source**, not at the destination. An event containing an address is
 never constructed, rather than constructed and filtered — a filter can be bypassed by a new code
@@ -174,7 +207,19 @@ reading real output catches the field nobody thought to pattern-match.
 
 ---
 
-## 9. Edge cases
+## 10. Architectural decisions
+
+| ID | Decision | Applies to |
+|---|---|---|
+| [0007](adr/0007-place-id-durable-coordinates-perishable.md) | Coordinates are perishable and personal | The prohibition on coordinates in any telemetry |
+| [0002](adr/0002-target-segment-and-monetization.md) | Trial to paid | Conversion and gate instrumentation |
+| [0011](adr/0011-server-side-quota-enforcement.md) | Quota decided server-side | Usage measured from server records, not client events |
+
+**Decided here:** usage and cost are measured server-side from the usage table, not from client
+analytics. Client events can be dropped, blocked or replayed; the number that decides whether
+the business works cannot come from a source the user can turn off.
+
+## 11. Edge cases
 
 | # | Condition | Expected behaviour |
 |---|---|---|
@@ -187,7 +232,7 @@ reading real output catches the field nobody thought to pattern-match.
 | 7 | `quota_reached` fires | **Alert** — treated as a probable defect, not a user problem |
 | 8 | Analytics SDK fails | Silent; never affects the app |
 
-## 10. Error handling
+## 12. Error handling
 
 | Failure | Result | Fallback |
 |---|---|---|
@@ -196,7 +241,7 @@ reading real output catches the field nobody thought to pattern-match.
 | `usage_events` write fails | **Logged as a defect** — cost attribution is lost | Reconcile from Google billing |
 | Personal data detected in a payload | Incident: purge, fix the source, review the class | [`19_SECURITY.md`](19_SECURITY.md) |
 
-## 11. Best practices
+## 13. Best practices
 
 1. **Every event must decide something.** If no one would act on it, do not collect it.
 2. **Never construct an event containing an address or coordinate.** Scrub at the source.
@@ -207,9 +252,9 @@ reading real output catches the field nobody thought to pattern-match.
 7. **Lower is better for time-in-app.** Do not import engagement metrics from products with
    opposite goals.
 
-## 12. Checklist
+## 14. Checklist
 
-- [ ] Every gate metric in §7 instrumented and verified before it is needed.
+- [ ] Every gate metric in §8 instrumented and verified before it is needed.
 - [ ] No event carries an address, coordinate, `place_id` or user text.
 - [ ] Sentry scrubbing verified with a deliberately polluted error.
 - [ ] Crashlytics breadcrumbs verified free of personal data.
@@ -220,7 +265,7 @@ reading real output catches the field nobody thought to pattern-match.
 - [ ] Real log output inspected by a human.
 - [ ] Privacy manifest and Data Safety declarations match what is actually collected.
 
-## 13. Roadmap
+## 15. Roadmap
 
 | Phase | Scope | Trigger |
 |---|---|---|
@@ -229,7 +274,7 @@ reading real output catches the field nobody thought to pattern-match.
 | 1.x | Automated log scanning for personal data | Post-launch |
 | 2.0 | Experiment framework for the paywall-placement test | Baseline established |
 
-## 14. Decision log
+## 16. Decision log
 
 | Date | Change | Reason | Author |
 |---|---|---|---|
@@ -239,7 +284,7 @@ reading real output catches the field nobody thought to pattern-match.
 | 2026-08-06 | Scrubbing at source rather than destination | A filter can be bypassed by a new code path; an absent field cannot | Architecture |
 | 2026-08-06 | Crash reporting continues after analytics opt-out | It carries no personal data and keeps the app working | Product owner |
 
-## 15. Rationale
+## 17. Rationale
 
 The event list is short because it was derived backwards, from the decisions in
 [`28_ROADMAP.md`](28_ROADMAP.md), rather than forwards from what is technically collectable. Every
@@ -260,7 +305,7 @@ privacy claim credible. A `beforeSend` filter protects against events that alrea
 cannot protect against a new code path that constructs an event with a field the filter does not
 know about. Never building the payload is the only defence that holds as the codebase grows.
 
-## 16. Rejected alternatives
+## 18. Rejected alternatives
 
 | Alternative | Attraction | Why rejected |
 |---|---|---|

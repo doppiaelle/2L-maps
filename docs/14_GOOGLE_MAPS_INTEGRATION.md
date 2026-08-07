@@ -76,7 +76,36 @@ trust the order before driving it ([ADR-0004](adr/0004-external-navigation-hando
 
 ---
 
-## 5. Map styling
+## 5. Flows
+
+**How a route reaches the map.**
+
+```
+  optimization result (13) ──▶ encoded polyline
+                                     │
+                                     ▼
+                       decoded once, at receipt, then memoised
+                                     │
+                                     ▼
+              drawn on a Google map — never a third-party map (terms)
+                                     │
+                                     ▼
+              markers memoised by id and state; clustered above 15
+                                     │
+                                     ▼
+              camera fitted to bounds with padding for the sheet's current detent
+```
+
+**How a map style is applied.** The paper and near-black styles are Cloud-based Map Styling,
+selected by Map ID per theme. They live outside version control, which is risk C15 — so the Map
+IDs are recorded here, the styles are exported into the repository as reference, and a missing
+or revoked Map ID falls back to the default style rather than a blank map.
+
+**What the terms forbid at every step.** No tile caching, no bulk pre-fetch, no Google-derived
+content on a non-Google map, and attribution visible wherever the map or its data appears —
+including in a shared snapshot ([`32_LEGAL_COMPLIANCE.md`](32_LEGAL_COMPLIANCE.md)).
+
+## 6. Map styling
 
 The paper aesthetic is delivered by **Cloud-based Map Styling**, configured in the Google Cloud
 console and referenced by **Map ID**, one per theme.
@@ -103,7 +132,7 @@ events.
 
 ---
 
-## 6. Markers
+## 7. Markers
 
 | Type | Appearance | State |
 |---|---|---|
@@ -135,7 +164,7 @@ individually, outside its cluster.
 
 ---
 
-## 7. Polyline
+## 8. Polyline
 
 | Property | Value |
 |---|---|
@@ -155,7 +184,7 @@ most common cause of map jank in this class of app.
 
 ---
 
-## 8. Camera, gestures and layers
+## 9. Camera, gestures and layers
 
 **Camera.** On a new result the camera fits the whole route with padding that accounts for the
 sheet's current detent — a route fitted behind a half-open sheet is fitted wrongly. After any
@@ -176,7 +205,7 @@ a non-gesture equivalent ([`../CLAUDE.md`](../CLAUDE.md) §7).
 
 ---
 
-## 9. Terms obligations
+## 10. Terms obligations
 
 **Non-negotiable**, and all traced to [`32_LEGAL_COMPLIANCE.md`](32_LEGAL_COMPLIANCE.md).
 
@@ -193,7 +222,22 @@ a non-gesture equivalent ([`../CLAUDE.md`](../CLAUDE.md) §7).
 
 ---
 
-## 10. Edge cases
+## 11. Architectural decisions
+
+| ID | Decision | Applies to |
+|---|---|---|
+| [0005](adr/0005-map-engine-and-route-preview.md) | `react-native-maps` behind `<AppMap>` | Every rendering concern here |
+| [0004](adr/0004-external-navigation-handoff.md) | Preview in-app, navigation elsewhere | Why the map is a preview surface, not a guidance surface |
+| [0007](adr/0007-place-id-durable-coordinates-perishable.md) | Coordinates perishable | Markers must tolerate a null coordinate |
+| [0008](adr/0008-offline-scope.md) | No offline maps | The absence of tile caching, and the offline map state |
+| [0009](adr/0009-visual-direction.md) | Quiet map, single accent | Map styling, marker and polyline colour |
+| [0012](adr/0012-long-term-osm-exit-path.md) | MapLibre exit path | Why styling is expressed as intent, not as a vendor payload |
+
+**Decided here:** the single Maps SDK key is the only Google credential in the client, and it is
+restricted by bundle ID and SHA-1 to the Maps SDK alone. Every other Google call is a server
+call ([ADR-0006](adr/0006-mandatory-backend-proxy.md)).
+
+## 12. Edge cases
 
 | # | Condition | Expected behaviour |
 |---|---|---|
@@ -208,7 +252,7 @@ a non-gesture equivalent ([`../CLAUDE.md`](../CLAUDE.md) §7).
 | 9 | Very long stop label in a callout | Truncated with ellipsis; full text in the sheet row |
 | 10 | Rapid marker selection | Debounced; only the final selection animates |
 
-## 11. Error handling
+## 13. Error handling
 
 | Failure | Detection | User-facing result | Fallback |
 |---|---|---|---|
@@ -221,7 +265,7 @@ a non-gesture equivalent ([`../CLAUDE.md`](../CLAUDE.md) §7).
 **The stop list must remain fully functional when the map fails.** The list is the product; the
 map is the preview.
 
-## 12. Best practices
+## 14. Best practices
 
 1. **Nothing imports `react-native-maps` except `<AppMap>`.** This is rule 2 in
    [`../CLAUDE.md`](../CLAUDE.md) §0.
@@ -234,7 +278,7 @@ map is the preview.
 6. **Never rely on colour alone** for marker state.
 7. **Attribution is never covered**, at any detent, in any state.
 
-## 13. Checklist
+## 15. Checklist
 
 - [ ] `<AppMap>` is the only importer of `react-native-maps`.
 - [ ] Map IDs configured for both themes and documented here.
@@ -248,7 +292,7 @@ map is the preview.
 - [ ] Contrast verified in direct sunlight.
 - [ ] No tile caching or pre-fetching anywhere in the codebase.
 
-## 14. Roadmap
+## 16. Roadmap
 
 | Phase | Scope | Trigger |
 |---|---|---|
@@ -257,7 +301,7 @@ map is the preview.
 | 1.x | Marker animation on reorder — the visual proof of optimization | Polish |
 | 3.0 | MapLibre adapter behind the same facade | An [ADR-0012](adr/0012-long-term-osm-exit-path.md) trigger |
 
-## 15. Decision log
+## 17. Decision log
 
 | Date | Change | Reason | Author |
 |---|---|---|---|
@@ -266,7 +310,7 @@ map is the preview.
 | 2026-08-06 | POIs suppressed except fuel and transit | Aesthetic quiet plus marker legibility; those two are operationally useful | Design |
 | 2026-08-06 | T0 rendered as dashed connectors | A smooth line would imply road routing that did not occur | Architecture |
 
-## 16. Rationale
+## 18. Rationale
 
 The map's job is **trust**, not navigation. A user who has just been told to visit their stops
 in an unexpected order needs to see that order laid out geographically before they will drive
@@ -285,7 +329,7 @@ current, documented breakage against recent Expo SDKs, and the only alternatives
 Navigation SDK cannot coexist with the Maps SDK. Being locked to a fragile dependency with no
 substitute makes containment worth its cost.
 
-## 17. Rejected alternatives
+## 19. Rejected alternatives
 
 | Alternative | Attraction | Why rejected |
 |---|---|---|
