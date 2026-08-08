@@ -300,9 +300,23 @@ fallback, and this response overrides them field by field.
 ```jsonc
 { "period": { "from": "2026-08-01", "to": "2026-08-31" },
   "plan": "free",
+  "status": "none",              // trial | active | lapsed | none
+  "trialEndsAt": null,
+  "renewsAt": null,
+  "dayPassExpiresAt": null,
   "limits": [{ "name": "optimizations", "used": 12, "limit": 15 },
              { "name": "autocompleteSessions", "used": 4, "limit": 10 }] }
 ```
+
+**Entitlement and allowances arrive together, in one call.** They are the same question asked
+twice — what may this user do — and splitting them would mean two round trips on every app start
+to render one screen. `plan` and `status` are distinct on purpose: a `lapsed` subscriber is on
+the `free` plan, not locked out ([ADR-0015](adr/0015-ad-supported-free-tier.md)).
+
+**This endpoint is the only thing the client trusts about entitlement.** The store SDK reports
+what the *device* believes; the two legitimately disagree after a refund, a family-sharing
+change, or a purchase made on another device, and when they do this response wins
+([ADR-0011](adr/0011-server-side-quota-enforcement.md)).
 
 ### `POST /revenuecat-webhook`
 
