@@ -124,6 +124,8 @@ owning your area (see §Areas below) → [`29`](29_DEFINITION_OF_DONE.md).
 | [0012](adr/0012-long-term-osm-exit-path.md) | MapLibre + Valhalla recorded as the exit path |
 | [0013](adr/0013-implementation-execution-model.md) | Implementation in waves, one branch each, status in the repository |
 | [0014](adr/0014-android-first-verification.md) | Android-first verification through a CI-built development build; iOS unverified |
+| [0015](adr/0015-ad-supported-free-tier.md) | Ad-supported free tier capped on address search, day pass, Pro; amends ADR-0002 |
+| [0016](adr/0016-ai-assisted-stop-entry.md) | Paste, photo and dictation parsed to stops by a model, behind the Edge Function |
 
 ---
 
@@ -214,8 +216,8 @@ template, and pushed.
 
 **File count.** The approved set is 42 documents: the 33 named in the brief, 8 extensions, and
 `36_IMPLEMENTATION_PLAN.md` added when implementation began ([ADR-0013](adr/0013-implementation-execution-model.md)),
-counting `adr/` as one entry. On disk that is **55 files** — 39 in `docs/`, 14 in `docs/adr/`,
-and `CLAUDE.md` and `README.md` at the root — because the single ADR entry expands to fourteen
+counting `adr/` as one entry. On disk that is **57 files** — 39 in `docs/`, 16 in `docs/adr/`,
+and `CLAUDE.md` and `README.md` at the root — because the single ADR entry expands to sixteen
 records. Both numbers are correct; they count different things.
 
 **Audit results, wave 6.**

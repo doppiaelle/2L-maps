@@ -43,13 +43,13 @@ this file holds the definition, so a risk cannot be described two different ways
                           IMPACT
               low          medium         high
            ┌────────────┬────────────┬─────────────────────┐
-      high │            │  C11       │  C2  C12  C17       │
+      high │            │  C11       │  C2  C12  C17  C18  │
            │            │            │  cost, App Review,  │
-           │            │            │  iOS unverified     │
+           │            │            │  iOS unverif., ads  │
    L       ├────────────┼────────────┼─────────────────────┤
-   I  med  │  C14  C15  │  C6  C13   │  C1  C7  C8         │
+   I  med  │  C14  C15  │  C6  C13   │  C1  C7  C8  C19    │
    K       │            │            │  economics, review, │
-   E       │            │            │  GDPR               │
+   E       │            │            │  GDPR, photo data   │
    L       ├────────────┼────────────┼─────────────────────┤
    I  low  │            │  C9  C10   │  C3  C4  C5  C16    │
    H       │            │            │  terms violations   │
@@ -197,6 +197,28 @@ announcement. A risk reviewed only when it fires was never being managed.
 | **Status** | **Accepted deliberately**, not mitigated. No amount of design removes Apple's provisioning requirement. |
 | **Trigger** | The first iOS-specific defect, or the decision to submit to the App Store |
 | **Response** | The facades keep platform-specific code in three known places, so an iOS pass is bounded work rather than an audit of everything. Nothing iOS-specific is claimed verified in the meantime. |
+| **Owner** | Product owner |
+
+#### C18 — The advertising SDK is a data collector inside a data-minimising product
+
+| | |
+|---|---|
+| **Description** | The ad-supported free tier ([ADR-0015](adr/0015-ad-supported-free-tier.md)) introduces an SDK whose business is collecting exactly what this product is built not to collect. It brings a Google-certified CMP for EEA and UK traffic, an ATT prompt on iOS, a "Third-Party Advertising" declaration in both stores, a consent state to persist and honour, and a permanent obligation to keep addresses, coordinates, `place_id`s and routes away from it. |
+| **Likelihood / Impact** | **High / High** — the obligation is certain, and a consent or disclosure defect is a store rejection or a regulator's letter, not a bug |
+| **Status** | Mitigated by design, not eliminated |
+| **Trigger** | Any of: a CMP that fails to gate the SDK, a privacy declaration that omits a collected field, an ad rendering during a route, product data reaching an ad call |
+| **Response** | The SDK sits behind `AdsProvider`, whose surface has no method that accepts a coordinate, an address, a `place_id` or a route — so no call site can pass one. Non-personalised until consent exists. Ad placement is a pure function (`shouldShowAdSlot`) with the during-a-route rule tested. Declining consent costs the user nothing, which is what makes it consent. |
+| **Owner** | Product owner |
+
+#### C19 — Photographed lists carry third-party personal data
+
+| | |
+|---|---|
+| **Description** | The photo path of AI-assisted entry ([ADR-0016](adr/0016-ai-assisted-stop-entry.md)) sends an image of a delivery sheet or manifest to a model provider. That image contains names and addresses of people who are not our user and have agreed to nothing. The user becomes a controller, we become a processor, the provider a sub-processor — a relationship this product otherwise does not have. |
+| **Likelihood / Impact** | **Medium / High** — medium only because paste and dictation ship first and carry none of it |
+| **Status** | Open. The photo path does not ship until the response is in place. |
+| **Trigger** | Shipping the photo path; a subject access or erasure request touching a parsed image |
+| **Response** | A data processing agreement with the provider is a precondition, with zero retention requested where offered. The image is transient — parsed and discarded, never stored, never logged, never in a crash report. The screen states what leaves the device before it leaves. Paste and dictation deliver most of the cost saving with none of this, and are the default. |
 | **Owner** | Product owner |
 
 ---
@@ -432,6 +454,9 @@ is not mitigated.
 |---|---|---|---|
 | 2026-08-06 | Register created with C1–C16, S1–S3 | Project inception | Product owner |
 | 2026-08-07 | C17 added: iOS unverified on hardware | Verification is Android-first; no Apple hardware or programme (ADR-0014) | Product owner |
+| 2026-08-08 | C18 added: advertising SDK as a data collector | The free tier is ad-supported (ADR-0015), which brings a CMP, ATT and a privacy declaration | Product owner |
+| 2026-08-08 | C19 added: third-party personal data in photographed lists | AI-assisted entry accepts photographs of manifests (ADR-0016); paste and dictation ship first | Product owner |
+| 2026-08-08 | C12 lowered from high to **medium** likelihood | The hard paywall is gone: a genuine free tier means the auto-renewing trial is no longer the only door in, which removes the most common cause of Guideline 3.1.2 rejection (ADR-0015) | Product owner |
 | 2026-08-06 | C12 raised to high impact | Trial auto-renewal is the leading cause of App Store rejection | Product owner |
 | 2026-08-06 | S2 and S3 recorded as accepted, not mitigated | No mitigation exists; recording them as managed would be false | Product owner |
 | 2026-08-06 | S4 added after the risk fired | A container reclaim destroyed a full set of committed-but-unpushed documentation | Product owner |

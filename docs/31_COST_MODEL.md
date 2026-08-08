@@ -62,6 +62,11 @@ what point the business closes.
   imports a list          ────────▶  Geocoding (batch)     ────▶  ◔ ~$0.005
                                                                   per address
 
+  pastes / photographs    ────────▶  Haiku 4.5 parse       ────▶  ◔ ~$0.003
+  a list                             then Geocoding (batch)       per PARSE
+                                                                  ← the other
+                                                                    lever
+
   taps Optimize, ≤25      ────────▶  computeRoutes ×2      ────▶  ◑ ~$0.01
                                      (order + accurate ETA)       per route
 
@@ -218,6 +223,20 @@ in [`../CLAUDE.md`](../CLAUDE.md) §6, not a suggestion.
 decision in the product follows from this single fact (risk C2,
 [`35_RISK_REGISTER.md`](35_RISK_REGISTER.md)) — which is why the address book is
 offered before search in every add-stop flow ([`04_FEATURES.md`](04_FEATURES.md)).
+
+### AI-assisted entry, measured against the same profile
+
+Fifteen addresses, priced against `claude-haiku-4-5` at $1.00 / 1M input and $5.00 / 1M output
+(retrieved 2026-08-08; [ADR-0016](adr/0016-ai-assisted-stop-entry.md)):
+
+| Path | Parse | Resolve | Total |
+|---|---|---|---|
+| Typed through autocomplete | — | 15 × $0.02 | **$0.300** |
+| Pasted, parsed, batch-geocoded | ~$0.003 | 15 × $0.005 | **$0.078** |
+
+**The parse is 4% of the cheaper path.** A photograph costs marginally more — roughly 1,600
+input tokens for the image — and lands near $0.004. This is the largest single reduction
+available to the dominant cost line, and it arrives disguised as a UX feature.
 
 ### Elena, the technician
 
@@ -420,10 +439,27 @@ and solving the TSP locally feels like the cost-conscious choice. It is O(n²) b
 elements: $3.38 for 25 stops against $0.01 for one `computeRoutes` request. Self-hosting only
 becomes cheaper when the matrix itself is free, which is tier T3.
 
-The trial-to-paid model is defended here on cost grounds rather than conversion grounds. A free
-user is a perpetual liability of $0.30–0.80 a month. A trial user is a bounded liability of
-$0.25 total. At any realistic free-to-paid ratio the freemium model consumes the margin of the
-paying base.
+**A free user's cost is a function of what you cap, not of being free.** The $0.30–0.80 a month
+above measures a free tier capped on *stops* — which constrains optimization, 6% of COGS, and
+leaves address search, 78%, running. Capping the expensive axis instead brings the same user to
+**~$0.48 a month**:
+
+| Free-tier line | Monthly | Basis |
+|---|---|---|
+| Autocomplete, 10 sessions | $0.20 | §6 |
+| Import, 25 addresses batch-geocoded | $0.13 | §6 |
+| Optimization, 15 × T1 | $0.15 | §6 |
+| **Total** | **~$0.48** | |
+
+Banner advertising returns **€0.13–0.26** against that (medium confidence, unverified against a
+live account — see [ADR-0015](adr/0015-ad-supported-free-tier.md)), so **the free tier does not
+pay for itself on banners alone**, and stating otherwise would make this model fiction. What
+closes it is rewarded ads coupled to the metered action — revenue that scales with COGS rather
+than with session time — plus the fact that every allowance above is server configuration and
+falls if measurement says it must. The free tier is held to cost-neutrality as an acquisition
+channel; it is not a revenue line.
+
+The trial remains a bounded liability of **$0.25 total** per trial user, unchanged.
 
 ## 19. Rejected alternatives
 

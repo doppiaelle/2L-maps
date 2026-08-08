@@ -103,7 +103,7 @@ and this document inherits that. No re-statement of any requirement, schema or b
 | 0 | `feat/w0-foundation` | Expo 57 scaffold, TS strict, lint, Jest + RNTL + MSW, NativeWind, CI `verify` | §6 W0 | ✅ |
 | 1 | `feat/w1-domain` | All of `lib/` — pure domain logic | §6 W1 | ✅ |
 | 2a | `feat/w2-backend` | Migrations, RLS, purge, seven-step pipeline, validation, cache key | §6 W2a | ✅ |
-| 2b | `feat/w2b-upstream` | Five Deno entrypoints and their Google upstream adapters | §6 W2b | ⏳ |
+| 2b | `feat/w2b-upstream` | Six Deno entrypoints and their upstream adapters (incl. `/parse-addresses`) | §6 W2b | ⏳ |
 | 3a | `feat/w3-data-layer` | Sync conflict resolution, route progress, the five facade interfaces | §6 W3a | ✅ |
 | 3b | `feat/w3b-adapters` | Edge Function client, draft route and its store ✅ · concrete facade adapters and React Query ⏳ | §6 W3b | 🔵 |
 | 4 | `feat/w4-design-system` | Tokens, `<AppMap>`, components | §6 W4 | ⏳ |
@@ -211,7 +211,7 @@ owner, who bypasses RLS; and without the grants Supabase gives `authenticated` b
 role receives permission-denied rather than an RLS-filtered result. Either would have reported
 every policy as working.
 
-**Still to do in this wave.** The five Deno entrypoints and their Google upstream adapters.
+**Still to do in this wave.** The six Deno entrypoints and their upstream adapters, now including `/parse-addresses` (ADR-0016).
 Entrypoints were drafted and then removed rather than committed, because they imported modules
 that did not exist yet — a file with a dangling import is a placeholder wearing a costume, and
 the constitution forbids both. The upstream adapters are also the part decision I2 defers:
@@ -250,7 +250,7 @@ without credentials they cannot be exercised against Google at all, only against
 | **W0** | `npx expo prebuild --platform android` completes with the pinned pair (§8); typecheck, lint and an empty suite run clean; CI green on the first push |
 | **W1** | Non-negotiable coverage of [`../CLAUDE.md`](../CLAUDE.md) §5: tier boundaries at 8/9 and 25/26 stops, coordinate expiry at 29/30/31 days, every handoff strategy against its capability matrix, long Italian addresses against the URL ceiling |
 | **W2a** | Migrations applied against a real Postgres; no table in `public` without RLS; ownership verified between two distinct users; pipeline order verified — entitlement before rate limit, cache after quota; 401, 402 and both 429 paths verified; every request schema tested at its boundaries |
-| **W2b** | Each of the five endpoints tested against [`33_API_CONTRACTS.md`](33_API_CONTRACTS.md) with MSW standing in for Google; retry and timeout behaviour verified; field masks asserted minimal |
+| **W2b** | Each of the six endpoints tested against [`33_API_CONTRACTS.md`](33_API_CONTRACTS.md) with MSW standing in for Google; retry and timeout behaviour verified; field masks asserted minimal |
 | **W3a** | The offline conflict table verified case by case, including that exactly one situation reaches the user; route progress cannot orphan an entry or leave a route unfinishable; every facade interface typechecks against the domain types |
 | **W3b** | MSW integration tests for every hook that calls an Edge Function, failure paths included; no query result copied into a store; draft route survives process death |
 | **W4** | Every component with a state machine tested in all its states; contrast verified in both themes; accessible labels present; no hardcoded values |

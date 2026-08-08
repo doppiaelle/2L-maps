@@ -68,7 +68,38 @@ export const MARKER_CLUSTER_THRESHOLD = 15;
 export const LIST_VIRTUALISATION_THRESHOLD = 20;
 
 // ─── Subscription ────────────────────────────────────────────────────────────
-// ADR-0002 · docs/20_SUBSCRIPTIONS.md
+// ADR-0002 · ADR-0015 · docs/20_SUBSCRIPTIONS.md
 
 /** The introductory period, at €0, metered exactly like a paid subscription. */
 export const TRIAL_DURATION_DAYS = 7;
+
+/** A day pass buys this many hours of Pro. Consumable, server-held balance. */
+export const DAY_PASS_DURATION_HOURS = 24;
+
+// ─── Plan allowances ─────────────────────────────────────────────────────────
+// ADR-0015 · docs/20_SUBSCRIPTIONS.md · docs/31_COST_MODEL.md
+//
+// **These are display fallbacks, not the rule.** The server decides access and
+// sends the live numbers on `/usage-quota` (ADR-0011); these exist so the app
+// can render a sensible allowance bar before that response arrives, and offline.
+// A client that gates a feature on these has moved the paywall to the one
+// machine the user controls.
+//
+// Free is capped on address search, not on stops: autocomplete is 78% of COGS
+// and a route costs $0.01 whether it has 8 stops or 25 (docs/31_COST_MODEL.md §8).
+// Being stingy about stops would save nothing and make the free tier feel mean
+// at exactly the moment a user is deciding whether the product works.
+
+/** Generous on purpose, and free of marginal cost. */
+export const FREE_MAX_STOPS = 15;
+
+/** T1 optimizations per month on free. Past this the app degrades to T0, which
+ *  costs nothing and needs no network — a free user is never locked out, only
+ *  labelled (ADR-0003, ADR-0015). */
+export const FREE_OPTIMIZATIONS_PER_MONTH = 15;
+
+/** The real limit. ~$0.02 a session is where the free tier's money goes. */
+export const FREE_AUTOCOMPLETE_SESSIONS_PER_MONTH = 10;
+
+/** Free keeps a handful of routes; history is something Pro sells. */
+export const FREE_SAVED_ROUTES = 3;

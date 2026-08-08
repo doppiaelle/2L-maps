@@ -168,8 +168,49 @@ process does not scale, is not auditable, and would fail a supervisory enquiry.
 ### Residency and processors
 
 Supabase in an **EU region**. Sub-processors: Supabase, Google Cloud Platform (Maps APIs),
-RevenueCat, Firebase, Sentry. Each requires a data processing agreement, and the list must be
-published in the privacy policy and kept current.
+RevenueCat, Firebase, Sentry, the advertising network ([ADR-0015](adr/0015-ad-supported-free-tier.md)),
+and the model provider used for address parsing ([ADR-0016](adr/0016-ai-assisted-stop-entry.md)).
+Each requires a data processing agreement, and the list must be published in the privacy policy
+and kept current.
+
+### Advertising consent — the free tier's obligation
+
+The ad-supported free tier adds an SDK whose purpose is data collection, inside a product built
+to collect as little as possible (risk C18). Four requirements, none optional:
+
+1. **A Google-certified Consent Management Platform for EEA and UK traffic.** Google requires one
+   for ad serving; the ePrivacy Directive requires consent for the device storage an ad SDK uses
+   **even when the ads are non-personalised**. Consent is obtained before the SDK initialises,
+   not after.
+2. **Non-personalised until consent exists**, including the `not-asked` state. There is no
+   "assume yes until told otherwise".
+3. **Declining costs the user nothing** — same allowances, same features, non-personalised ads.
+   Consent that is priced is not freely given, and under Article 7(4) is not consent.
+4. **App Tracking Transparency on iOS**, and a "Third-Party Advertising" entry in both stores'
+   privacy declarations. A declaration that omits a field the SDK collects is the defect that
+   gets a release pulled, not a rejected submission.
+
+**The ad SDK receives no product data.** No address, no coordinate, no `place_id`, no route. This
+is enforced structurally rather than by review: the `AdsProvider` facade declares no method that
+accepts any of them.
+
+### AI-assisted entry — where we become a processor
+
+Pasted text and photographed lists change our role. A photographed delivery manifest contains
+names and addresses of people who are not our user and have consented to nothing (risk C19):
+
+| | |
+|---|---|
+| **Controller** | The user — it is their list, gathered for their purpose |
+| **Processor** | Us |
+| **Sub-processor** | The model provider, which requires a DPA and zero retention where offered |
+
+Obligations that follow: the image is **transient** — parsed and discarded, never stored, never
+logged, never attached to a crash report; the screen states what leaves the device before it
+leaves; and the parsed result obeys the coordinate rules like any other address
+([ADR-0007](adr/0007-place-id-durable-coordinates-perishable.md)). Dictation is transcribed
+**on-device** and never leaves it, which is why it carries none of this. Paste and photograph
+differ only in what the payload contains, and photograph is the one that waits for the DPA.
 
 ### Breach procedure
 

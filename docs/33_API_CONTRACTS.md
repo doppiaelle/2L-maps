@@ -218,13 +218,51 @@ never on `message`.**
 | Quota | 1,500 per calendar month per user |
 | Partial success | **Always allowed.** Unresolved rows never fail the request |
 
+### `POST /parse-addresses`
+
+Turns unstructured input into candidate address strings ([ADR-0016](adr/0016-ai-assisted-stop-entry.md)).
+
+```jsonc
+// Request — exactly one of `text` or `imageBase64`
+{ "text": "domani: via roma 12 bergamo, poi p.zza garibaldi 5 int 2, e Kennedy 3/B",
+  "locale": "it-IT" }
+
+// Response 200
+{
+  "candidates": [{ "index": 0, "address": "Via Roma 12, Bergamo" }],
+  "unparsed": ["e Kennedy 3/B"]
+}
+```
+
+| Property | Value |
+|---|---|
+| Input | `text` (≤ 4,000 characters) **or** `imageBase64` (≤ 5 MB), never both |
+| Output | Candidate **address strings only**. Constrained by JSON schema — the model cannot emit a URL, a `place_id` or a coordinate because no such field is declared |
+| Maximum candidates | `MAX_STOPS`. A paste yielding more is a 400, not a 200-address geocoding bill |
+| Timeout | 15 s |
+| Retry | 5xx only; 1 attempt |
+| Cache | Content-keyed on the input hash; TTL 1 h. A user re-parsing the same paste after a mistake is free |
+| Quota | 100 per calendar month per user |
+| Trust | The input is **third-party text**. It is delimited and labelled as data in the request, and the response is never used as an instruction, a URL or a query parameter — only as text passed to `/geocode` |
+| Image retention | **None.** Parsed and discarded. Never stored, never logged, never in a crash report (risk C19) |
+| Partial success | Always allowed. Unparsed lines are returned for the user to correct, never dropped |
+
+**Parsing does not produce a stop.** The candidates go through `/geocode` to become `place_id`s;
+the durable key is minted by Google, not by a model
+([ADR-0007](adr/0007-place-id-durable-coordinates-perishable.md)).
+
 ### `GET /usage-quota`
 
-Read-only, no upstream call, no quota consumption.
+Read-only, no upstream call, no quota consumption. **The authoritative source of plan
+allowances** ([ADR-0011](adr/0011-server-side-quota-enforcement.md),
+[ADR-0015](adr/0015-ad-supported-free-tier.md)): the client's constants are an offline display
+fallback, and this response overrides them field by field.
 
 ```jsonc
 { "period": { "from": "2026-08-01", "to": "2026-08-31" },
-  "limits": [{ "name": "optimizations", "used": 47, "limit": 300 }] }
+  "plan": "free",
+  "limits": [{ "name": "optimizations", "used": 12, "limit": 15 },
+             { "name": "autocompleteSessions", "used": 4, "limit": 10 }] }
 ```
 
 ### `POST /revenuecat-webhook`
@@ -312,6 +350,7 @@ Enterprise, since March 2025. Confidence: medium. Cost implications in
 | `/places-autocomplete` | 4 s | 3 s | **none** | — |
 | `/place-details` | 5 s | 4 s | 1 × on 5xx | 500 ms |
 | `/geocode` | 10 s | 8 s | 2 × on 5xx | 500 ms, ×2 |
+| `/parse-addresses` | 15 s | 12 s | 1 × on 5xx | 500 ms |
 | `/usage-quota` | 3 s | n/a | 1 × | 300 ms |
 | `/revenuecat-webhook` | n/a | n/a | RevenueCat retries | — |
 
@@ -328,6 +367,11 @@ so a malformed one is always our defect. Retrying burns quota and hides the bug.
 | Autocomplete sessions | calendar month | 1,200 | ~7× the target profile |
 | Autocomplete requests | per session | 12 | Matches Places session billing |
 | Geocoding | calendar month | 1,500 | Daily import of 25 stops with headroom |
+| Address parsing | calendar month | 100 | Bounds the model bill; a parse is ~$0.003 |
+
+The table above is the **Pro** allowance. Free and day-pass allowances are lower and are listed
+in [`20_SUBSCRIPTIONS.md`](20_SUBSCRIPTIONS.md); all of them are read by the client from
+`/usage-quota` rather than compiled into it ([ADR-0015](adr/0015-ad-supported-free-tier.md)).
 
 Values are **server configuration**, adjustable without an app release
 ([ADR-0011](adr/0011-server-side-quota-enforcement.md)). Derivation in

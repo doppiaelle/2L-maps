@@ -126,17 +126,45 @@ cancellation costs more than the subscription would ever have earned (risk C11).
 
 ## 6. Products
 
-| Product | Price | Trial | Notes |
-|---|---|---|---|
-| Monthly | €9.99 | 7 days | Default selection |
-| Annual | €79.99 | 7 days | ~33% saving; improves retention and cash flow |
+| Product | Price | Type | Trial | Notes |
+|---|---|---|---|---|
+| Free | €0 | — | — | Ad-supported, permanent ([ADR-0015](adr/0015-ad-supported-free-tier.md)) |
+| Day pass | €1.99 | Consumable | — | 24 hours of Pro, no ads |
+| Monthly | €9.99 | Auto-renewing | 7 days | Default selection |
+| Annual | €79.99 | Auto-renewing | 7 days | ~33% saving; improves retention and cash flow |
 
 One subscription group, so a user moves between monthly and annual without losing entitlement.
 **Trial eligibility is once per subscription group per account** — a user who trialled monthly
 cannot trial annual.
 
-There is no free tier and no one-time purchase
-([ADR-0002](adr/0002-target-segment-and-monetization.md)).
+### Allowances per rung
+
+| | Free | Day pass | Pro |
+|---|---|---|---|
+| Stops per route | 15 | 25 | 25 |
+| T1 optimizations | 15 / month | 25 / day | 300 / month |
+| Autocomplete sessions | 10 / month | 40 / day | 1,200 / month |
+| Saved routes | 3 | unlimited | unlimited |
+| Ads | Yes | No | No |
+
+**Free is capped on address search, not on stops.** A route costs $0.01 whether it carries 8
+stops or 25, while an autocomplete session costs ~$0.02 and address entry is 78% of COGS
+([`31_COST_MODEL.md`](31_COST_MODEL.md) §8). Restricting free users to 8 stops would save nothing
+and make the product feel mean at the moment someone is deciding whether it works.
+
+**Running out does not lock anyone out.** Past the monthly allowance the app falls back to T0,
+the local solver, which costs nothing and needs no network — labelled degraded, as every T0
+result is. Above the T0 ceiling of 8 stops there is nothing honest to fall back to, and that is
+the one state where a free user is genuinely stopped; a rewarded ad buys one more optimization
+there. An ad that fails to load grants the unlock anyway.
+
+**The day pass is consumable, so its balance lives on the server**, keyed to the user. A store
+receipt alone cannot restore it to a second device
+([ADR-0011](adr/0011-server-side-quota-enforcement.md)).
+
+**Every number above is server configuration.** The client reads them from `/usage-quota` and
+carries a fallback copy only so it can render an allowance bar offline
+([ADR-0015](adr/0015-ad-supported-free-tier.md)).
 
 ---
 
