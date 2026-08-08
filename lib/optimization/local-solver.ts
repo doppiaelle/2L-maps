@@ -130,7 +130,11 @@ function twoOptPass(
       if (now() > deadline) return { improved, hitBudget: true };
 
       const before = lengthOf(order, matrix, closed);
-      const candidate = [...order.slice(0, i), ...order.slice(i, j + 1).reverse(), ...order.slice(j + 1)];
+      const candidate = [
+        ...order.slice(0, i),
+        ...order.slice(i, j + 1).reverse(),
+        ...order.slice(j + 1),
+      ];
       const after = lengthOf(candidate, matrix, closed);
 
       if (before - after > EPSILON_METERS) {

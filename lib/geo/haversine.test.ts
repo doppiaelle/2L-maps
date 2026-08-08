@@ -58,7 +58,8 @@ describe('tourLengthMeters', () => {
 
   it('sums the legs of an open tour', () => {
     const expected =
-      haversineMeters(MILAN_DUOMO, MILAN_CENTRALE) + haversineMeters(MILAN_CENTRALE, ROME_COLOSSEUM);
+      haversineMeters(MILAN_DUOMO, MILAN_CENTRALE) +
+      haversineMeters(MILAN_CENTRALE, ROME_COLOSSEUM);
     expect(tourLengthMeters([MILAN_DUOMO, MILAN_CENTRALE, ROME_COLOSSEUM], false)).toBeCloseTo(
       expected,
       6,

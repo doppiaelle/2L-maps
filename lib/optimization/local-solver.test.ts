@@ -66,7 +66,10 @@ describe('invariants that must hold for every input', () => {
   });
 
   it('handles all-identical coordinates', () => {
-    const same: LatLng[] = Array.from({ length: 5 }, () => ({ latitude: 45.4642, longitude: 9.19 }));
+    const same: LatLng[] = Array.from({ length: 5 }, () => ({
+      latitude: 45.4642,
+      longitude: 9.19,
+    }));
     const result = solveLocally({ points: same, isRoundTrip: true });
     expect([...result.order].sort((a, b) => a - b)).toEqual([0, 1, 2, 3, 4]);
     expect(result.totalDistanceMeters).toBeCloseTo(0, 6);
