@@ -101,8 +101,8 @@ and this document inherits that. No re-statement of any requirement, schema or b
 |---|---|---|---|---|
 | — | `main` | Documentation set 00–36, ADRs 0001–0013 | Consolidation audit passed | ✅ |
 | 0 | `feat/w0-foundation` | Expo 57 scaffold, TS strict, lint, Jest + RNTL + MSW, NativeWind, CI `verify` | §6 W0 | ✅ |
-| 1 | `feat/w1-domain` | All of `lib/` — pure domain logic | §6 W1 | 🔵 |
-| 2 | `feat/w2-backend` | Migrations, RLS, five Edge Functions | §6 W2 | ⏳ |
+| 1 | `feat/w1-domain` | All of `lib/` — pure domain logic | §6 W1 | ✅ |
+| 2 | `feat/w2-backend` | Migrations, RLS, five Edge Functions | §6 W2 | 🔵 |
 | 3 | `feat/w3-data-layer` | Facades, React Query, Zustand, offline queue | §6 W3 | ⏳ |
 | 4 | `feat/w4-design-system` | Tokens, `<AppMap>`, components | §6 W4 | ⏳ |
 | 5 | `feat/w5-screens` | Expo Router, the ten screens | §6 W5 | ⏳ |
@@ -137,6 +137,38 @@ tests asserting each still matches the document that owns it, which makes rule 9
 enforceable rather than aspirational.
 
 **Not covered by this gate:** no iOS prebuild (no Mac), no native compilation, no device run.
+
+### Wave 1 outcome — recorded 2026-08-07
+
+Gate passed. 138 tests, `lib/` at 95% statements and 85% branches, typecheck and lint clean.
+All four non-negotiable items are covered: tier boundaries at 8/9 and 25/26 from both sides,
+coordinate expiry at 29/30/31 days, every handoff strategy against its capability matrix, and
+long Italian addresses against the URL ceiling.
+
+Modules: `geo/haversine`, `coordinates/staleness`, `optimization/tier-selection`,
+`optimization/local-solver`, `routing/polyline`, `handoff/{capabilities,urls,chunking}`,
+`format/units`.
+
+Three assumptions the tests contradicted, each corrected in favour of the measurement:
+
+- **The URL ceiling does not bite at nine waypoints for a typical Italian address.** Measured,
+  a 128-character address yields a 1,687-character URL at nine waypoints, so the waypoint cap
+  binds first. The ceiling is the safety net for genuinely verbose addresses — c/o, building,
+  floor, internal number — which is still the case a fixed count of nine would truncate
+  silently. Both paths are now tested.
+- **Italian numbers carry no thousands separator at 1000.** CLDR sets `minimumGroupingDigits`
+  to 2, so grouping starts at 10.000. A hand-rolled formatter inserts one and reads as foreign.
+- **`en-IT` resolves to European number conventions**, so an English interface in Italy gets a
+  decimal comma. A language-keyed lookup would have produced a full stop, wrong in exactly the
+  case the locale rule exists for.
+
+The T0 solver is tested by property rather than by fixed expected orders: a heuristic has no
+single right answer, so pinning one would test this implementation instead of the requirement.
+The properties are that no stop is lost, the origin never moves, and the result is never longer
+than the order it was handed.
+
+**Not covered by this gate:** nothing in `lib/` calls the network, so no contract is exercised
+here — that is wave 2's gate.
 
 ## 6. Flows
 
