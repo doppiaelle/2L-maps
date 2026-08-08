@@ -9,9 +9,11 @@ import type { NavigationProviderId } from '@/types';
  * versioned as a capability matrix (ADR-0004, docs/16_INTERNAL_NAVIGATION.md).
  *
  * Everything here is a pure string builder so the length ceiling can be measured
- * before a URL is opened. Chunk size is decided by measuring these outputs, never
- * by counting stops: a route of Italian addresses breaches 2,048 characters well
- * before it reaches nine waypoints.
+ * before a URL is opened. Chunk size is decided by measuring these outputs rather
+ * than by counting stops: a typical Italian address leaves nine waypoints around
+ * 1,700 characters and so stays under the ceiling, but an address carrying c/o
+ * details, a building, a floor and an internal number does not — and a fixed
+ * count of nine would truncate that route silently, since the URL still opens.
  */
 
 /** A place as a handoff target. Either identifier may be absent, and which one a
