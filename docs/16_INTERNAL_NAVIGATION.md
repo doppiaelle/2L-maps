@@ -233,7 +233,7 @@ silently truncate.
 - [ ] Chunk size computed from URL length, verified with long Italian addresses.
 - [ ] Chunk overlap verified — each chunk's destination is the next chunk's origin.
 - [ ] Progress persisted before every external app launch.
-- [ ] Process death mid-route tested on both platforms.
+- [ ] Process death mid-route tested on Android. iOS **blocked** (ADR-0014).
 - [ ] Waze handoff tested with expired coordinates.
 - [ ] Web fallback tested with no navigation app installed.
 - [ ] Return-to-app lands directly on the Done/Skip decision.

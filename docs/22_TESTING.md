@@ -30,7 +30,7 @@ mechanism.
 | Unit and integration tests | Whoever writes the code | Same pull request |
 | E2E flows | QA + engineering | One per journey |
 | Contract tests | Architecture | Against [`33`](33_API_CONTRACTS.md) |
-| Device verification | QA | Physical devices, both platforms |
+| Device verification | QA | Physical Android device. iOS **unverified** (ADR-0014) |
 
 ---
 
@@ -102,7 +102,7 @@ mechanism.
   pre-commit   typecheck · lint · format
   pull request unit · component · integration · contract
   pre-release  E2E on the three journeys · performance on reference devices ·
-               accessibility audit · both platforms, both themes
+               accessibility audit · Android (iOS deferred) · both themes
 ```
 
 **How the hard parts are tested.** Native maps are mocked at the `<AppMap>` facade, external
@@ -304,7 +304,7 @@ testing what is easy; these are the cases that are hard and that break users.
 - [ ] Every component state in [`09`](09_COMPONENT_LIBRARY.md) rendered in a test.
 - [ ] Every failure path in [`33`](33_API_CONTRACTS.md) exercised against a substituted network.
 - [ ] Contract tests pass against a local Supabase instance.
-- [ ] All seven E2E flows pass on both platforms.
+- [ ] All seven E2E flows pass on Android. iOS **blocked** — no Apple hardware (ADR-0014).
 - [ ] Three-tap count asserted in E2E.
 - [ ] Order-preservation-on-failure asserted in E2E.
 - [ ] Cost regression guards in place and passing.

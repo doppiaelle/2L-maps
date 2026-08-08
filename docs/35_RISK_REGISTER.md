@@ -43,8 +43,9 @@ this file holds the definition, so a risk cannot be described two different ways
                           IMPACT
               low          medium         high
            ┌────────────┬────────────┬─────────────────────┐
-      high │            │  C11       │  C2  C12            │
-           │            │            │  cost, App Review   │
+      high │            │  C11       │  C2  C12  C17       │
+           │            │            │  cost, App Review,  │
+           │            │            │  iOS unverified     │
    L       ├────────────┼────────────┼─────────────────────┤
    I  med  │  C14  C15  │  C6  C13   │  C1  C7  C8         │
    K       │            │            │  economics, review, │
@@ -272,7 +273,7 @@ account termination or a blocked release.*
 | **Likelihood / Impact** | **Medium / Medium, but with no clean fallback** |
 | **Status** | Mitigated — version pinning as a pair, plus the `<AppMap>` facade ([ADR-0005](adr/0005-map-engine-and-route-preview.md)) |
 | **Trigger** | Any Expo SDK upgrade; any `react-native-maps` release |
-| **Response** | Expo SDK upgrades are never routine. Each requires a verified build on both platforms before merge. Remaining pinned on a working pair is always an acceptable outcome. |
+| **Response** | Expo SDK upgrades are never routine. Each requires a verified build on Android before merge; the iOS half cannot run (ADR-0014), so an upgrade that breaks iOS would not be caught here. Remaining pinned on a working pair is always an acceptable outcome, and now more attractive than before. |
 | **Owner** | Architecture |
 
 #### C13 — Route Optimization latency differs between sync and batch modes
@@ -430,6 +431,7 @@ is not mitigated.
 | Date | Change | Reason | Author |
 |---|---|---|---|
 | 2026-08-06 | Register created with C1–C16, S1–S3 | Project inception | Product owner |
+| 2026-08-07 | C17 added: iOS unverified on hardware | Verification is Android-first; no Apple hardware or programme (ADR-0014) | Product owner |
 | 2026-08-06 | C12 raised to high impact | Trial auto-renewal is the leading cause of App Store rejection | Product owner |
 | 2026-08-06 | S2 and S3 recorded as accepted, not mitigated | No mitigation exists; recording them as managed would be false | Product owner |
 | 2026-08-06 | S4 added after the risk fired | A container reclaim destroyed a full set of committed-but-unpushed documentation | Product owner |

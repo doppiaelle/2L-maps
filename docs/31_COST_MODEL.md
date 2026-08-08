@@ -292,8 +292,8 @@ At the standard 30% commission, gross margin is €5.97 (60%) — still healthy.
 
 | Price | Net per user | Fixed costs | Break-even |
 |---|---|---|---|
-| €9.99/month | €8.49 | ~$50/month | **~7 subscribers** |
-| €14.99/month | €12.74 | ~$50/month | **~4 subscribers** |
+| €9.99/month | €8.49 | ~$25/month | **~3 subscribers** |
+| €14.99/month | €12.74 | ~$25/month | **~2 subscribers** |
 
 An annual plan should be offered at roughly a 30% discount — around €79.99 — because it
 improves cash flow and materially reduces churn, at a margin still well above cost.
