@@ -142,14 +142,18 @@ What we pay regardless of users.
 | **Apple Developer Program** | None | Immediately, to use TestFlight or publish | **$99/year** | High |
 | **Google Play Developer** | None | Before publishing | **$25 once** | High |
 | Supabase | 500 MB DB · 50k auth MAU · 500k Edge Function invocations · 2 projects | ⚠️ **Free projects pause after 7 days of inactivity** — unacceptable in beta | $25/month (Pro) | Medium-high |
-| Expo EAS | 15 iOS + 15 Android builds/month · 1,000 MAU on Updates | More builds, or queue priority | $19/month (Starter) | Medium-high |
+| ~~Expo EAS~~ | — | **Not used.** Gradle on GitHub Actions produces the Android build free ([ADR-0014](adr/0014-android-first-verification.md)) | **$0** | High |
 | GitHub Actions | 2,000 min/month on private repos | macOS runners consume 10× → ~200 effective minutes | Usage-based | High |
 | Sentry | 5,000 errors/month | Above that | ~$26/month | Medium |
 | Firebase Analytics + Crashlytics | Unlimited for our usage | — | $0 | High |
 | RevenueCat | Free below $2,500/month tracked revenue | Above that | 1% of tracked revenue | Medium-high |
 
-**Fixed cost at MVP scale: roughly $50/month** (Supabase Pro + EAS Starter), plus $99/year and
-$25 once.
+**Fixed cost at MVP scale: roughly $25/month** (Supabase Pro), plus $25 once for Play. Dropping
+EAS removed $19/month and a 15-builds-a-month ceiling.
+
+**The $99/year Apple Developer Program is deferred, not budgeted.** Nothing in the Android-first
+path needs it, and it buys exactly one thing: installing on an iPhone and publishing there
+([ADR-0014](adr/0014-android-first-verification.md)).
 
 **The one unavoidable cost is the Apple Developer Program.** Everything else has a free tier
 sufficient for development and early beta.

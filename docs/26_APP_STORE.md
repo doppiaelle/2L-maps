@@ -7,6 +7,11 @@
 
 ---
 
+> ⚠️ **Deferred.** Submission requires the Apple Developer Program, which is not held, and
+> verification is Android-first ([ADR-0014](adr/0014-android-first-verification.md)). Everything
+> below stays accurate and prepared — the Guideline 3.1.2 exposure in particular does not soften
+> with time — but none of it is actionable until that decision is revisited.
+
 ## 1. Purpose
 
 This document specifies what App Review will examine, what is most likely to be rejected, and the

@@ -172,7 +172,12 @@ Everything in §6 for every change, plus:
 - [ ] The journey it belongs to passes end to end
       ([`03_USER_JOURNEYS.md`](03_USER_JOURNEYS.md)).
 - [ ] **Three-tap count re-measured** if the critical path was touched.
-- [ ] Verified on **physical devices, both platforms**, light and dark.
+- [ ] Verified on a **physical Android device**, light and dark, through the development
+      build ([ADR-0014](adr/0014-android-first-verification.md)).
+- [ ] iOS behaviour reviewed in code and covered by tests. **Not verified on hardware** — the
+      gate is unmet and stays unmet until a Mac or the Apple Developer Program exists. It is
+      recorded here rather than ticked, because a gate that is quietly reinterpreted stops
+      being a gate.
 - [ ] Verified one-handed, standing, on a real device.
 - [ ] Analytics events added where a gate metric depends on them
       ([`21_ANALYTICS.md`](21_ANALYTICS.md)).
@@ -227,7 +232,7 @@ Everything in §7 for every feature, plus:
 | [0007](adr/0007-place-id-durable-coordinates-perishable.md) | Coordinates perishable | The null-coordinate handling gate |
 | [0005](adr/0005-map-engine-and-route-preview.md) | Facades mandatory | The "no direct SDK import" gate |
 
-**Decided here:** verification on a physical device, on both platforms, in both themes, is part
+**Decided here:** verification on a physical device, in both themes, is part
 of done rather than part of QA. A simulator does not reproduce thermal throttling, sunlight,
 gloved touch or a real network — and those are this product's operating conditions.
 

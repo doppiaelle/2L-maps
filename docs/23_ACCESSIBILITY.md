@@ -255,7 +255,9 @@ deliberate.
 - [ ] Every state distinguishable without colour.
 - [ ] Touch targets ≥ 44 pt with adequate separation, markers included.
 - [ ] Dynamic Type verified to 200% on Plan at 25 stops.
-- [ ] VoiceOver walkthrough of all three journeys.
+- [ ] VoiceOver walkthrough of all three journeys. **Blocked** — needs Apple hardware
+      ([ADR-0014](adr/0014-android-first-verification.md)). The requirement stands; the box
+      stays unticked.
 - [ ] TalkBack walkthrough of all three journeys.
 - [ ] Every gesture has a verified non-gesture equivalent.
 - [ ] Reduce Motion verified on every animated surface.

@@ -141,7 +141,10 @@ contributor guide, not a footnote — and it is risk C10 in
 | `preview` | Production-like, internal testing | Internal |
 | `production` | Store submission | App Store / Play Store |
 
-**Free tier: 15 iOS + 15 Android builds per month** ([`31_COST_MODEL.md`](31_COST_MODEL.md)),
+**EAS is not used** ([ADR-0014](adr/0014-android-first-verification.md)). Gradle on a Linux
+GitHub Actions runner produces the same Android artifact with no monthly ceiling and no
+subscription; the profiles below describe the build shapes, not the service. Its free tier was
+**15 iOS + 15 Android builds per month** ([`31_COST_MODEL.md`](31_COST_MODEL.md)),
 which is sufficient for MVP cadence. Builds are not triggered on every commit — only on merge to
 `main` and on release tags.
 

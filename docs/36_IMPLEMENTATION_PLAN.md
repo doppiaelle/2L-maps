@@ -360,6 +360,34 @@ the request, so a superseded keystroke was paid for. And TypeScript narrowed `si
 false after that guard and never widened it, because control-flow analysis cannot see the signal
 change mid-flight — which is exactly when a cancellation happens.
 
+### How the app is actually tried — decided 2026-08-07
+
+Recorded because it changed the shape of several documents, and because my first answer on it was
+wrong.
+
+**The decision.** Verification is Android-first, on a real phone, through a development build
+that CI produces as a downloadable artifact ([ADR-0014](adr/0014-android-first-verification.md)).
+It is installed once; after that every change arrives by QR code with instant reload — the Expo
+Go loop, but carrying this app's own native capabilities. iOS stays in the codebase and is
+explicitly unverified.
+
+**The correction.** I first said hands-on iOS testing was impossible without a Mac or the $99
+Developer Program, and the product owner made a scope decision on that basis. It was wrong: an
+iOS *simulator* build needs no paid account and can be streamed to a browser and operated by
+hand. The $99 buys installation on a *physical* iPhone and publication, not hands-on use. The
+decision landed in the same place for a different and better reason — an Android phone gives a
+real device with real GPS and real navigation apps installed, which a simulator cannot — but the
+reasoning offered at the time was not sound.
+
+**Why not Expo Go**, more precisely than "native modules": detecting which navigation apps are
+installed needs build-time manifest declarations that Expo Go cannot carry, and in-app purchases
+need native configuration it does not have. Those are the product's two edges. Expo Go would
+verify the middle and neither end.
+
+**What stays unverified, and stays written down as such.** Handoff to installed navigation apps
+on iOS, and the performance budgets on an iPhone. Neither threshold is lowered. A budget chosen
+because it can be measured is no longer a budget.
+
 ## 7. Environment limits
 
 Verified in the development environment, not assumed. These are the reason several gates state

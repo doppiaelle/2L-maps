@@ -73,8 +73,8 @@ are recorded here in a compact form.
 authoring effort, concentrated in areas that were previously unspecified rather than
 duplicating existing content. A forty-second document, `36_IMPLEMENTATION_PLAN.md`, was added
 when implementation began ([ADR-0013](0013-implementation-execution-model.md)). Note that these
-counts treat `adr/` as a single entry; on disk the repository holds 54 markdown files, because
-that entry expands to thirteen ADRs.
+counts treat `adr/` as a single entry; on disk the repository holds 55 markdown files, because
+that entry expands to fourteen ADRs.
 
 ## Alternatives considered
 
