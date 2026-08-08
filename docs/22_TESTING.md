@@ -147,13 +147,27 @@ are exactly the ones users encounter at the worst moment.
 
 Accessibility is asserted here: every interactive element has a label, and labels state outcomes.
 
-### Integration — Jest + MSW
+### Integration — Jest, with the network substituted at the seam
 
 Every hook that talks to an Edge Function, **including every failure path**: 402, 429, 503, 504,
-partial success, timeout, and offline.
+partial success, timeout, and offline. The substitute returns the exact shapes in
+[`33_API_CONTRACTS.md`](33_API_CONTRACTS.md), including the error envelope and
+`degradationHint`, so the degradation logic is genuinely exercised.
 
-MSW returns the exact shapes in [`33_API_CONTRACTS.md`](33_API_CONTRACTS.md), including the error
-envelope and `degradationHint`, so the client's degradation logic is genuinely exercised.
+**Not MSW, though it was specified as MSW until 2026-08-07.** MSW v2 pulls ESM-only transitive
+dependencies (`rettime`) that Jest's CommonJS runtime refuses to load regardless of
+`transformIgnorePatterns`, `moduleFileExtensions` or a dedicated project; the `.mjs` extension
+forces the refusal before any transform runs. Rather than carry a dependency that cannot run,
+the network is substituted through the `fetchImpl` the `ApiClient` already accepts.
+
+That is not a weaker test. The rule being served is "mock the network, never the function under
+test", and injecting at a seam the design provides satisfies it more directly than intercepting
+would: no global is patched, and the substitution is visible in the call signature rather than
+hidden in a lifecycle hook. MSW earns its place when a dependency cannot be replaced — here it
+can, so the interception was machinery without a job.
+
+**Revisit if** a hook ever needs to exercise something below the client, or if MSW ships a build
+Jest can load.
 
 ### Contract
 
@@ -288,7 +302,7 @@ testing what is easy; these are the cases that are hard and that break users.
 
 - [ ] Every function in `lib/` unit tested, boundaries included.
 - [ ] Every component state in [`09`](09_COMPONENT_LIBRARY.md) rendered in a test.
-- [ ] Every failure path in [`33`](33_API_CONTRACTS.md) exercised via MSW.
+- [ ] Every failure path in [`33`](33_API_CONTRACTS.md) exercised against a substituted network.
 - [ ] Contract tests pass against a local Supabase instance.
 - [ ] All seven E2E flows pass on both platforms.
 - [ ] Three-tap count asserted in E2E.
@@ -344,6 +358,6 @@ would still look healthy. The mandatory list in §6 is the actual requirement.
 | A coverage percentage target | Objective; easy to enforce in CI | Rewards testing easy code and says nothing about whether the risky logic is covered |
 | E2E against a real map | Tests what users see | Slow, flaky, and hard to assert on marker order. The facade gives assertable equivalence |
 | Manual regression scripts | No infrastructure; flexible | Does not scale, gets skipped under deadline, and never catches cost or compliance regressions |
-| Testing against real Google APIs | Highest fidelity | Costs money per run, is slow, and fails when Google does. Contract tests plus MSW give the same confidence |
+| Testing against real Google APIs | Highest fidelity | Costs money per run, is slow, and fails when Google does. Contract tests plus a substituted network give the same confidence |
 | Snapshot tests as the primary component strategy | Fast to write; broad coverage | Breaks on every cosmetic change and asserts nothing about behaviour |
 | Deferring E2E until after launch | Faster MVP | The three journeys are the product. Shipping without verifying them end to end is shipping untested |
