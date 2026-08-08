@@ -180,12 +180,23 @@ announcement. A risk reviewed only when it fires was never being managed.
 
 | | |
 |---|---|
-| **Description** | `react-native-maps` is a native module, so a development build is required from day one. Any workflow assuming Expo Go fails immediately. |
+| **Description** | A development build is required from day one, and the reason is sharper than "native modules". Detecting which navigation apps are installed depends on build-time manifest declarations (`LSApplicationQueriesSchemes`, Android `<queries>`) that Expo Go cannot carry, since it ships its own manifest; in-app purchases need native configuration it also lacks. Those are the product's two edges, so Expo Go could verify the middle of it and neither end. |
 | **Likelihood / Impact** | Low / Medium |
-| **Status** | Accepted — documented in [`25_DEPLOYMENT.md`](25_DEPLOYMENT.md) |
+| **Status** | Accepted — CI produces the development build ([ADR-0014](adr/0014-android-first-verification.md)) |
 | **Trigger** | Onboarding friction for a new contributor |
-| **Response** | Development-build setup documented as the first step of the contributor guide. |
+| **Response** | The development build is a CI artifact: installed once, then every change arrives by QR code with no rebuild. |
 | **Owner** | Architecture |
+
+#### C17 — iOS ships unverified on hardware
+
+| | |
+|---|---|
+| **Description** | Verification is Android-first ([ADR-0014](adr/0014-android-first-verification.md)) because installing on an iPhone requires the Apple Developer Program. iOS is covered by tests and by code review, and by nothing that runs on an Apple device. |
+| **Likelihood / Impact** | **High / High** — not a possibility but the current state |
+| **Status** | **Accepted deliberately**, not mitigated. No amount of design removes Apple's provisioning requirement. |
+| **Trigger** | The first iOS-specific defect, or the decision to submit to the App Store |
+| **Response** | The facades keep platform-specific code in three known places, so an iOS pass is bounded work rather than an audit of everything. Nothing iOS-specific is claimed verified in the meantime. |
+| **Owner** | Product owner |
 
 ---
 

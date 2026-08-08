@@ -95,6 +95,13 @@ because it makes no request at all — which is also why it is the largest cost 
 | **Low** | iPhone, 3+ generations old | Marco's device class; professionals do not upgrade annually |
 | Reference | Current mid-range | Sanity check only |
 
+> ⚠️ **The iPhone half of this table is currently unmeasurable.** Verification is Android-first
+> ([ADR-0014](adr/0014-android-first-verification.md)) and no Apple hardware is available. The
+> budgets below keep their values for both platforms — they are not lowered to what can be
+> measured, because a number chosen to be achievable stops being a budget. The iOS column is
+> simply **unverified**, and a simulator does not substitute: it neither throttles nor has a real
+> GPU, which is the whole point of the conditions stated here.
+
 **Measurement conditions:** on battery, not plugged in; after 10 minutes of use so thermal
 throttling has begun; with a real network, not a local server. A phone mounted on a windscreen in
 August is thermally throttled, and that is the condition that matters.

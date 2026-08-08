@@ -123,6 +123,7 @@ owning your area (see §Areas below) → [`29`](29_DEFINITION_OF_DONE.md).
 | [0011](adr/0011-server-side-quota-enforcement.md) | Entitlements and quotas enforced server-side only |
 | [0012](adr/0012-long-term-osm-exit-path.md) | MapLibre + Valhalla recorded as the exit path |
 | [0013](adr/0013-implementation-execution-model.md) | Implementation in waves, one branch each, status in the repository |
+| [0014](adr/0014-android-first-verification.md) | Android-first verification through a CI-built development build; iOS unverified |
 
 ---
 
@@ -213,8 +214,8 @@ template, and pushed.
 
 **File count.** The approved set is 42 documents: the 33 named in the brief, 8 extensions, and
 `36_IMPLEMENTATION_PLAN.md` added when implementation began ([ADR-0013](adr/0013-implementation-execution-model.md)),
-counting `adr/` as one entry. On disk that is **54 files** — 39 in `docs/`, 13 in `docs/adr/`,
-and `CLAUDE.md` and `README.md` at the root — because the single ADR entry expands to thirteen
+counting `adr/` as one entry. On disk that is **55 files** — 39 in `docs/`, 14 in `docs/adr/`,
+and `CLAUDE.md` and `README.md` at the root — because the single ADR entry expands to fourteen
 records. Both numbers are correct; they count different things.
 
 **Audit results, wave 6.**
