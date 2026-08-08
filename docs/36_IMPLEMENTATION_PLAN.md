@@ -170,6 +170,35 @@ than the order it was handed.
 **Not covered by this gate:** nothing in `lib/` calls the network, so no contract is exercised
 here — that is wave 2's gate.
 
+### Wave 2 progress — recorded 2026-08-07, **not yet complete**
+
+The wave is open. What is done is merged-quality and tested; what remains is named rather than
+implied.
+
+**Done and verified.** Migrations for all eight tables, RLS on every one, the coordinate purge
+with a scheduled job and a health predicate, the seven-step pipeline, Zod validation for every
+endpoint input, and the shared cache key. 214 tests across both projects.
+
+**The environment limit in §7 is lifted.** The plan recorded that migrations could be written
+but not executed, because there is no Docker daemon. [PGlite](https://pglite.dev) is Postgres
+compiled to WebAssembly and runs in-process, so the migrations are now *applied* and the
+policies are exercised between two actual users — the difference between a reviewed schema and
+a verified one.
+
+Building that harness surfaced two ways it could have passed for the wrong reason, both fixed:
+`set local role` outside a transaction reverts immediately, leaving the query to run as the
+owner, who bypasses RLS; and without the grants Supabase gives `authenticated` by default, the
+role receives permission-denied rather than an RLS-filtered result. Either would have reported
+every policy as working.
+
+**Still to do in this wave.** The five Deno entrypoints and their Google upstream adapters.
+Entrypoints were drafted and then removed rather than committed, because they imported modules
+that did not exist yet — a file with a dangling import is a placeholder wearing a costume, and
+the constitution forbids both. The upstream adapters are also the part decision I2 defers:
+without credentials they cannot be exercised against Google at all, only against MSW.
+
+**Not covered by what is verified so far:** no call has been made to any Google API.
+
 ## 6. Flows
 
 ### How a wave runs
