@@ -1,0 +1,212 @@
+import { ApiError, statusFor, type DegradationHint, type ErrorEnvelope } from './errors';
+
+/**
+ * The seven-step pipeline every metered function runs.
+ *
+ *   1 verify JWT        → 401
+ *   2 check entitlement → 402
+ *   3 rate limit        → 429 RATE_LIMITED
+ *   4 quota             → 429 QUOTA_EXHAUSTED
+ *   5 cache lookup      → hit returns, still recorded
+ *   6 upstream call     → the only step that costs money
+ *   7 record usage      → always, hit or miss
+ *
+ * **The order is load-bearing** (docs/13_BACKEND.md §4), and two placements in
+ * particular are decisions rather than conveniences.
+ *
+ * Entitlement precedes rate limiting because reversing them tells a lapsed user
+ * they are going too fast when the truth is they are not subscribed. The error a
+ * user sees has to name the real cause, or the action they take next cannot fix
+ * it.
+ *
+ * Cache lookup follows the quota check because a hit costs us nothing upstream
+ * and must still consume allowance. Free hits would let a user with a recurring
+ * route consume unlimited value while the quota reports them idle — and recurring
+ * routes are precisely what this segment has.
+ *
+ * Every dependency is injected. That is what lets the order be tested without a
+ * network, a database or a Deno runtime: mock the network, never the function
+ * under test (CLAUDE.md §5).
+ */
+
+export interface AuthenticatedUser {
+  readonly userId: string;
+}
+
+export interface EntitlementState {
+  readonly hasEntitlement: boolean;
+  readonly status: string;
+}
+
+export interface QuotaState {
+  readonly isExhausted: boolean;
+  readonly limit: number;
+  readonly used: number;
+  readonly resetsAt: string;
+}
+
+export interface RateLimitState {
+  readonly isLimited: boolean;
+  readonly retryAfterSeconds: number;
+}
+
+export interface UsageRecord {
+  readonly userId: string;
+  readonly endpoint: string;
+  readonly tier: string | null;
+  readonly cacheHit: boolean;
+  readonly units: number;
+}
+
+/**
+ * What the pipeline needs from the outside world.
+ *
+ * `readCache` and `writeCache` are optional: `/places-autocomplete` deliberately
+ * has no cache, because caching would breach Places session semantics and return
+ * stale suggestions (docs/13_BACKEND.md §6).
+ */
+export interface PipelineDependencies<TRequest, TResult> {
+  readonly endpoint: string;
+  authenticate: (request: TRequest) => Promise<AuthenticatedUser | null>;
+  readEntitlement: (userId: string) => Promise<EntitlementState>;
+  checkRateLimit: (userId: string, endpoint: string) => Promise<RateLimitState>;
+  checkQuota: (userId: string, endpoint: string) => Promise<QuotaState>;
+  readCache?: (request: TRequest) => Promise<TResult | null>;
+  callUpstream: (request: TRequest, user: AuthenticatedUser) => Promise<UpstreamOutcome<TResult>>;
+  writeCache?: (request: TRequest, result: TResult) => Promise<void>;
+  recordUsage: (record: UsageRecord) => Promise<void>;
+}
+
+export interface UpstreamOutcome<TResult> {
+  readonly result: TResult;
+  /** Which engine served it, for the usage record. Null where the notion does not apply. */
+  readonly tier: string | null;
+  /** Billable units. Stops for T2, which bills per stop; requests otherwise. */
+  readonly units: number;
+}
+
+export type PipelineOutcome<TResult> =
+  | { readonly ok: true; readonly status: 200; readonly body: TResult; readonly cacheHit: boolean }
+  | { readonly ok: false; readonly status: number; readonly body: ErrorEnvelope };
+
+/** The steps, in order, for assertions that the order itself has not changed. */
+export const PIPELINE_STEPS = [
+  'authenticate',
+  'entitlement',
+  'rate-limit',
+  'quota',
+  'cache',
+  'upstream',
+  'record',
+] as const;
+
+export type PipelineStep = (typeof PIPELINE_STEPS)[number];
+
+export async function runPipeline<TRequest, TResult>(
+  request: TRequest,
+  deps: PipelineDependencies<TRequest, TResult>,
+  /** Records which steps ran, so tests can assert the order and the short-circuits. */
+  trace: PipelineStep[] = [],
+): Promise<PipelineOutcome<TResult>> {
+  try {
+    // 1 — who is calling
+    trace.push('authenticate');
+    const user = await deps.authenticate(request);
+    if (user === null) {
+      throw new ApiError('UNAUTHENTICATED', 'Sign in to continue');
+    }
+
+    // 2 — may they use metered features at all
+    trace.push('entitlement');
+    const entitlement = await deps.readEntitlement(user.userId);
+    if (!entitlement.hasEntitlement) {
+      throw new ApiError('NO_ENTITLEMENT', 'Your subscription has ended', {
+        details: { status: entitlement.status },
+      });
+    }
+
+    // 3 — burst protection
+    trace.push('rate-limit');
+    const rate = await deps.checkRateLimit(user.userId, deps.endpoint);
+    if (rate.isLimited) {
+      throw new ApiError('RATE_LIMITED', 'Too many requests just now', {
+        details: { retryAfterSeconds: rate.retryAfterSeconds },
+        degradationHint: 'RETRY_LATER',
+      });
+    }
+
+    // 4 — monthly allowance
+    trace.push('quota');
+    const quota = await deps.checkQuota(user.userId, deps.endpoint);
+    if (quota.isExhausted) {
+      throw new ApiError('QUOTA_EXHAUSTED', 'Monthly limit reached', {
+        details: { limit: quota.limit, used: quota.used, resetsAt: quota.resetsAt },
+        degradationHint: 'T0_AVAILABLE',
+      });
+    }
+
+    // 5 — a hit costs nothing upstream, and still consumes allowance
+    trace.push('cache');
+    if (deps.readCache !== undefined) {
+      const cached = await deps.readCache(request);
+      if (cached !== null) {
+        trace.push('record');
+        await deps.recordUsage({
+          userId: user.userId,
+          endpoint: deps.endpoint,
+          tier: null,
+          cacheHit: true,
+          units: 1,
+        });
+        return { ok: true, status: 200, body: cached, cacheHit: true };
+      }
+    }
+
+    // 6 — the only step that costs money
+    trace.push('upstream');
+    const outcome = await deps.callUpstream(request, user);
+
+    if (deps.writeCache !== undefined) {
+      await deps.writeCache(request, outcome.result);
+    }
+
+    // 7 — always, hit or miss
+    trace.push('record');
+    await deps.recordUsage({
+      userId: user.userId,
+      endpoint: deps.endpoint,
+      tier: outcome.tier,
+      cacheHit: false,
+      units: outcome.units,
+    });
+
+    return { ok: true, status: 200, body: outcome.result, cacheHit: false };
+  } catch (error) {
+    return toFailure(error);
+  }
+}
+
+function toFailure<TResult>(error: unknown): PipelineOutcome<TResult> {
+  if (error instanceof ApiError) {
+    return { ok: false, status: statusFor(error.code), body: error.toEnvelope() };
+  }
+
+  // An unexpected throw becomes a generic INTERNAL. The original message never
+  // reaches the client: error objects are the most common way a query, a stack
+  // trace or a credential ends up somewhere it should not be.
+  return {
+    ok: false,
+    status: statusFor('INTERNAL'),
+    body: {
+      error: {
+        code: 'INTERNAL',
+        message: 'Something went wrong on our side',
+        degradationHint: 'RETRY_LATER' satisfies DegradationHint,
+      },
+    },
+  };
+}
+
+// Status codes live in errors.ts and are read from there. A second copy here
+// would be a number in two places, which is the failure the audit exists to
+// catch — and the two would diverge the first time one of them changed.

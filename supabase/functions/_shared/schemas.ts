@@ -1,0 +1,132 @@
+import { z } from 'zod';
+
+import { MAX_STOPS, MIN_STOPS } from '../../../types/constants';
+
+/**
+ * Input validation at the boundary.
+ *
+ * "Validate every Edge Function input against a schema before use"
+ * (CLAUDE.md §9 rule 5). Data arriving over the network is `unknown` until parsed
+ * — trusting a request shape is how production breaks quietly, and on a metered
+ * endpoint it is also how a malformed request becomes a billed upstream call.
+ *
+ * The stop limits come from types/constants.ts, which cites the document that
+ * owns them. Restating 25 here would put the number in a third place.
+ */
+
+/** Google place identifiers are opaque; we bound the length rather than the
+ *  alphabet, so a format change upstream does not reject valid input. */
+const placeId = z.string().min(1).max(512);
+
+const stopInput = z.object({
+  placeId,
+  label: z.string().max(200).nullable().optional(),
+  note: z.string().max(2000).nullable().optional(),
+});
+
+/**
+ * `/optimize`.
+ *
+ * The stop count is enforced here as well as in the client. The client's check is
+ * for the user's benefit — stating the limit before it is reached — and this one
+ * is the enforcement: a client can be modified, and above 25 stops the request
+ * would silently escalate to a tier that bills per stop (ADR-0011).
+ */
+export const optimizeRequestSchema = z.object({
+  routeId: z.string().uuid(),
+  origin: z.object({
+    placeId: placeId.nullable(),
+    isCurrentLocation: z.boolean(),
+    latitude: z.number().min(-90).max(90).nullable().optional(),
+    longitude: z.number().min(-180).max(180).nullable().optional(),
+  }),
+  stops: z.array(stopInput).min(MIN_STOPS).max(MAX_STOPS),
+  isRoundTrip: z.boolean(),
+  departureTime: z.string().datetime().nullable().optional(),
+  /** Makes a client retry after a timeout free rather than a second billed call. */
+  idempotencyKey: z.string().min(8).max(128).optional(),
+});
+
+export type OptimizeRequest = z.infer<typeof optimizeRequestSchema>;
+
+/**
+ * `/places-autocomplete`.
+ *
+ * The session token is required, not optional. Without one every keystroke bills
+ * as a separate request instead of falling under session pricing, which is the
+ * single largest way this product's COGS can escape control
+ * (docs/31_COST_MODEL.md). A request without a token is a client defect and is
+ * rejected as one rather than quietly billed.
+ */
+export const autocompleteRequestSchema = z.object({
+  input: z.string().min(1).max(200),
+  sessionToken: z.string().min(1).max(128),
+  locale: z.string().min(2).max(35).optional(),
+  bias: z
+    .object({
+      latitude: z.number().min(-90).max(90),
+      longitude: z.number().min(-180).max(180),
+      radiusMeters: z.number().int().positive().max(50_000),
+    })
+    .optional(),
+});
+
+export type AutocompleteRequest = z.infer<typeof autocompleteRequestSchema>;
+
+/**
+ * `/geocode` — batch resolution for list import.
+ *
+ * Used instead of autocomplete for bulk entry because it is materially cheaper,
+ * and it returns resolved and unresolved rows separately so the client can offer
+ * partial success rather than failing the whole import.
+ */
+export const geocodeRequestSchema = z.object({
+  addresses: z.array(z.string().min(1).max(500)).min(1).max(MAX_STOPS),
+  region: z.string().length(2).optional(),
+});
+
+export type GeocodeRequest = z.infer<typeof geocodeRequestSchema>;
+
+/**
+ * The RevenueCat webhook.
+ *
+ * Deliberately permissive about fields we do not read: RevenueCat adds them, and
+ * a strict schema would start rejecting valid events on their release schedule
+ * rather than ours. The signature is what establishes authenticity; the schema
+ * only establishes shape.
+ */
+export const revenueCatWebhookSchema = z.object({
+  event: z.object({
+    id: z.string().min(1),
+    type: z.string().min(1),
+    app_user_id: z.string().min(1),
+    product_id: z.string().nullable().optional(),
+    expiration_at_ms: z.number().nullable().optional(),
+    period_type: z.string().nullable().optional(),
+  }),
+});
+
+export type RevenueCatWebhook = z.infer<typeof revenueCatWebhookSchema>;
+
+/** Parsed input, or the taxonomy code the caller should respond with. */
+export type ParseOutcome<T> =
+  | { readonly ok: true; readonly value: T }
+  | { readonly ok: false; readonly code: 'INVALID_REQUEST' | 'MISSING_SESSION_TOKEN' };
+
+/**
+ * Parse a request body.
+ *
+ * The failure detail never reaches the client. A malformed request is our own
+ * defect (docs/33_API_CONTRACTS.md §6): the client built it, so the user cannot
+ * act on the specifics, and echoing them back describes our internals to whoever
+ * sent the request.
+ */
+export function parseRequest<T>(schema: z.ZodType<T>, body: unknown): ParseOutcome<T> {
+  const result = schema.safeParse(body);
+  if (result.success) return { ok: true, value: result.data };
+
+  // Autocomplete without a session token gets its own code, because it is the
+  // one malformed request with a specific and expensive consequence.
+  const missingSessionToken = result.error.issues.some((issue) => issue.path[0] === 'sessionToken');
+  return { ok: false, code: missingSessionToken ? 'MISSING_SESSION_TOKEN' : 'INVALID_REQUEST' };
+}

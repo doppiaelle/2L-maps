@@ -102,7 +102,8 @@ and this document inherits that. No re-statement of any requirement, schema or b
 | — | `main` | Documentation set 00–36, ADRs 0001–0013 | Consolidation audit passed | ✅ |
 | 0 | `feat/w0-foundation` | Expo 57 scaffold, TS strict, lint, Jest + RNTL + MSW, NativeWind, CI `verify` | §6 W0 | ✅ |
 | 1 | `feat/w1-domain` | All of `lib/` — pure domain logic | §6 W1 | ✅ |
-| 2 | `feat/w2-backend` | Migrations, RLS, five Edge Functions | §6 W2 | 🔵 |
+| 2a | `feat/w2-backend` | Migrations, RLS, purge, seven-step pipeline, validation, cache key | §6 W2a | ✅ |
+| 2b | `feat/w2b-upstream` | Five Deno entrypoints and their Google upstream adapters | §6 W2b | ⏳ |
 | 3 | `feat/w3-data-layer` | Facades, React Query, Zustand, offline queue | §6 W3 | ⏳ |
 | 4 | `feat/w4-design-system` | Tokens, `<AppMap>`, components | §6 W4 | ⏳ |
 | 5 | `feat/w5-screens` | Expo Router, the ten screens | §6 W5 | ⏳ |
@@ -170,6 +171,52 @@ than the order it was handed.
 **Not covered by this gate:** nothing in `lib/` calls the network, so no contract is exercised
 here — that is wave 2's gate.
 
+### Wave 2 split into 2a and 2b — recorded 2026-08-07
+
+Wave 2's gate required contract tests for every endpoint, and the endpoints do not exist yet, so
+the whole wave was being held back by its unfinished half. That held the schema, the RLS policies
+and the pipeline off `main` — work that is finished, tested, and that wave 3 depends on, since
+the facades are built against these contracts.
+
+Holding it back was applying the rule to the letter against its purpose. The gate is therefore
+**changed deliberately and recorded here**, as §6 requires, rather than quietly waived: wave 2
+becomes 2a (schema and pipeline — gate met, merged) and 2b (entrypoints and Google adapters —
+the part decision I2 defers, since without credentials they can only ever be exercised against
+MSW).
+
+Splitting is the honest move here and lowering the bar would not have been. Every original
+requirement still has to be met; they are now attached to the wave that can actually satisfy
+them.
+
+### Wave 2a outcome — recorded 2026-08-07
+
+The wave is open. What is done is merged-quality and tested; what remains is named rather than
+implied.
+
+**Done and verified.** Migrations for all eight tables, RLS on every one, the coordinate purge
+with a scheduled job and a health predicate, the seven-step pipeline, Zod validation for every
+endpoint input, and the shared cache key. 214 tests across both projects.
+
+**The environment limit in §7 is lifted.** The plan recorded that migrations could be written
+but not executed, because there is no Docker daemon. [PGlite](https://pglite.dev) is Postgres
+compiled to WebAssembly and runs in-process, so the migrations are now *applied* and the
+policies are exercised between two actual users — the difference between a reviewed schema and
+a verified one.
+
+Building that harness surfaced two ways it could have passed for the wrong reason, both fixed:
+`set local role` outside a transaction reverts immediately, leaving the query to run as the
+owner, who bypasses RLS; and without the grants Supabase gives `authenticated` by default, the
+role receives permission-denied rather than an RLS-filtered result. Either would have reported
+every policy as working.
+
+**Still to do in this wave.** The five Deno entrypoints and their Google upstream adapters.
+Entrypoints were drafted and then removed rather than committed, because they imported modules
+that did not exist yet — a file with a dangling import is a placeholder wearing a costume, and
+the constitution forbids both. The upstream adapters are also the part decision I2 defers:
+without credentials they cannot be exercised against Google at all, only against MSW.
+
+**Not covered by what is verified so far:** no call has been made to any Google API.
+
 ## 6. Flows
 
 ### How a wave runs
@@ -200,7 +247,8 @@ here — that is wave 2's gate.
 |---|---|
 | **W0** | `npx expo prebuild --platform android` completes with the pinned pair (§8); typecheck, lint and an empty suite run clean; CI green on the first push |
 | **W1** | Non-negotiable coverage of [`../CLAUDE.md`](../CLAUDE.md) §5: tier boundaries at 8/9 and 25/26 stops, coordinate expiry at 29/30/31 days, every handoff strategy against its capability matrix, long Italian addresses against the URL ceiling |
-| **W2** | Contract tests for every function against [`33_API_CONTRACTS.md`](33_API_CONTRACTS.md); 401, 402 and 429 paths verified; pipeline order verified — entitlement before rate limit, cache after quota |
+| **W2a** | Migrations applied against a real Postgres; no table in `public` without RLS; ownership verified between two distinct users; pipeline order verified — entitlement before rate limit, cache after quota; 401, 402 and both 429 paths verified; every request schema tested at its boundaries |
+| **W2b** | Each of the five endpoints tested against [`33_API_CONTRACTS.md`](33_API_CONTRACTS.md) with MSW standing in for Google; retry and timeout behaviour verified; field masks asserted minimal |
 | **W3** | MSW integration tests for every hook that calls an Edge Function, failure paths included; no query result copied into a store; draft route survives process death |
 | **W4** | Every component with a state machine tested in all its states; contrast verified in both themes; accessible labels present; no hardcoded values |
 | **W5** | The three journeys of [`03_USER_JOURNEYS.md`](03_USER_JOURNEYS.md) traversable in tests; three taps from open to optimized route; every screen state implemented |
