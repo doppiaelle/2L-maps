@@ -108,6 +108,7 @@ and this document inherits that. No re-statement of any requirement, schema or b
 | 4 | `feat/w4-design-system` | Tokens, `<AppMap>`, components | §6 W4 | ⏳ |
 | 5 | `feat/w5-screens` | Expo Router, the ten screens | §6 W5 | ⏳ |
 | 6 | `feat/w6-delivery` | EAS, Fastlane, CI, store preparation | §6 W6 | ⏳ |
+| 7 | `docs/go-live-runbook` | **Go-live runbook** — every external account, key and limit, step by step | §6 W7 | ⏳ |
 
 **Decisions taken at implementation start, and open to revision:**
 
@@ -253,6 +254,7 @@ without credentials they cannot be exercised against Google at all, only against
 | **W4** | Every component with a state machine tested in all its states; contrast verified in both themes; accessible labels present; no hardcoded values |
 | **W5** | The three journeys of [`03_USER_JOURNEYS.md`](03_USER_JOURNEYS.md) traversable in tests; three taps from open to optimized route; every screen state implemented |
 | **W6** | Full suite green; [`29_DEFINITION_OF_DONE.md`](29_DEFINITION_OF_DONE.md) walked item by item, with hardware-only items explicitly marked rather than ticked |
+| **W7** | Written only once everything compiles, builds and the full suite is green. Someone with no context can follow it end to end and reach a working live configuration without asking a question |
 
 ### How a cold session resumes
 
@@ -267,6 +269,47 @@ without credentials they cannot be exercised against Google at all, only against
         ▼
   continue
 ```
+
+### Wave 7 — the go-live runbook
+
+**Requested by the product owner, 2026-08-07.** It is recorded here rather than held in a
+conversation, because conversations do not survive a reclaimed container and this is the
+document a cold session reads.
+
+**When.** After wave 6, once nothing is missing, everything compiles and builds, and the full
+suite is green. Not before: a runbook written against code that is still moving describes a
+configuration that will not be the one shipped.
+
+**What it must contain**, per external service, in the order a person actually performs them:
+
+1. **Account creation** — which account, which plan, which region (Supabase must be EU, risk C8),
+   and what it costs at that moment.
+2. **What to enable** — the exact APIs to switch on, and just as importantly the ones to leave
+   off. An enabled API nobody calls is an attack surface and a billing surface.
+3. **Spending caps and quotas, before any key exists.** Budget alerts and per-API quotas in
+   Google Cloud, set at creation time rather than afterwards: the risk begins when the key
+   exists, not when the code first calls it.
+4. **Key creation and restriction** — the Maps SDK key restricted by bundle ID and SHA-1 and
+   scoped to the Maps SDK alone; the server key IP-unrestricted but server-only; the service
+   account for Route Optimization, which cannot exist on a client under any circumstances
+   (ADR-0006).
+5. **Where each secret goes** — `.env` local, Supabase secrets, EAS secrets — and the fact that
+   none of them is ever pasted into a chat or committed.
+6. **Applying the migrations** and verifying every RLS policy with two distinct users, which is
+   the same check the PGlite suite runs but against the real project.
+7. **Cloud-based Map Styling** — one Map ID per theme, and the fallback if one fails to resolve
+   (risk C15).
+8. **RevenueCat** — products, offerings, the webhook endpoint and its signing secret.
+9. **Store setup** — Apple Developer Program, App Store Connect, Play Console, and the
+   declarations each requires.
+10. **A verification step per service**, so the reader knows the step worked rather than assuming
+    it, and **a rollback note** for anything that costs money if left on.
+
+**Figures must be re-verified at the time of writing.** The costs in
+[`31_COST_MODEL.md`](31_COST_MODEL.md) carry medium confidence: `developers.google.com` was
+unreachable from the authoring environment, so they came from secondary sources, and Google has
+changed Maps Platform pricing unilaterally before. A runbook repeating an unverified figure is
+worse than one that says where to look.
 
 ## 7. Environment limits
 
