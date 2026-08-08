@@ -134,7 +134,35 @@ export interface GeocodingProvider {
       }
     | { readonly ok: false; readonly failure: GeocodingFailure }
   >;
+
+  /**
+   * Pull addresses out of whatever the user gave us — a pasted message, a
+   * photographed list, a dictated transcript ([ADR-0016](../../docs/adr/0016-ai-assisted-stop-entry.md)).
+   *
+   * It lives on this facade rather than a seventh one because it answers the
+   * same question as everything else here: turning what the user gave us into
+   * places. It is deliberately a *separate step* from `geocodeAddresses` —
+   * candidates are shown for review before anything is resolved, because a
+   * silently wrong address is a driver at the wrong door.
+   *
+   * `unparsed` carries the lines it could not read, so the user corrects two
+   * rows instead of losing twenty-eight.
+   */
+  parse: (input: ParseInput) => Promise<
+    | {
+        readonly ok: true;
+        readonly candidates: readonly string[];
+        readonly unparsed: readonly string[];
+      }
+    | { readonly ok: false; readonly failure: GeocodingFailure }
+  >;
 }
+
+/** Text or an image, never both — the union makes the "never both" structural
+ *  rather than a runtime check somebody forgets (docs/33_API_CONTRACTS.md). */
+export type ParseInput =
+  | { readonly kind: 'text'; readonly text: string; readonly locale?: string }
+  | { readonly kind: 'image'; readonly base64: string; readonly locale?: string };
 
 // ─── Navigation handoff ──────────────────────────────────────────────────────
 

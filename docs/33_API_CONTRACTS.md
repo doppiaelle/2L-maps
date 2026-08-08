@@ -204,10 +204,17 @@ never on `message`.**
 
 // Response 200
 {
-  "resolved":   [{ "index": 0, "placeId": "ChIJ…", "formattedAddress": "…" }],
+  "resolved":   [{ "index": 0, "placeId": "ChIJ…", "formattedAddress": "…",
+                   "lat": 45.6983, "lng": 9.6773 }],
   "unresolved": [{ "index": 1, "input": "…", "reason": "NOT_FOUND" }]
 }
 ```
+
+**Coordinates are returned here** because the caller needs them immediately — an imported list
+has to appear on the map — and a second round trip to fetch what this call already resolved
+would be a billed request for data we just had. They are subject to the 30-day rule like every
+other coordinate ([ADR-0007](adr/0007-place-id-durable-coordinates-perishable.md)); `place_id`
+is the durable half of each row.
 
 | Property | Value |
 |---|---|
@@ -217,6 +224,38 @@ never on `message`.**
 | Cache | Per address, keyed by normalised input + region; TTL 24 h |
 | Quota | 1,500 per calendar month per user |
 | Partial success | **Always allowed.** Unresolved rows never fail the request |
+
+### `POST /place-details`
+
+The re-hydration path. `place_id` is stored indefinitely; the coordinates beside it expire after
+30 consecutive days and are then null. This endpoint turns the durable keys back into a usable
+route ([ADR-0007](adr/0007-place-id-durable-coordinates-perishable.md)).
+
+```jsonc
+// Request — batch, because twenty-five sequential lookups cost twenty-five times one batch
+{ "placeIds": ["ChIJ…", "ChIJ…"] }
+
+// Response 200
+{
+  "resolved":   [{ "placeId": "ChIJ…", "formattedAddress": "…",
+                   "lat": 45.6983, "lng": 9.6773 }],
+  "unresolved": [{ "placeId": "ChIJ…", "reason": "NOT_FOUND" }]
+}
+```
+
+| Property | Value |
+|---|---|
+| Batch maximum | `MAX_STOPS` per request |
+| Timeout | 5 s |
+| Retry | 5xx only; 1 attempt |
+| Cache | Per `place_id`; **TTL 30 days, never longer.** The cache expiry *is* the terms obligation, not a tuning knob |
+| Quota | Shares the geocoding allowance |
+| Partial success | Always allowed. A `place_id` Google no longer recognises is reported, never silently dropped — the stop stays in the route with no coordinate and the user is told which one needs re-entering |
+
+**`NOT_FOUND` here is a real state, not an error.** Places are demolished, merged and re-issued;
+a saved route from last year can contain a `place_id` that no longer resolves. The route survives
+minus that stop's geometry, which is why coordinates are nullable everywhere
+(`CLAUDE.md` §0 rule 3).
 
 ### `POST /parse-addresses`
 
