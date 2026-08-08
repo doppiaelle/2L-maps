@@ -104,7 +104,8 @@ and this document inherits that. No re-statement of any requirement, schema or b
 | 1 | `feat/w1-domain` | All of `lib/` — pure domain logic | §6 W1 | ✅ |
 | 2a | `feat/w2-backend` | Migrations, RLS, purge, seven-step pipeline, validation, cache key | §6 W2a | ✅ |
 | 2b | `feat/w2b-upstream` | Five Deno entrypoints and their Google upstream adapters | §6 W2b | ⏳ |
-| 3 | `feat/w3-data-layer` | Facades, React Query, Zustand, offline queue | §6 W3 | ⏳ |
+| 3a | `feat/w3-data-layer` | Sync conflict resolution, route progress, the five facade interfaces | §6 W3a | ✅ |
+| 3b | `feat/w3b-adapters` | Concrete adapters, React Query, Zustand stores, MSW integration tests | §6 W3b | ⏳ |
 | 4 | `feat/w4-design-system` | Tokens, `<AppMap>`, components | §6 W4 | ⏳ |
 | 5 | `feat/w5-screens` | Expo Router, the ten screens | §6 W5 | ⏳ |
 | 6 | `feat/w6-delivery` | EAS, Fastlane, CI, store preparation | §6 W6 | ⏳ |
@@ -250,7 +251,8 @@ without credentials they cannot be exercised against Google at all, only against
 | **W1** | Non-negotiable coverage of [`../CLAUDE.md`](../CLAUDE.md) §5: tier boundaries at 8/9 and 25/26 stops, coordinate expiry at 29/30/31 days, every handoff strategy against its capability matrix, long Italian addresses against the URL ceiling |
 | **W2a** | Migrations applied against a real Postgres; no table in `public` without RLS; ownership verified between two distinct users; pipeline order verified — entitlement before rate limit, cache after quota; 401, 402 and both 429 paths verified; every request schema tested at its boundaries |
 | **W2b** | Each of the five endpoints tested against [`33_API_CONTRACTS.md`](33_API_CONTRACTS.md) with MSW standing in for Google; retry and timeout behaviour verified; field masks asserted minimal |
-| **W3** | MSW integration tests for every hook that calls an Edge Function, failure paths included; no query result copied into a store; draft route survives process death |
+| **W3a** | The offline conflict table verified case by case, including that exactly one situation reaches the user; route progress cannot orphan an entry or leave a route unfinishable; every facade interface typechecks against the domain types |
+| **W3b** | MSW integration tests for every hook that calls an Edge Function, failure paths included; no query result copied into a store; draft route survives process death |
 | **W4** | Every component with a state machine tested in all its states; contrast verified in both themes; accessible labels present; no hardcoded values |
 | **W5** | The three journeys of [`03_USER_JOURNEYS.md`](03_USER_JOURNEYS.md) traversable in tests; three taps from open to optimized route; every screen state implemented |
 | **W6** | Full suite green; [`29_DEFINITION_OF_DONE.md`](29_DEFINITION_OF_DONE.md) walked item by item, with hardware-only items explicitly marked rather than ticked |
@@ -310,6 +312,29 @@ configuration that will not be the one shipped.
 unreachable from the authoring environment, so they came from secondary sources, and Google has
 changed Maps Platform pricing unilaterally before. A runbook repeating an unverified figure is
 worse than one that says where to look.
+
+### Wave 3a outcome — recorded 2026-08-07
+
+Gate passed. 258 tests. Three modules, all pure and all in `lib/`, plus the facade contracts.
+
+**Conflict resolution** verifies the table of §8 case by case, including a test asserting that no
+mutation kind other than reorder-versus-reorder can ever reach the user. That asymmetry is the
+design: a dialog for a case the system can decide is noise, and noise trains people to dismiss
+the dialog that matters.
+
+**Route progress** is tested for what must never happen rather than for the happy path, because
+it accumulates across a working day while the app is backgrounded: no mutation of a caller's
+reference, no orphan entry holding a route permanently unfinishable, no route that cannot end.
+
+**The facade interfaces** are the seam ADR-0012 depends on. They return expected failures rather
+than throwing them, and they name product concepts rather than SDK ones.
+
+**Split from 3b for the same reason wave 2 was split**: the concrete adapters, React Query wiring
+and Zustand stores are a coherent unit of their own, and holding these contracts back would block
+wave 4, which builds components against them.
+
+**Not covered by this gate:** nothing here touches the network or React. No hook, store or
+adapter exists yet.
 
 ## 7. Environment limits
 
