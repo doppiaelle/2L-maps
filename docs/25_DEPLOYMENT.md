@@ -9,7 +9,7 @@
 
 ## 1. Purpose
 
-This document specifies how code becomes a released app: environments, EAS builds, Fastlane,
+This document specifies how code becomes a released app: environments, builds, Fastlane,
 GitHub Actions, versioning, release channels and rollback.
 
 Two constraints shape everything: **Expo Go cannot run this app** because of native modules, and
@@ -30,7 +30,7 @@ fragility recorded as risk C6.
 | Concern | Owner | Notes |
 |---|---|---|
 | Build configuration | `eas.json`, config plugins | Versioned |
-| Secrets | EAS secrets + Supabase secrets | Never in the repository |
+| Secrets | GitHub Actions secrets + Supabase secrets | Never in the repository |
 | Release decision | Product owner | Manual gate on production |
 | Version pinning | Architecture | Expo SDK and maps as a pair |
 
@@ -46,15 +46,22 @@ fragility recorded as risk C6.
                 ├─ fail ──▶ blocked
                 │
                 ▼
-  merge to main ──▶ EAS build (internal profile)
+  merge to main ──▶ Gradle on Linux ──▶ Android development build (APK artifact)
                 │
                 ▼
-         E2E on the built artifact (Maestro, both platforms)
+         installed once on a physical phone; every later change
+         arrives by QR code from the dev server, no rebuild
+                │
+                ▼
+  ─────────────── everything below is DEFERRED (ADR-0014) ───────────────
+                │
+                ▼
+         E2E on the built artifact (Maestro)
                 │
                 ▼
   ┌─────────────────────────────────────────────────────────┐
   │  TestFlight (iOS)          Play Internal Testing        │
-  │  internal testers          internal track               │
+  │  needs the $99 programme   needs the $25 Play account   │
   └───────────────────────┬─────────────────────────────────┘
                           │ manual gate: product owner
                           ▼
@@ -99,7 +106,7 @@ cost alerting are configured from day one rather than at launch.
   commit ──▶ CI: typecheck · lint · test ──── red ──▶ stops here, always
                         │ green
                         ▼
-              EAS build (dev · preview · production)
+              Gradle build (development · release)
                         │
                         ▼
               internal testing ──▶ TestFlight / Play internal track
@@ -111,7 +118,7 @@ cost alerting are configured from day one rather than at launch.
               staged rollout ──▶ monitored against 21 and 24 ──▶ full release
 ```
 
-**Rollback.** A JS-only defect is rolled back with EAS Update within minutes; a native defect
+**Rollback.** Over-the-air JS rollback is not available today (see below); a native defect
 requires halting the staged rollout and submitting a build. The distinction is decided before
 release, not during an incident, because the two have very different clocks.
 
@@ -133,20 +140,23 @@ and every contributor needs one before writing a line of code. This is the first
 contributor guide, not a footnote — and it is risk C10 in
 [`35_RISK_REGISTER.md`](35_RISK_REGISTER.md), which costs onboarding time rather than money.
 
-### EAS profiles
-
-| Profile | Purpose | Distribution |
-|---|---|---|
-| `development` | Dev client with debugging | Internal, ad hoc |
-| `preview` | Production-like, internal testing | Internal |
-| `production` | Store submission | App Store / Play Store |
+### Build shapes
 
 **EAS is not used** ([ADR-0014](adr/0014-android-first-verification.md)). Gradle on a Linux
-GitHub Actions runner produces the same Android artifact with no monthly ceiling and no
-subscription; the profiles below describe the build shapes, not the service. Its free tier was
-**15 iOS + 15 Android builds per month** ([`31_COST_MODEL.md`](31_COST_MODEL.md)),
-which is sufficient for MVP cadence. Builds are not triggered on every commit — only on merge to
-`main` and on release tags.
+GitHub Actions runner produces the Android artifact with no monthly ceiling and no subscription,
+at the 1× minute rate rather than the 10× macOS rate.
+
+| Shape | Purpose | How it is obtained |
+|---|---|---|
+| **development** | The daily loop. Installed once; every later change arrives by QR code from the dev server | `android-preview` workflow, artifact download |
+| release | Store submission | Deferred — needs the Play account |
+| iOS, any shape | — | Deferred — needs macOS and, for a device, the Apple programme |
+
+**The Maps key is bound to the signing certificate.** CI signs with its own keystore, so that
+keystore's SHA-1 must be registered against the Google Maps Android key alongside the release
+one. Get this wrong and the map renders **grey with no error message** — tiles simply never
+load. The `android-preview` workflow prints the SHA-1 on every run so it never has to be hunted
+for.
 
 ### Version pinning — risk C6
 
@@ -156,7 +166,7 @@ which is sufficient for MVP cadence. Builds are not triggered on every commit �
 |---|---|
 | Both versions pinned exactly, no ranges | A patch release has broken this pairing before |
 | An upgrade is its own pull request, touching nothing else | Isolates the failure |
-| Requires a successful build **and** a map render test on both platforms before merge | Config-plugin failures appear at prebuild, not at typecheck |
+| Requires a successful build **and** a map render test on Android before merge; the iOS half cannot run (ADR-0014) | Config-plugin failures appear at prebuild, not at typecheck |
 | Staying on a working pair is always an acceptable outcome | There is no substitute engine ([ADR-0005](adr/0005-map-engine-and-route-preview.md)) |
 
 Known failure modes to check on every upgrade: the config plugin importing internal
@@ -180,14 +190,15 @@ Config plugins own everything that must be correct at build time:
 | Workflow | Trigger | Runs |
 |---|---|---|
 | `verify` | Every push and pull request | Lint, typecheck, unit, component, integration, contract |
-| `build-preview` | Merge to `main` | EAS preview build, both platforms |
-| `e2e` | After `build-preview` | Maestro against the artifact |
-| `release` | Release tag | EAS production build, Fastlane submission |
-| `migrate` | Merge touching `supabase/migrations` | Applies migrations, regenerates types |
+| `android-preview` | Merge to `main`, or on demand | Gradle development build; APK as an artifact |
+| `e2e` | Deferred | Maestro against the artifact |
+| `release` | Deferred | Release build and store submission |
+| `migrate` | Deferred | Applies migrations, regenerates types |
 
-**macOS runners consume minutes at 10×**, so 2,000 free private-repo minutes is roughly 200
-effective macOS minutes ([`31_COST_MODEL.md`](31_COST_MODEL.md)). E2E therefore runs on merge,
-not on every pull request.
+Everything running today is on Linux, at the 1× minute rate. **macOS runners bill at 10×**, so
+the 2,000 free private-repo minutes would be roughly 200 effective macOS minutes
+([`31_COST_MODEL.md`](31_COST_MODEL.md)) — which is one reason iOS builds are deferred rather
+than merely unverified.
 
 ### Fastlane
 
@@ -236,7 +247,7 @@ survivable:
 | Layer | Mechanism | Speed |
 |---|---|---|
 | **Edge Function** | Redeploy the previous version | **Minutes** |
-| **EAS Update** (JS only) | Republish the previous bundle | **Minutes** |
+| ~~Over-the-air JS update~~ | **Not available** — see below | — |
 | **Native binary** | Halt the rollout, submit a fix | **Hours to days** — store review |
 | **Database migration** | Forward fix only | Varies |
 
@@ -248,11 +259,21 @@ be corrected in minutes.
 **Database migrations are never rolled back.** They are fixed forward, because a released app
 version may already depend on the new schema.
 
-### EAS Update
+### Over-the-air updates
 
-Used for JS-only fixes between store releases. **Never for native changes**, and never to bypass
-review for behaviour that requires it — an update that changes what the app does functionally is
-a store-review matter, not a hotfix.
+**Not available, and this is a real loss to name rather than gloss.** EAS Update was the
+mechanism that made a JavaScript defect recoverable in minutes without a store round trip.
+Dropping EAS ([ADR-0014](adr/0014-android-first-verification.md)) removes it, so a JS defect and
+a native defect now have the same remedy: rebuild and redistribute.
+
+It costs nothing today, because there is no store presence to roll back from — the development
+build is replaced by rebuilding. It starts costing something the day the app is published, and
+that is the moment to reconsider: EAS Update is a separate product from EAS Build and has its own
+free tier, so adopting it later does not undo the build decision.
+
+When it is adopted: JS-only fixes, **never native changes**, and never to bypass review for
+behaviour that requires it — an update changing what the app functionally does is a store-review
+matter, not a hotfix.
 
 ---
 
@@ -265,7 +286,8 @@ a store-review matter, not a hotfix.
 | [0002](adr/0002-target-segment-and-monetization.md) | Trial to paid | Store configuration and release gating on billing |
 
 **Decided here:** the Expo SDK and `react-native-maps` are upgraded together, never separately,
-and an upgrade requires a verified build on both platforms before merge. They have broken as a
+and an upgrade requires a verified build on Android before merge — the iOS half is unavailable
+(ADR-0014), which leaves that pairing genuinely unverified. They have broken as a
 pair before (risk C6); treating them as one dependency is the only version of this that holds.
 
 ## 11. Edge cases
@@ -273,7 +295,7 @@ pair before (risk C6); treating them as one dependency is the only version of th
 | # | Condition | Expected behaviour |
 |---|---|---|
 | 1 | Expo SDK upgrade breaks the maps plugin | Upgrade PR fails at build; stay on the working pair |
-| 2 | EAS build minutes exhausted | Builds queue; release delayed. Cadence is planned within the free tier |
+| 2 | GitHub Actions minutes exhausted | Builds queue; the daily loop is unaffected, since it runs from the dev server rather than a rebuild |
 | 3 | Store review rejects during a phased release | Rollout halted; fix submitted |
 | 4 | Critical bug found at 5% rollout | Halt immediately; **this is what staged rollout is for** |
 | 5 | Migration applied, app release rejected | Migration must be backward compatible — this is why they are additive |
@@ -287,11 +309,11 @@ pair before (risk C6); treating them as one dependency is the only version of th
 | Failure | Detection | Response |
 |---|---|---|
 | CI fails | Pipeline | Merge blocked |
-| EAS build fails | Build log | Investigate; commonly a config-plugin issue after an upgrade |
+| Gradle build fails | Build log | Investigate; commonly a config-plugin issue after an upgrade (risk C6) |
 | Submission rejected | Store feedback | Address, resubmit; see [`26`](26_APP_STORE.md) |
 | Crash spike after release | Crashlytics | Halt rollout; assess; fix forward |
 | Migration fails | Migration workflow | Deployment blocked; fix forward |
-| EAS Update breaks the app | Crash spike | Republish the previous bundle — minutes |
+| A bad build reaches the phone | Crash on launch | Reinstall the previous artifact; retention keeps 30 days of them |
 
 ## 13. Best practices
 
@@ -299,7 +321,7 @@ pair before (risk C6); treating them as one dependency is the only version of th
 2. **Never release without phased or staged rollout.**
 3. **Keep migrations additive** — old app versions are still running.
 4. **Prefer server-side logic** where it can be corrected in minutes rather than days.
-5. **Never use EAS Update to bypass review** for functional changes.
+5. **Never use an over-the-air update to bypass review** for functional changes, once one exists.
 6. **Verify scheme declarations on a device with the apps installed** before every release.
 7. **Rotate every credential once before launch** to prove the procedure works.
 8. **Both platforms ship together.** A platform-specific release doubles the support surface.
@@ -311,7 +333,7 @@ pair before (risk C6); treating them as one dependency is the only version of th
 Before every production release:
 
 - [ ] All CI checks green.
-- [ ] E2E passing on both platforms.
+- [ ] E2E passing on Android. iOS **blocked** (ADR-0014).
 - [ ] Performance budgets measured on physical reference devices.
 - [ ] Store validation checklist complete ([`22_TESTING.md`](22_TESTING.md)).
 - [ ] Paywall verified against Guideline 3.1.2, both languages.
@@ -330,7 +352,7 @@ Before every production release:
 | MVP | Full pipeline, phased rollout, rollback | — |
 | 1.x | Automated performance regression in CI | Post-launch |
 | 1.x | Automated release notes from conventional commits | Post-launch |
-| 2.0 | Paid EAS tier if build cadence exceeds the free allowance | Build volume |
+| 2.0 | EAS Update reconsidered for over-the-air JS rollback | First store release |
 
 ## 16. Decision log
 

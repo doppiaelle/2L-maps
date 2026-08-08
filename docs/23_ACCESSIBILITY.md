@@ -33,7 +33,7 @@ and designing for a driver produce the same interface.**
 |---|---|---|
 | Contrast tokens | [`07_DESIGN_SYSTEM.md`](07_DESIGN_SYSTEM.md) | Verified in CI |
 | Component labels | [`09_COMPONENT_LIBRARY.md`](09_COMPONENT_LIBRARY.md) | Composed at the component |
-| Screen-level verification | QA | Manual, both platforms, every release |
+| Screen-level verification | QA | Manual, Android, every release. iOS **unverified** (ADR-0014) |
 | Store declarations | [`26`](26_APP_STORE.md), [`27`](27_PLAY_STORE.md) | Accessibility statements |
 
 ---

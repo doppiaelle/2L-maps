@@ -372,8 +372,10 @@ Non-blocking preferences are marked `nit:` and never hold a merge.
 Concrete failure modes this project is exposed to, and the rule that prevents each.
 
 1. **Never upgrade the Expo SDK and `react-native-maps` separately.** They are pinned as a
-   pair. An upgrade requires a verified build on both platforms before merge
-   ([ADR-0005](docs/adr/0005-map-engine-and-route-preview.md)).
+   pair. An upgrade requires a verified build on **Android** before merge
+   ([ADR-0005](docs/adr/0005-map-engine-and-route-preview.md)). The iOS half of that check
+   cannot run ([ADR-0014](docs/adr/0014-android-first-verification.md)), which is a standing
+   reason risk C6 remains open rather than closed.
 2. **Never assume a coordinate is present.** Handle `null` at every read
    ([ADR-0007](docs/adr/0007-place-id-durable-coordinates-perishable.md)).
 3. **Never cache a coordinate beyond 30 days**, anywhere — including analytics payloads and
@@ -408,7 +410,8 @@ A change is done when **all** of these hold. Not most.
 - [ ] No new client credential; no new unmetered upstream call.
 - [ ] Analytics events for new user-facing actions, with no personal data.
 - [ ] Documentation updated, including the decision log of the affected file.
-- [ ] Verified on a physical device, both platforms, light and dark.
+- [ ] Verified on a physical **Android** device, light and dark. iOS is **unverified on
+      hardware** and the box stays unticked ([ADR-0014](docs/adr/0014-android-first-verification.md)).
 
 Full specification: [`docs/29_DEFINITION_OF_DONE.md`](docs/29_DEFINITION_OF_DONE.md).
 

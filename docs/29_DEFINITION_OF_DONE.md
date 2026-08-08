@@ -85,7 +85,8 @@ is the most expensive kind of work, because the remaining 10% is discovered by a
   a change is done   ──▶ typecheck · lint · tests · states · a11y · tokens · docs
         │                 stops: work that compiles but is unfinished
         ▼
-  a feature is done  ──▶ every journey path · every error path · analytics · both platforms
+  a feature is done  ──▶ every journey path · every error path · analytics · Android
+                          (iOS unverified — ADR-0014)
         │                 stops: a feature that works only on the happy path
         ▼
   a release is done  ──▶ E2E · performance measured · store metadata · rollback rehearsed
@@ -196,7 +197,7 @@ Everything in §7 for every feature, plus:
 ### Verification
 
 - [ ] All CI checks green; no skipped tests without an issue and an owner.
-- [ ] All seven E2E flows pass on both platforms
+- [ ] All seven E2E flows pass on Android. iOS **blocked** (ADR-0014)
       ([`22_TESTING.md`](22_TESTING.md)).
 - [ ] Order-preservation-on-failure verified.
 - [ ] Performance budgets measured on physical reference devices, on battery, warm.
