@@ -128,14 +128,18 @@ describe('mapping Google’s order back onto our stops', () => {
 
 const quotaContext = (entitlement: Record<string, unknown> | null): HandlerContext => ({
   database: {
-    queryOne: (async (sql: string) =>
-      sql.includes('user_entitlements')
-        ? entitlement
-        : { optimizations: 4, autocomplete_sessions: 2 }) as HandlerContext['database']['queryOne'],
+    queryOne: (async () => entitlement) as HandlerContext['database']['queryOne'],
+    // Usage arrives grouped by endpoint and summed by `units`, not counted by
+    // row: `/place-details` charges what it actually fetched, so counting rows
+    // would report a twenty-five stop resolution as a single use.
+    queryMany: (async () => [
+      { endpoint: '/optimize', used: 4 },
+      { endpoint: '/places-autocomplete', used: 2 },
+    ]) as HandlerContext['database']['queryMany'],
     execute: async () => undefined,
   },
   tokens: { verify: async () => 'user-1' },
-  limits: { monthly: {}, burst: {} },
+  limits: { burst: {} },
 });
 
 describe('the plan a user is actually on', () => {
@@ -231,12 +235,13 @@ const webhookContext = () => {
   const context: HandlerContext = {
     database: {
       queryOne: (async () => null) as HandlerContext['database']['queryOne'],
+      queryMany: (async () => []) as HandlerContext['database']['queryMany'],
       execute: async (_sql: string, params: readonly unknown[]) => {
         writes.push([...params]);
       },
     },
     tokens: { verify: async () => 'user-1' },
-    limits: { monthly: {}, burst: {} },
+    limits: { burst: {} },
   };
   return { context, writes };
 };

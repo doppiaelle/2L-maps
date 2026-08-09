@@ -90,27 +90,47 @@ export async function verifyAndApply(
   // Idempotent by event id, and ordered by event timestamp rather than by
   // arrival: `where excluded.occurred_at > user_entitlements.occurred_at`
   // discards a stale event that overtook a newer one in flight.
+  const expiresAt =
+    event.expiration_at_ms === null || event.expiration_at_ms === undefined
+      ? null
+      : new Date(event.expiration_at_ms).toISOString();
+
+  // A day pass is consumable and its balance lives here, keyed to the user,
+  // because a store receipt alone cannot restore it across devices
+  // (ADR-0015, docs/20_SUBSCRIPTIONS.md §6). Writing only `status` would leave
+  // `resolvePlan` with nothing to check against the clock, and the pass would
+  // either never start or never end.
+  const dayPassExpiresAt = status === 'day-pass' ? expiresAt : null;
+
   await context.database.execute(
     `insert into user_entitlements
-       (user_id, status, product_id, expires_at, last_event_id, occurred_at)
-     values ($1, $2, $3, $4, $5, $6)
+       (user_id, status, product_id, expires_at, day_pass_expires_at, last_event_id, occurred_at)
+     values ($1, $2, $3, $4, $5, $6, $7)
      on conflict (user_id) do update
-       set status        = excluded.status,
-           product_id    = excluded.product_id,
-           expires_at    = excluded.expires_at,
-           last_event_id = excluded.last_event_id,
-           occurred_at   = excluded.occurred_at
+       set status              = excluded.status,
+           product_id          = excluded.product_id,
+           expires_at          = excluded.expires_at,
+           -- Kept when the new event is not itself a day pass: buying a pass and
+           -- then renewing a subscription must not cancel the hours already paid
+           -- for, and a subscription event knows nothing about them.
+           day_pass_expires_at = coalesce(
+             excluded.day_pass_expires_at,
+             user_entitlements.day_pass_expires_at
+           ),
+           last_event_id       = excluded.last_event_id,
+           occurred_at         = excluded.occurred_at
        where excluded.occurred_at > user_entitlements.occurred_at
          and user_entitlements.last_event_id is distinct from excluded.last_event_id`,
     [
       event.app_user_id,
       status,
       event.product_id ?? null,
-      event.expiration_at_ms === null || event.expiration_at_ms === undefined
-        ? null
-        : new Date(event.expiration_at_ms).toISOString(),
+      expiresAt,
+      dayPassExpiresAt,
       event.id,
-      new Date().toISOString(),
+      // The *event's* time, not ours. Delivery is unordered, so ordering by
+      // arrival would let a cancellation that overtook its renewal win.
+      new Date(event.event_timestamp_ms ?? Date.now()).toISOString(),
     ],
   );
 

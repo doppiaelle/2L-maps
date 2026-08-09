@@ -34,8 +34,19 @@ export interface AuthenticatedUser {
 }
 
 export interface EntitlementState {
+  /**
+   * Whether this user may use metered features **at all**.
+   *
+   * Since [ADR-0015](../../../docs/adr/0015-ad-supported-free-tier.md) a free
+   * user is entitled — to the free allowances. This is false only where there is
+   * genuinely no rung to stand on, which today means nothing: the flag stays
+   * because the step is the right place to refuse a suspended or fraudulent
+   * account, and removing it would leave nowhere to put that.
+   */
   readonly hasEntitlement: boolean;
   readonly status: string;
+  /** Which rung, and therefore which allowances the quota step applies. */
+  readonly plan: string;
 }
 
 export interface QuotaState {
@@ -70,7 +81,20 @@ export interface PipelineDependencies<TRequest, TResult> {
   authenticate: (request: TRequest) => Promise<AuthenticatedUser | null>;
   readEntitlement: (userId: string) => Promise<EntitlementState>;
   checkRateLimit: (userId: string, endpoint: string) => Promise<RateLimitState>;
-  checkQuota: (userId: string, endpoint: string) => Promise<QuotaState>;
+  /**
+   * The allowance is per plan, so the plan is passed in rather than read again.
+   *
+   * Explicit because it is an ordering dependency: step 4 cannot answer without
+   * what step 3 learned. Re-reading the entitlement here would be a second
+   * database round trip that can disagree with the first — a user whose day pass
+   * expires between the two would be entitled and out of allowance in the same
+   * request.
+   */
+  checkQuota: (
+    userId: string,
+    endpoint: string,
+    entitlement: EntitlementState,
+  ) => Promise<QuotaState>;
   readCache?: (request: TRequest) => Promise<TResult | null>;
   callUpstream: (request: TRequest, user: AuthenticatedUser) => Promise<UpstreamOutcome<TResult>>;
   writeCache?: (request: TRequest, result: TResult) => Promise<void>;
@@ -137,7 +161,7 @@ export async function runPipeline<TRequest, TResult>(
 
     // 4 — monthly allowance
     trace.push('quota');
-    const quota = await deps.checkQuota(user.userId, deps.endpoint);
+    const quota = await deps.checkQuota(user.userId, deps.endpoint, entitlement);
     if (quota.isExhausted) {
       throw new ApiError('QUOTA_EXHAUSTED', 'Monthly limit reached', {
         details: { limit: quota.limit, used: quota.used, resetsAt: quota.resetsAt },

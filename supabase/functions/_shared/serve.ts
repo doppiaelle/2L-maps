@@ -1,3 +1,4 @@
+import { createRequestContext } from './context';
 import { errorResponse } from './http';
 
 import type { HandlerContext } from './handler';
@@ -22,13 +23,24 @@ interface DenoGlobal {
 }
 declare const Deno: DenoGlobal | undefined;
 
-/** Supplied by the platform at deploy time; replaced in a local Deno run. */
+/** How a request gets its database and token verifier. */
 export type ContextFactory = () => Promise<Omit<HandlerContext, 'limits'>>;
 
-let contextFactory: ContextFactory | null = null;
+/**
+ * The default is the real one.
+ *
+ * It was previously null until something called `setContextFactory`, and nothing
+ * ever did — so every deployed function answered `INTERNAL` to every request,
+ * and the failure was invisible here because no test can reach this file. Wiring
+ * that must be performed for the code to work at all, and that nothing forces,
+ * is wiring that will be missing.
+ *
+ * The override survives for a local harness that wants a different connection;
+ * it is no longer what production depends on.
+ */
+let contextFactory: ContextFactory = () => Promise.resolve(createRequestContext());
 
-/** Set once, at deploy wiring. Exported so a local harness can substitute a real
- *  Postgres connection without this module reaching for one itself. */
+/** Substitute the context, for a local Deno run against another database. */
 export function setContextFactory(factory: ContextFactory): void {
   contextFactory = factory;
 }
@@ -41,11 +53,6 @@ export function serveWith(
 
   Deno.serve(async (request: Request): Promise<Response> => {
     try {
-      if (contextFactory === null) {
-        // A deployment that reached traffic without wiring. Reported as ours,
-        // loudly, rather than as a user-facing validation failure.
-        return errorResponse('INTERNAL', 'Something went wrong on our side');
-      }
       const base = await contextFactory();
       return await handler(request, { ...base, limits: limits() });
     } catch {
