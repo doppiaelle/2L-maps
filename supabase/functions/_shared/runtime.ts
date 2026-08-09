@@ -62,23 +62,20 @@ export function parseAdapter(): ReturnType<typeof createParseAdapter> {
 }
 
 /**
- * Quota and rate limits, from [`docs/33_API_CONTRACTS.md`](../../../docs/33_API_CONTRACTS.md) §10.
+ * Rate limits, from [`docs/33_API_CONTRACTS.md`](../../../docs/33_API_CONTRACTS.md) §10.
  *
- * Server configuration by design: these move without an app release, which is
- * the control that keeps the ad-supported free tier cost-neutral
- * ([ADR-0011](../../../docs/adr/0011-server-side-quota-enforcement.md),
- * [ADR-0015](../../../docs/adr/0015-ad-supported-free-tier.md)). The values here
- * are the Pro allowance; per-plan allowances are read from the entitlement row.
+ * **Only burst lives here.** The monthly allowance used to be a single Pro-shaped
+ * table, which meant every plan was charged the Pro ceiling and a free user was
+ * refused by step 2 before ever reaching it. Per-plan allowances now live in
+ * `plans.ts`, read by the quota gate and by `/usage-quota` alike so the number
+ * that refuses and the number that is displayed cannot drift
+ * ([ADR-0015](../../../docs/adr/0015-ad-supported-free-tier.md)).
+ *
+ * Burst stays flat across plans on purpose: it catches a stuck input or a retry
+ * loop, which is a defect rather than a purchase.
  */
 export function defaultLimits(): HandlerContext['limits'] {
   return {
-    monthly: {
-      '/optimize': 300,
-      '/places-autocomplete': 1_200,
-      '/geocode': 1_500,
-      '/place-details': 1_500,
-      '/parse-addresses': 100,
-    },
     burst: {
       '/optimize': { max: 20, windowSeconds: 3_600 },
       '/places-autocomplete': { max: 60, windowSeconds: 60 },

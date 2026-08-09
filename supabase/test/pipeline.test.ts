@@ -55,6 +55,11 @@ function makeDeps(overrides: Overrides = {}): {
     readEntitlement: async () => ({
       hasEntitlement: overrides.entitled ?? true,
       status: (overrides.entitled ?? true) ? 'active' : 'expired',
+      // The real dependencies never return `hasEntitlement: false` any more —
+      // every plan grants access to its own allowances (ADR-0015). The step is
+      // still tested here because it is where a suspended account would be
+      // refused, and an untested refusal path is an unwritten one.
+      plan: (overrides.entitled ?? true) ? 'pro' : 'free',
     }),
     checkRateLimit: async () => ({
       isLimited: overrides.rateLimited ?? false,

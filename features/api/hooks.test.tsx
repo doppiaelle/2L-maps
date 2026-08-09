@@ -49,6 +49,19 @@ afterEach(() => {
   queryClient = null;
 });
 
+/**
+ * Saved routes go over PostgREST rather than the Edge Functions, so they are not
+ * driven by `fetchImpl` and none of the tests in this file touch them. A stub
+ * that refuses everything is honest about that — a real one would let a test
+ * pass by accident on a path it never meant to exercise.
+ */
+const stubRoutes = {
+  save: async () => ({ ok: false, failure: { kind: 'failed' } }) as const,
+  list: async () => null,
+  load: async () => null,
+  advance: async () => ({ ok: false, failure: { kind: 'failed' } }) as const,
+};
+
 function renderWithServices(fetchImpl: typeof fetch, ui: React.ReactElement) {
   queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -57,7 +70,11 @@ function renderWithServices(fetchImpl: typeof fetch, ui: React.ReactElement) {
   const result = render(
     <QueryClientProvider client={queryClient}>
       <SessionProvider auth={auth}>
-        <ServicesProvider baseUrl="https://example.test/functions/v1" fetchImpl={fetchImpl}>
+        <ServicesProvider
+          baseUrl="https://example.test/functions/v1"
+          routes={stubRoutes}
+          fetchImpl={fetchImpl}
+        >
           {ui}
         </ServicesProvider>
       </SessionProvider>

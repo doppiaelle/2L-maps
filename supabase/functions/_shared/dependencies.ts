@@ -1,4 +1,12 @@
 import { ApiError } from './errors';
+import {
+  allowanceFor,
+  quotaResetsAt,
+  quotaWindowStart,
+  resolvePlan,
+  type EntitlementRow,
+  type PlanTier,
+} from './plans';
 import type {
   AuthenticatedUser,
   EntitlementState,
@@ -28,6 +36,7 @@ import type {
  *  queries mockable without the SDK present. */
 export interface DatabaseClient {
   queryOne: <T>(sql: string, params: readonly unknown[]) => Promise<T | null>;
+  queryMany: <T>(sql: string, params: readonly unknown[]) => Promise<readonly T[]>;
   execute: (sql: string, params: readonly unknown[]) => Promise<void>;
 }
 
@@ -37,9 +46,14 @@ export interface TokenVerifier {
 }
 
 export interface QuotaLimits {
-  /** Calendar-month allowance per endpoint. Values live in docs/31_COST_MODEL.md. */
-  readonly monthly: Readonly<Record<string, number>>;
-  /** Short-window velocity ceiling, and the window itself in seconds. */
+  /**
+   * Short-window velocity ceiling, and the window itself in seconds.
+   *
+   * Burst is deliberately **not** per plan. It exists to catch a stuck input or
+   * a retry loop, which is a client defect rather than a purchase — charging a
+   * paying user a lower ceiling for the same bug would be arbitrary, and giving
+   * a free user a higher one would make them the cheaper way to attack us.
+   */
   readonly burst: Readonly<
     Record<string, { readonly max: number; readonly windowSeconds: number }>
   >;
@@ -56,15 +70,15 @@ export interface DependencyContext<TRequest, TResult> {
   writeCache?: (request: TRequest, result: TResult) => Promise<void>;
 }
 
-/** Statuses that grant access. A trial is metered exactly like a paid
- *  subscription, and `grace` keeps a user working through a billing retry rather
- *  than locking them out of a route they are halfway through driving. */
-const ENTITLED: ReadonlySet<string> = new Set(['trial', 'active', 'grace']);
-
 export function buildDependencies<TRequest, TResult>(
   context: DependencyContext<TRequest, TResult>,
 ): PipelineDependencies<TRequest, TResult> {
   const { database, tokens, limits, endpoint } = context;
+
+  // Held between step 3 and step 4 so the quota window can be derived from the
+  // same row the plan was. A day pass has a window that is not the calendar
+  // month, and re-reading the row to find it would let the two steps disagree.
+  let entitlementRow: EntitlementRow | null = null;
 
   return {
     endpoint,
@@ -75,12 +89,22 @@ export function buildDependencies<TRequest, TResult>(
     },
 
     readEntitlement: async (userId: string): Promise<EntitlementState> => {
-      const row = await database.queryOne<{ status: string }>(
-        `select status from user_entitlements where user_id = $1`,
+      entitlementRow = await database.queryOne<EntitlementRow>(
+        `select status, plan, trial_ends_at, renews_at, day_pass_expires_at
+           from user_entitlements where user_id = $1`,
         [userId],
       );
-      const status = row?.status ?? 'none';
-      return { hasEntitlement: ENTITLED.has(status), status };
+
+      const plan = resolvePlan(entitlementRow, new Date());
+      return {
+        // Every plan grants access to its own allowances, free included
+        // (ADR-0015). Refusing here for want of a subscription is the hard
+        // paywall that ADR removed, and it would answer 402 to every new
+        // account on its first search.
+        hasEntitlement: true,
+        status: entitlementRow?.status ?? 'none',
+        plan,
+      };
     },
 
     checkRateLimit: async (userId: string, forEndpoint: string): Promise<RateLimitState> => {
@@ -102,11 +126,18 @@ export function buildDependencies<TRequest, TResult>(
       };
     },
 
-    checkQuota: async (userId: string, forEndpoint: string): Promise<QuotaState> => {
-      const limit = limits.monthly[forEndpoint];
+    checkQuota: async (
+      userId: string,
+      forEndpoint: string,
+      entitlement: EntitlementState,
+    ): Promise<QuotaState> => {
+      const now = new Date();
+      const plan = entitlement.plan as PlanTier;
+      const limit = allowanceFor(plan, forEndpoint);
+
       if (limit === undefined) {
-        // An endpoint with no configured quota is a configuration gap, not a free
-        // pass. Failing closed is the only safe direction on a metered call.
+        // An endpoint with no configured allowance is a configuration gap, not a
+        // free pass. Failing closed is the only safe direction on a metered call.
         throw new ApiError('INTERNAL', 'Quota not configured for this endpoint');
       }
 
@@ -115,8 +146,8 @@ export function buildDependencies<TRequest, TResult>(
            from usage_events
           where user_id = $1
             and endpoint = $2
-            and occurred_at >= date_trunc('month', now())`,
-        [userId, forEndpoint],
+            and occurred_at >= $3`,
+        [userId, forEndpoint, quotaWindowStart(plan, entitlementRow, now).toISOString()],
       );
       const used = row?.used ?? 0;
 
@@ -124,7 +155,7 @@ export function buildDependencies<TRequest, TResult>(
         isExhausted: used >= limit,
         limit,
         used,
-        resetsAt: startOfNextMonth().toISOString(),
+        resetsAt: quotaResetsAt(plan, entitlementRow, now).toISOString(),
       };
     },
 
@@ -144,9 +175,4 @@ export function buildDependencies<TRequest, TResult>(
       );
     },
   };
-}
-
-/** The quota window is the calendar month, so the reset is the first of the next. */
-export function startOfNextMonth(now: Date = new Date()): Date {
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 0, 0, 0, 0));
 }

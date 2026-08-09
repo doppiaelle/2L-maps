@@ -154,6 +154,10 @@ export const revenueCatWebhookSchema = z.object({
     product_id: z.string().nullable().optional(),
     expiration_at_ms: z.number().nullable().optional(),
     period_type: z.string().nullable().optional(),
+    /** When RevenueCat says the event happened. Ordering by this rather than by
+     *  arrival is what stops a cancellation that overtook its own renewal from
+     *  locking a paying user out — delivery is not ordered. */
+    event_timestamp_ms: z.number().nullable().optional(),
   }),
 });
 

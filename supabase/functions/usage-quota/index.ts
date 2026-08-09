@@ -11,6 +11,9 @@ import { readUsageQuota } from '../_shared/endpoints/usage-quota';
  * answer the user who has run out — which is exactly who asks.
  */
 serveWith(
-  createQuotaHandler((userId) => readUsageQuota(userId)),
+  // The context is passed, not dropped. `readUsageQuota` reads the entitlement
+  // row and the month's usage through it, so a call without it answers every
+  // request with an internal error — which is what this file used to do.
+  createQuotaHandler((userId, context) => readUsageQuota(userId, context)),
   defaultLimits,
 );

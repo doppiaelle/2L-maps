@@ -1,4 +1,14 @@
-import { startOfNextMonth } from '../dependencies';
+import {
+  ALLOWANCES,
+  REPORTED_LIMITS,
+  quotaResetsAt,
+  quotaWindowStart,
+  resolvePlan,
+  resolveStatus,
+  type EntitlementRow,
+  type EntitlementStatus,
+  type PlanTier,
+} from '../plans';
 
 import type { HandlerContext } from '../handler';
 
@@ -14,10 +24,14 @@ import type { HandlerContext } from '../handler';
  * Entitlement and allowances come back together because they are the same
  * question asked twice, and two round trips on every app start to render one
  * screen is the sort of cost this product spends its discipline avoiding.
+ *
+ * **Every number here comes from `plans.ts`, which the quota gate also reads.**
+ * Held separately they drift, and the drift is invisible from either side: an
+ * allowance bar reading "4 of 15 left" above a button that answers 429 gives the
+ * user no way to tell which of the two is lying.
  */
 
-export type PlanTier = 'free' | 'day-pass' | 'pro';
-export type EntitlementStatus = 'trial' | 'active' | 'lapsed' | 'none';
+export type { PlanTier, EntitlementStatus };
 
 export interface UsageQuotaResponse {
   readonly period: { readonly from: string; readonly to: string };
@@ -33,26 +47,9 @@ export interface UsageQuotaResponse {
   }[];
 }
 
-/** Per-plan monthly allowances, from docs/20_SUBSCRIPTIONS.md §6. Server-side so
- *  they move without an app release, which is the control that keeps the
- *  ad-supported free tier cost-neutral. */
-const ALLOWANCES: Readonly<Record<PlanTier, Readonly<Record<string, number>>>> = {
-  free: { optimizations: 15, autocompleteSessions: 10 },
-  'day-pass': { optimizations: 25, autocompleteSessions: 40 },
-  pro: { optimizations: 300, autocompleteSessions: 1_200 },
-};
-
-interface EntitlementRow {
-  readonly status: string;
-  readonly plan: string | null;
-  readonly trial_ends_at: string | null;
-  readonly renews_at: string | null;
-  readonly day_pass_expires_at: string | null;
-}
-
 interface UsageRow {
-  readonly optimizations: number;
-  readonly autocomplete_sessions: number;
+  readonly endpoint: string;
+  readonly used: number;
 }
 
 export async function readUsageQuota(
@@ -66,82 +63,39 @@ export async function readUsageQuota(
     [userId],
   );
 
-  const usage = await context.database.queryOne<UsageRow>(
-    `select
-       count(*) filter (where endpoint = '/optimize')            as optimizations,
-       count(*) filter (where endpoint = '/places-autocomplete') as autocomplete_sessions
-     from usage_events
-     where user_id = $1 and occurred_at >= date_trunc('month', $2::timestamptz)`,
-    [userId, now.toISOString()],
+  const plan = resolvePlan(entitlement, now);
+  const windowStart = quotaWindowStart(plan, entitlement, now);
+  const resetsAt = quotaResetsAt(plan, entitlement, now);
+
+  // Summed by `units`, and grouped rather than counted per endpoint in separate
+  // filters, because `units` is not always one: `/place-details` charges what it
+  // actually fetched, and counting rows would report a twenty-five stop
+  // resolution as a single use.
+  const usage = await context.database.queryMany<UsageRow>(
+    `select endpoint, coalesce(sum(units), 0)::int as used
+       from usage_events
+      where user_id = $1 and occurred_at >= $2::timestamptz
+      group by endpoint`,
+    [userId, windowStart.toISOString()],
   );
 
-  const plan = resolvePlan(entitlement, now);
+  const usedByEndpoint = new Map(usage.map((row) => [row.endpoint, row.used]));
   const allowance = ALLOWANCES[plan];
 
   return {
     period: {
-      from: startOfMonth(now).toISOString().slice(0, 10),
-      to: startOfNextMonth(now).toISOString().slice(0, 10),
+      from: windowStart.toISOString().slice(0, 10),
+      to: resetsAt.toISOString().slice(0, 10),
     },
     plan,
     status: resolveStatus(entitlement?.status ?? null),
     trialEndsAt: entitlement?.trial_ends_at ?? null,
     renewsAt: entitlement?.renews_at ?? null,
     dayPassExpiresAt: entitlement?.day_pass_expires_at ?? null,
-    limits: [
-      {
-        name: 'optimizations',
-        used: usage?.optimizations ?? 0,
-        limit: allowance['optimizations'] ?? 0,
-      },
-      {
-        name: 'autocompleteSessions',
-        used: usage?.autocomplete_sessions ?? 0,
-        limit: allowance['autocompleteSessions'] ?? 0,
-      },
-    ],
+    limits: REPORTED_LIMITS.map(({ name, endpoint }) => ({
+      name,
+      used: usedByEndpoint.get(endpoint) ?? 0,
+      limit: allowance[endpoint] ?? 0,
+    })),
   };
-}
-
-/**
- * Which rung this user is actually on right now.
- *
- * A day pass is checked before the stored plan and against the clock, because
- * it is consumable: the row keeps saying `day-pass` after it expires, and
- * trusting it would hand out Pro allowances indefinitely for €1.99.
- *
- * No row at all means free — a user who has never bought anything, which is the
- * common case now that a free tier exists rather than an error state.
- */
-function resolvePlan(row: EntitlementRow | null, now: Date): PlanTier {
-  if (row === null) return 'free';
-
-  if (row.day_pass_expires_at !== null && Date.parse(row.day_pass_expires_at) > now.getTime()) {
-    return 'day-pass';
-  }
-
-  // `grace` keeps a user working through a billing retry rather than locking
-  // them out of a route they are halfway through driving.
-  const entitled = row.status === 'trial' || row.status === 'active' || row.status === 'grace';
-  return entitled ? 'pro' : 'free';
-}
-
-function resolveStatus(status: string | null): EntitlementStatus {
-  switch (status) {
-    case 'trial':
-      return 'trial';
-    case 'active':
-    case 'grace':
-      return 'active';
-    case 'lapsed':
-    case 'cancelled':
-    case 'expired':
-      return 'lapsed';
-    default:
-      return 'none';
-  }
-}
-
-function startOfMonth(now: Date): Date {
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
 }

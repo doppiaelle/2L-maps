@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { createHandler, createQuotaHandler } from '../functions/_shared/handler';
 import type { HandlerContext } from '../functions/_shared/handler';
-import type { AuthenticatedUser, UpstreamOutcome } from '../functions/_shared/pipeline';
+import type { UpstreamOutcome } from '../functions/_shared/pipeline';
 
 /**
  * The handler's job is ordering, so these tests are almost all about what did
@@ -11,6 +11,16 @@ import type { AuthenticatedUser, UpstreamOutcome } from '../functions/_shared/pi
 
 const schema = z.object({ value: z.string().min(3) });
 type Request_ = z.infer<typeof schema>;
+
+/**
+ * The endpoint under test is a real one.
+ *
+ * Allowances are per plan and live in `plans.ts`, so an invented endpoint name
+ * has no allowance and fails closed with INTERNAL — which is the correct
+ * behaviour and a useless fixture. Using `/optimize` means these tests run
+ * against the allowance table the product actually ships.
+ */
+const ENDPOINT = '/optimize';
 
 const contextWith = (overrides: { entitled?: boolean; userId?: string | null } = {}) => {
   const executed: string[] = [];
@@ -23,6 +33,7 @@ const contextWith = (overrides: { entitled?: boolean; userId?: string | null } =
         // Quota and rate-limit counters: nothing used yet.
         return { used: 0 };
       }) as HandlerContext['database']['queryOne'],
+      queryMany: (async () => []) as HandlerContext['database']['queryMany'],
       execute: async (sql: string) => {
         executed.push(sql);
       },
@@ -32,8 +43,7 @@ const contextWith = (overrides: { entitled?: boolean; userId?: string | null } =
         overrides.userId !== undefined ? overrides.userId : header === null ? null : 'user-1',
     },
     limits: {
-      monthly: { '/test': 100 },
-      burst: { '/test': { max: 10, windowSeconds: 60 } },
+      burst: { [ENDPOINT]: { max: 10, windowSeconds: 60 } },
     },
   };
   return { context, executed };
@@ -60,7 +70,7 @@ describe('validation precedes anything metered', () => {
     // A malformed request that reached upstream is a billed call for a result
     // nobody can use.
     const { calls, callUpstream } = upstreamSpy();
-    const handler = createHandler({ endpoint: '/test', schema, callUpstream });
+    const handler = createHandler({ endpoint: ENDPOINT, schema, callUpstream });
     const { context } = contextWith();
 
     const response = await handler(post({ value: 'ab' }), context);
@@ -70,7 +80,7 @@ describe('validation precedes anything metered', () => {
 
   it('does not call upstream for a body that is not JSON at all', async () => {
     const { calls, callUpstream } = upstreamSpy();
-    const handler = createHandler({ endpoint: '/test', schema, callUpstream });
+    const handler = createHandler({ endpoint: ENDPOINT, schema, callUpstream });
     const { context } = contextWith();
 
     const request = new Request('https://edge.test/test', {
@@ -86,7 +96,7 @@ describe('validation precedes anything metered', () => {
   it('refuses the wrong method before looking at credentials', async () => {
     // A routing mistake, not an access decision — there is nothing to protect.
     const { calls, callUpstream } = upstreamSpy();
-    const handler = createHandler({ endpoint: '/test', schema, callUpstream });
+    const handler = createHandler({ endpoint: ENDPOINT, schema, callUpstream });
     const { context } = contextWith({ userId: null });
 
     const request = new Request('https://edge.test/test', { method: 'GET' });
@@ -98,7 +108,7 @@ describe('validation precedes anything metered', () => {
     // The client built the request, so the user cannot act on the specifics,
     // and echoing them describes our internals to whoever sent it.
     const { callUpstream } = upstreamSpy();
-    const handler = createHandler({ endpoint: '/test', schema, callUpstream });
+    const handler = createHandler({ endpoint: ENDPOINT, schema, callUpstream });
     const { context } = contextWith();
 
     const response = await handler(post({ value: 'ab' }), context);
@@ -111,7 +121,7 @@ describe('validation precedes anything metered', () => {
 describe('the pipeline still runs in front of upstream', () => {
   it('rejects an unauthenticated caller without calling upstream', async () => {
     const { calls, callUpstream } = upstreamSpy();
-    const handler = createHandler({ endpoint: '/test', schema, callUpstream });
+    const handler = createHandler({ endpoint: ENDPOINT, schema, callUpstream });
     const { context } = contextWith({ userId: null });
 
     const response = await handler(post({ value: 'valid' }), context);
@@ -119,19 +129,37 @@ describe('the pipeline still runs in front of upstream', () => {
     expect(calls).toHaveLength(0);
   });
 
-  it('rejects a lapsed subscriber without calling upstream', async () => {
+  it('serves a lapsed subscriber on the free allowance rather than locking them out', async () => {
+    // This assertion is the reverse of what it used to be, and the reversal is
+    // ADR-0015: a lapsed subscriber is on the `free` plan, not out of the
+    // product. Their own routes are never held hostage — only the allowance
+    // shrinks, and when it runs out the answer is 429 with T0 still available,
+    // not 402.
     const { calls, callUpstream } = upstreamSpy();
-    const handler = createHandler({ endpoint: '/test', schema, callUpstream });
+    const handler = createHandler({ endpoint: ENDPOINT, schema, callUpstream });
     const { context } = contextWith({ entitled: false });
 
     const response = await handler(post({ value: 'valid' }), context);
-    expect(response.status).toBe(402);
+    expect(response.status).toBe(200);
+    expect(calls).toHaveLength(1);
+  });
+
+  it('fails closed on an endpoint with no configured allowance', async () => {
+    // A configuration gap is not a free pass. Adding a metered endpoint and
+    // forgetting to give it an allowance must refuse, not wave the call through
+    // to a bill.
+    const { calls, callUpstream } = upstreamSpy();
+    const handler = createHandler({ endpoint: '/not-configured', schema, callUpstream });
+    const { context } = contextWith();
+
+    const response = await handler(post({ value: 'valid' }), context);
+    expect(response.status).toBe(500);
     expect(calls).toHaveLength(0);
   });
 
   it('serves a valid request and records it', async () => {
     const { calls, callUpstream } = upstreamSpy();
-    const handler = createHandler({ endpoint: '/test', schema, callUpstream });
+    const handler = createHandler({ endpoint: ENDPOINT, schema, callUpstream });
     const { context, executed } = contextWith();
 
     const response = await handler(post({ value: 'valid' }), context);
@@ -144,7 +172,7 @@ describe('the pipeline still runs in front of upstream', () => {
   it('serves a cache hit without calling upstream', async () => {
     const { calls, callUpstream } = upstreamSpy();
     const handler = createHandler({
-      endpoint: '/test',
+      endpoint: ENDPOINT,
       schema,
       callUpstream,
       readCache: async () => ({ echoed: 'from-cache' }),

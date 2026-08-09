@@ -6,6 +6,7 @@ import { createGeocodingProvider } from '@/lib/api/geocoding-adapter';
 import { createQuotaProvider } from '@/lib/api/quota-adapter';
 import type { QuotaProvider } from '@/lib/api/quota-adapter';
 import { createRoutingProvider } from '@/lib/api/routing-adapter';
+import type { RoutesProvider } from '@/lib/supabase/routes-adapter';
 import type { GeocodingProvider, RoutingProvider } from '@/lib/providers/types';
 
 /**
@@ -37,6 +38,18 @@ export interface Services {
   readonly routing: RoutingProvider;
   readonly geocoding: GeocodingProvider;
   readonly quota: QuotaProvider;
+  /**
+   * Saved routes, over PostgREST rather than an Edge Function.
+   *
+   * It sits beside the other three because callers should not have to know which
+   * of their dependencies goes through a proxy — that is an implementation
+   * detail of `lib/`, and ADR-0006 is about Google credentials rather than about
+   * our own database.
+   *
+   * Null when the build has no project, like every other service here, and for
+   * the same reason: a caller must handle absence anyway.
+   */
+  readonly routes: RoutesProvider;
 }
 
 const ServicesContext = createContext<Services | null>(null);
@@ -44,6 +57,15 @@ const ServicesContext = createContext<Services | null>(null);
 export interface ServicesProviderProps {
   /** The Edge Function base URL, or null when this build has no project. */
   readonly baseUrl: string | null;
+  /**
+   * The saved-routes facade, built at the composition root.
+   *
+   * Passed in rather than constructed here because building it means touching
+   * the Supabase SDK, and this file sits in `features/` — where an SDK import
+   * would be exactly the violation the facades exist to prevent (`CLAUDE.md`
+   * §0 rule 2).
+   */
+  readonly routes: RoutesProvider | null;
   /** Substituted in tests; production passes nothing and uses the real one. */
   readonly fetchImpl?: typeof fetch;
   readonly children: React.ReactNode;
@@ -51,6 +73,7 @@ export interface ServicesProviderProps {
 
 export function ServicesProvider({
   baseUrl,
+  routes,
   fetchImpl,
   children,
 }: ServicesProviderProps): React.JSX.Element {
@@ -65,7 +88,7 @@ export function ServicesProvider({
   const hasSession = session !== null;
 
   const services = useMemo<Services | null>(() => {
-    if (baseUrl === null || !hasSession) return null;
+    if (baseUrl === null || routes === null || !hasSession) return null;
 
     const client = new ApiClient({
       baseUrl,
@@ -77,8 +100,9 @@ export function ServicesProvider({
       routing: createRoutingProvider({ client }),
       geocoding: createGeocodingProvider({ client }),
       quota: createQuotaProvider({ client }),
+      routes,
     };
-  }, [baseUrl, hasSession, fetchImpl, sessionRef]);
+  }, [baseUrl, routes, hasSession, fetchImpl, sessionRef]);
 
   return <ServicesContext.Provider value={services}>{children}</ServicesContext.Provider>;
 }

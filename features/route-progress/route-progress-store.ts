@@ -47,6 +47,19 @@ export interface RouteProgressStore {
    *  the user's driving day, and the name should say so at the call site. */
   abandon: () => void;
 
+  /**
+   * Restore progress loaded from the server, including none.
+   *
+   * Distinct from `begin`, which starts a route at zero. Opening a route that
+   * another device is halfway through must land on that half, and `begin` would
+   * put the driver back at stop one — the same experience as data loss, arrived
+   * at differently.
+   *
+   * Null is a legitimate argument: it is what a route that has not started
+   * looks like, and passing it clears whatever the previous route left behind.
+   */
+  restore: (progress: RouteProgress | null) => void;
+
   mark: (stopId: string, state: Exclude<StopProgressState, 'pending'>) => void;
 
   /**
@@ -87,6 +100,10 @@ export function createRouteProgressStore(storage?: ProgressStorage) {
 
         abandon: () => {
           set({ progress: null });
+        },
+
+        restore: (progress) => {
+          set({ progress });
         },
 
         mark: (stopId, state) => {

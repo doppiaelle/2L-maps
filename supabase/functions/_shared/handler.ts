@@ -34,9 +34,23 @@ export interface HandlerContext {
 export interface HandlerDefinition<TRequest, TResult> {
   readonly endpoint: string;
   readonly schema: z.ZodType<TRequest>;
-  callUpstream: (request: TRequest, user: AuthenticatedUser) => Promise<UpstreamOutcome<TResult>>;
-  readCache?: (request: TRequest) => Promise<TResult | null>;
-  writeCache?: (request: TRequest, result: TResult) => Promise<void>;
+  /**
+   * The upstream step, with the request's own context.
+   *
+   * The context is passed rather than captured because it carries the database
+   * connection, and two endpoints need it during the upstream step rather than
+   * around it: `/place-details` resolves what it can from `places_cache` before
+   * deciding what to buy, and both it and `/geocode` write back what they
+   * fetched. Doing that in the pipeline's cache slots is not possible — those are
+   * all-or-nothing, and every real request here is partial.
+   */
+  callUpstream: (
+    request: TRequest,
+    user: AuthenticatedUser,
+    context: HandlerContext,
+  ) => Promise<UpstreamOutcome<TResult>>;
+  readCache?: (request: TRequest, context: HandlerContext) => Promise<TResult | null>;
+  writeCache?: (request: TRequest, result: TResult, context: HandlerContext) => Promise<void>;
   /** POST for everything except the read-only quota endpoint. */
   readonly method?: 'GET' | 'POST';
 }
@@ -72,9 +86,20 @@ export function createHandler<TRequest, TResult>(definition: HandlerDefinition<T
       tokens: context.tokens,
       limits: context.limits,
       authorizationHeader: request.headers.get('authorization'),
-      callUpstream: definition.callUpstream,
-      ...(definition.readCache === undefined ? {} : { readCache: definition.readCache }),
-      ...(definition.writeCache === undefined ? {} : { writeCache: definition.writeCache }),
+      callUpstream: (value, user) => definition.callUpstream(value, user, context),
+      ...(definition.readCache === undefined
+        ? {}
+        : {
+            readCache: async (value: TRequest) =>
+              (await definition.readCache?.(value, context)) ?? null,
+          }),
+      ...(definition.writeCache === undefined
+        ? {}
+        : {
+            writeCache: async (value: TRequest, result: TResult) => {
+              await definition.writeCache?.(value, result, context);
+            },
+          }),
     });
 
     return pipelineResponse(await runPipeline(parsed.value, dependencies));
