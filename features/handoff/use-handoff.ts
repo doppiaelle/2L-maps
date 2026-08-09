@@ -1,0 +1,142 @@
+import { useCallback, useMemo, useState } from 'react';
+
+import { usePreferencesStore, useRouteProgressStore } from '@/features/stores';
+import { requiresCoordinates } from '@/lib/handoff/capabilities';
+import { planHandoff } from '@/lib/handoff/chunking';
+import type { HandoffPlace } from '@/lib/handoff/urls';
+import type { LatLng } from '@/lib/geo/haversine';
+import type { NavigationProviderId, Stop } from '@/types';
+
+/**
+ * Handing the route to a navigation app.
+ *
+ * This is the moment the product exists for and the moment it stops being in
+ * control ([ADR-0004](../../docs/adr/0004-external-navigation-handoff.md)): the
+ * user leaves for Google Maps or Waze and may not come back for an hour, or at
+ * all on this launch.
+ *
+ * **Progress is persisted before the handoff, never after.** The app may be
+ * killed while the other one is in the foreground, and state that was going to
+ * be written on return is state that is simply lost
+ * ([`docs/16_INTERNAL_NAVIGATION.md`](../../docs/16_INTERNAL_NAVIGATION.md)).
+ * So the route is marked underway *before* the URL is opened.
+ *
+ * **Nothing is marked completed here.** Departing is not arriving. The stop is
+ * marked when the driver taps Done, which is the only moment anyone knows they
+ * got there — marking on departure would show a route finished by a driver still
+ * in the van.
+ *
+ * **A provider that cannot take the whole route is not an error.** Only Google
+ * Maps accepts multiple waypoints, and even it stops at the URL ceiling, so the
+ * route is chunked and the count is reported — the user learns there are three
+ * hops now rather than discovering it at the second one.
+ */
+
+export type HandoffOutcome =
+  | { readonly kind: 'handed-off'; readonly chunkCount: number }
+  /** No provider chosen yet. The screen presents the picker rather than
+   *  guessing: a first handoff to the wrong app is a bad introduction to the one
+   *  feature the product is for. */
+  | { readonly kind: 'needs-provider' }
+  /** Waze takes coordinates and has no address form, so an expired cache blocks
+   *  the handoff outright rather than degrading it (ADR-0007). */
+  | { readonly kind: 'needs-coordinates'; readonly stopIds: readonly string[] }
+  | { readonly kind: 'route-too-long' }
+  | { readonly kind: 'failed' }
+  | { readonly kind: 'no-route' };
+
+export interface HandoffState {
+  start: () => Promise<HandoffOutcome>;
+  readonly lastOutcome: HandoffOutcome | null;
+  readonly preferredProvider: NavigationProviderId | null;
+}
+
+export interface ResolvedPlace {
+  readonly address: string;
+  readonly coordinate: LatLng;
+}
+
+export interface HandoffOptions {
+  readonly stops: readonly Stop[];
+  readonly resolved: ReadonlyMap<string, ResolvedPlace>;
+  /** Opens a URL, reporting whether the other app came up. Injected so the whole
+   *  flow is testable without a device — the same seam `NavigationProvider`
+   *  already uses. */
+  open: (url: string) => Promise<boolean>;
+}
+
+export function useHandoff({ stops, resolved, open }: HandoffOptions): HandoffState {
+  const preferredProvider = usePreferencesStore((store) => store.preferences.navigationProvider);
+  const progress = useRouteProgressStore((store) => store.progress);
+  const begin = useRouteProgressStore((store) => store.begin);
+
+  const [lastOutcome, setLastOutcome] = useState<HandoffOutcome | null>(null);
+
+  const places = useMemo<readonly HandoffPlace[]>(
+    () =>
+      stops.map((stop) => {
+        const fresh = resolved.get(stop.placeId);
+        const cached = stop.coordinate;
+
+        return {
+          placeId: stop.placeId,
+          coordinate:
+            cached === null
+              ? (fresh?.coordinate ?? null)
+              : { latitude: cached.latitude, longitude: cached.longitude },
+          address: cached?.formattedAddress ?? fresh?.address ?? null,
+        };
+      }),
+    [stops, resolved],
+  );
+
+  const start = useCallback(async (): Promise<HandoffOutcome> => {
+    const record = (outcome: HandoffOutcome): HandoffOutcome => {
+      setLastOutcome(outcome);
+      return outcome;
+    };
+
+    if (places.length < 2) return record({ kind: 'no-route' });
+    if (preferredProvider === null) return record({ kind: 'needs-provider' });
+
+    // Checked before a single URL is built. Waze has no address form, so a stop
+    // whose coordinate has expired cannot be handed to it at all — and finding
+    // that out halfway through a chunked sequence strands the driver between two
+    // apps. The stop ids come from the same index, because `places` mirrors
+    // `stops` and `place_id` can legitimately repeat within one route.
+    if (requiresCoordinates(preferredProvider)) {
+      const missing = places
+        .map((place, index) => (place.coordinate === null ? stops[index]?.id : undefined))
+        .filter((id): id is string => id !== undefined);
+
+      if (missing.length > 0) return record({ kind: 'needs-coordinates', stopIds: missing });
+    }
+
+    const planned = planHandoff(preferredProvider, places);
+    if (!planned.ok) {
+      return record(
+        planned.failure.reason === 'single-leg-too-long'
+          ? { kind: 'route-too-long' }
+          : { kind: 'failed' },
+      );
+    }
+
+    const first = planned.plan.chunks[0];
+    if (first === undefined) return record({ kind: 'no-route' });
+
+    // Written before the URL opens. A process killed while Google Maps is in the
+    // foreground comes back to a route that knows it had begun; the other order
+    // comes back to a route that never started.
+    if (progress === null) begin(stops[0]?.id ?? 'route');
+
+    const opened = await open(first.url);
+    // A refusal is reported, not swallowed. The route stays underway either way
+    // — the user did set out — but the screen has to be able to say that the
+    // navigation app did not come up.
+    return record(
+      opened ? { kind: 'handed-off', chunkCount: planned.plan.chunks.length } : { kind: 'failed' },
+    );
+  }, [places, stops, preferredProvider, progress, begin, open]);
+
+  return { start, lastOutcome, preferredProvider };
+}

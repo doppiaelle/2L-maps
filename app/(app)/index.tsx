@@ -1,7 +1,8 @@
 import { router } from 'expo-router';
 import { useEffect, useMemo } from 'react';
-import { useColorScheme, useWindowDimensions } from 'react-native';
+import { Linking, useColorScheme, useWindowDimensions } from 'react-native';
 
+import { useHandoff } from '@/features/handoff/use-handoff';
 import { usePendingDeepLinkContext } from '@/features/navigation/deep-link-provider';
 import { useLaunchDestination } from '@/features/navigation/use-launch-destination';
 import { useResolvedPlaces } from '@/features/places/use-resolved-places';
@@ -72,6 +73,18 @@ export default function PlanScreen(): React.JSX.Element {
   const availability = useOptimizeAvailability(draft.stops.length, quota);
   const { optimize, isOptimizing, failure } = useOptimizeRoute();
 
+  const handoff = useHandoff({
+    stops: draft.stops,
+    resolved: places.byPlaceId,
+    // `openURL` rejects when nothing can handle the URL; that is a refusal, not
+    // a crash, and the handoff reports it as one.
+    open: (url) =>
+      Linking.openURL(url).then(
+        () => true,
+        () => false,
+      ),
+  });
+
   const completed = progress === null ? 0 : summarise(progress, draft.stops).completed;
 
   // Decoded once, here, and memoised — never per render. A 25-stop polyline is
@@ -132,7 +145,22 @@ export default function PlanScreen(): React.JSX.Element {
       selectedStopId={selectedStopId}
       onSelectStop={selectStop}
       onClearSelection={clearSelection}
-      onPrimaryAction={optimize}
+      onPrimaryAction={() => {
+        // The control's own state already says which of the two this is; the
+        // screen only has to route the tap. `planStateOf` decided that, and
+        // re-deriving it here would be the same rule in two places.
+        if (state.kind !== 'optimized') {
+          optimize();
+          return;
+        }
+
+        void handoff.start().then((outcome) => {
+          // A first handoff with no provider chosen presents the picker rather
+          // than guessing — sending a twelve-stop day to the wrong app is a bad
+          // introduction to the one feature the product is for.
+          if (outcome.kind === 'needs-provider') router.push('/provider');
+        });
+      }}
       onAddStop={() => {
         router.push('/add-stop');
       }}

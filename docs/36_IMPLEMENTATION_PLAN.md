@@ -626,6 +626,32 @@ meets a mid-range Android.
 distance shown is the straight-line total and the duration stays absent rather than being
 invented — the same rule the draft follows, for the same reason.
 
+### The handoff — recorded 2026-08-09
+
+Start hands the route to a navigation app, and the provider picker exists. **903 tests.** The
+three taps now run end to end: add a stop, optimize, start.
+
+**Progress is persisted before the URL opens, never after.** The app may be killed while Google
+Maps is in the foreground, and state that was going to be written on return is state that is
+simply lost ([`16_INTERNAL_NAVIGATION.md`](16_INTERNAL_NAVIGATION.md)).
+
+**Nothing is marked completed at the handoff.** Departing is not arriving. The stop is marked
+when the driver taps Done, which is the only moment anyone knows they got there — marking on
+departure would show a route finished by a driver still in the van. This was written the wrong
+way round first, and the ordering rule in `markAndHandOff` is what made it obvious.
+
+**The picker states the cost of each provider before the choice, in numbers.** Twelve stops in
+Waze is twelve handoffs, and a user should learn that here rather than on the road. Waze's real
+caveat is named separately: it takes `ll=lat,lng` and no address, so an expired coordinate blocks
+the handoff outright rather than degrading it — checked before a single URL is built, because
+discovering it halfway through a chunked sequence strands the driver between two apps.
+
+**React Native's `Switch` cannot be rendered under this project's Jest setup.** Its deprecated
+Android spec fails codegen and takes the suite with it — the same failure `react-native-gesture-handler`
+has. The toggle is written by hand instead, which is the right answer twice over: a control that
+cannot be tested has no business on the screen that decides where a driver's day is sent, and
+ours carries the design system's label and states its own role.
+
 ### How the app is actually tried — decided 2026-08-07
 
 Recorded because it changed the shape of several documents, and because my first answer on it was
