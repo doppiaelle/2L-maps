@@ -88,6 +88,43 @@ export const geocodeRequestSchema = z.object({
 export type GeocodeRequest = z.infer<typeof geocodeRequestSchema>;
 
 /**
+ * `/place-details` — the re-hydration path.
+ *
+ * `place_id` is storable indefinitely; the coordinates beside it expire after 30
+ * consecutive days and are then null (ADR-0007). This endpoint turns the durable
+ * keys back into a usable route, so its batch ceiling is the route ceiling.
+ */
+export const placeDetailsRequestSchema = z.object({
+  placeIds: z.array(placeId).min(1).max(MAX_STOPS),
+});
+
+export type PlaceDetailsRequest = z.infer<typeof placeDetailsRequestSchema>;
+
+/**
+ * `/parse-addresses` — unstructured input to candidate addresses (ADR-0016).
+ *
+ * `text` and `imageBase64` are mutually exclusive, and the refinement below is
+ * what makes that structural rather than a convention. Sending both would be
+ * ambiguous about which one to bill for, and ambiguity on a metered endpoint
+ * resolves in the expensive direction.
+ *
+ * The input bounds are cost controls, not politeness. Four thousand characters
+ * is a long pasted message; beyond it we are paying to parse a document the user
+ * did not mean to send.
+ */
+export const parseAddressesRequestSchema = z
+  .object({
+    text: z.string().min(1).max(4000).optional(),
+    imageBase64: z.string().min(1).max(7_000_000).optional(),
+    locale: z.string().max(35).nullable().optional(),
+  })
+  .refine((value) => (value.text === undefined) !== (value.imageBase64 === undefined), {
+    message: 'exactly one of text or imageBase64',
+  });
+
+export type ParseAddressesRequest = z.infer<typeof parseAddressesRequestSchema>;
+
+/**
  * The RevenueCat webhook.
  *
  * Deliberately permissive about fields we do not read: RevenueCat adds them, and
