@@ -1,0 +1,70 @@
+# Supabase project configuration.
+#
+# Committed so `supabase link` and `supabase db push` have something to work
+# from, and so the settings that matter are reviewable in a diff rather than
+# remembered from a console.
+#
+# `project_id` is a local alias, not a secret — the real project reference is
+# passed to the CLI from `SUPABASE_PROJECT_REF` (see .github/workflows/migrate.yml).
+
+project_id = "2l-maps"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public"]
+extra_search_path = ["public", "extensions"]
+# The stop ceiling is 25 and every list endpoint is bounded by it, so a large
+# default here would only ever serve a bug (docs/33_API_CONTRACTS.md).
+max_rows = 100
+
+[db]
+port = 54322
+# Must match the project's Postgres major version, or a local run proves nothing
+# about production.
+major_version = 15
+
+[auth]
+enabled = true
+# Deep links come back to the app, not to a web page: React Native has no URL
+# bar to read a callback fragment from (docs/10_NAVIGATION_FLOW.md).
+site_url = "twolmaps://"
+additional_redirect_urls = ["twolmaps://", "2lmaps://"]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+# A token refresh that arrives mid-route must not sign the driver out.
+refresh_token_reuse_interval = 10
+
+[auth.external.apple]
+enabled = true
+client_id = "env(SUPABASE_AUTH_APPLE_CLIENT_ID)"
+secret = "env(SUPABASE_AUTH_APPLE_SECRET)"
+
+[auth.external.google]
+enabled = true
+client_id = "env(SUPABASE_AUTH_GOOGLE_CLIENT_ID)"
+secret = "env(SUPABASE_AUTH_GOOGLE_SECRET)"
+
+[functions.optimize]
+verify_jwt = true
+
+[functions.places-autocomplete]
+verify_jwt = true
+
+[functions.place-details]
+verify_jwt = true
+
+[functions.geocode]
+verify_jwt = true
+
+[functions.parse-addresses]
+verify_jwt = true
+
+[functions.usage-quota]
+verify_jwt = true
+
+[functions.revenuecat-webhook]
+# The only unauthenticated entrypoint. RevenueCat has no Supabase JWT, so the
+# gate is a constant-time signature check inside the function instead — an
+# unverified webhook is an open door to free entitlement (docs/19_SECURITY.md §6).
+verify_jwt = false
