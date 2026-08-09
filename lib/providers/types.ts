@@ -276,6 +276,48 @@ export interface AdsProvider {
   showRewarded: () => Promise<RewardedOutcome>;
 }
 
+// ─── Authentication ──────────────────────────────────────────────────────────
+
+/**
+ * The session, reduced to what the app actually needs.
+ *
+ * No email, no display name, no provider identity. Authorisation is decided by
+ * RLS from the JWT the server verifies ([`docs/19_SECURITY.md`](../../docs/19_SECURITY.md)
+ * §8), so the only thing the client does with a session is attach a token and
+ * know whether it has one. Carrying more would be personal data held for no
+ * purpose (`CLAUDE.md` §9 rule 7).
+ */
+export interface Session {
+  readonly userId: string;
+  readonly accessToken: string;
+}
+
+export type SignInMethod = 'apple' | 'google';
+
+export type SignInOutcome =
+  | { readonly ok: true }
+  /** The user backed out of the provider's sheet. Not an error, and never shown
+   *  as one — they simply changed their mind. */
+  | { readonly ok: false; readonly reason: 'cancelled' }
+  | { readonly ok: false; readonly reason: 'unavailable' | 'failed' };
+
+/**
+ * Authentication, behind a facade like every other external capability.
+ *
+ * `subscribe` exists because the session changes without anyone asking: a token
+ * refresh, an expiry, a sign-out on another device. A `getSession()`-only
+ * interface would leave the app holding a session that stopped being true, and
+ * the first symptom would be a 401 in the middle of a route.
+ */
+export interface AuthProvider {
+  /** Resolves once the persisted session has been read from storage. Null means
+   *  signed out, and is a normal answer rather than a failure. */
+  currentSession: () => Promise<Session | null>;
+  subscribe: (listener: (session: Session | null) => void) => () => void;
+  signIn: (method: SignInMethod) => Promise<SignInOutcome>;
+  signOut: () => Promise<void>;
+}
+
 // ─── Map ─────────────────────────────────────────────────────────────────────
 
 export interface MapCamera {

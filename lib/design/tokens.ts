@@ -261,6 +261,11 @@ export const layout = {
   /** Non-negotiable, map markers included: the visual pin may be smaller than
    *  its hit area, but the hit area may not shrink (CLAUDE.md §10 rule 2). */
   touchMin: 44,
+  /** The primary action is taller than the 44 pt floor by design
+   *  (docs/09_COMPONENT_LIBRARY.md §7): it is pressed one-handed, in a van, often
+   *  without looking straight at it. 44 is the minimum a control may be; 56 is
+   *  what this one is. */
+  actionMinHeight: 56,
 } as const;
 
 export const radius = {

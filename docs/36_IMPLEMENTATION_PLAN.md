@@ -111,7 +111,8 @@ and this document inherits that. No re-statement of any requirement, schema or b
 | 4c | `feat/w4c-map-list` | Marker clustering, the virtualised `<StopList>` | §6 W4 | ✅ |
 | 4d | `feat/w4d-appmap` | `<AppMap>` over `react-native-maps`, route geometry, map style | §6 W4 | ✅ |
 | 4e | `feat/w4e-feedback` | `<UndoToast>`, `<StatusChip>`, `<MetricPair>`, `<Skeleton>`, `<StateView>` | §6 W4 | ✅ |
-| 5 | `feat/w5-screens` | Expo Router, the ten screens | §6 W5 | ⏳ |
+| 5a | `feat/w5-screens` | Router tree, guards, deep links, restoration, sign-in | §6 W5 | ✅ |
+| 5b | `feat/w5b-plan` | The sheet and the ten screens' contents | §6 W5 | ⏳ |
 | 6 | `feat/w6-delivery` | EAS, Fastlane, CI, store preparation | §6 W6 | ⏳ |
 | 7 | `docs/go-live-runbook` | **Go-live runbook** — every external account, key and limit, step by step | §6 W7 | ⏳ |
 
@@ -421,6 +422,34 @@ thing — the stops, the order and the handoff do not depend on tiles rendering 
 the product's actual behaviour and it is the sentence the user needs. A missing or revoked Map ID
 falls back to Google's default style rather than to a blank map, which is the mitigation risk C15
 promised and which now has a test.
+
+### Wave 5a closed — recorded 2026-08-09
+
+**Done.** The route tree of [`10_NAVIGATION_FLOW.md`](10_NAVIGATION_FLOW.md), both guards, deep
+links, restoration, the `AuthProvider` facade with its Supabase adapter, and the sign-in screen.
+**749 tests.**
+
+**The launch decision is a pure function.** `decideLaunch` takes restoration, session,
+in-progress route and held deep link, and returns where to land. The ordering in it is
+load-bearing — an in-progress route outranks a deep link, restoration outranks everything — and
+the scenarios that matter most are the ones nobody can reproduce on a device on demand: a
+notification tapped mid-delivery, a cold start with a route half driven. As a function they cost
+one line each to test.
+
+**A deep link is untrusted input, and is parsed like one.** The route id is checked against a
+UUID shape before it can reach a query; query strings and fragments are dropped rather than
+accepted, because nothing in this product takes a deep-link parameter and accepting one would be
+an input surface added for no feature.
+
+**Two defects the wiring found.** The session subscription has to be registered *before* the
+first `currentSession()` read is awaited — a sign-in completing in the gap between them would
+otherwise be missed, leaving the app on the sign-in screen holding a valid session. And
+`<PrimaryAction>` was 44 pt while [`09_COMPONENT_LIBRARY.md`](09_COMPONENT_LIBRARY.md) §7
+specifies 56: 44 is the floor any control must clear, 56 is what this one is, and the test that
+"verified" it had asserted the floor.
+
+**`expo-splash-screen` was not added as a dependency.** `expo-router` re-exports it, and it
+already owns the splash lifecycle — a second copy of the module would race it.
 
 ### How the app is actually tried — decided 2026-08-07
 

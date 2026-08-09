@@ -25,13 +25,16 @@ describe('ready', () => {
     expect(taps).toBe(1);
   });
 
-  it('is the full touch target', () => {
-    // Non-negotiable, and this is the largest control on screen — if anything
-    // shrinks below 44 it will be this one, under a long label.
+  it('is taller than the touch-target floor, as its specification requires', () => {
+    // 44 pt is the minimum a control may be; 56 is what this one *is*
+    // (docs/09_COMPONENT_LIBRARY.md §7). It is pressed one-handed, in a van,
+    // often without looking straight at it — so it gets the larger number, and
+    // the floor is asserted alongside it so a future edit cannot drop below both.
     renderWith({ kind: 'ready', label: 'Optimize' });
-    expect(screen.getByRole('button').props.style).toMatchObject({
-      minHeight: layout.touchMin,
-    });
+
+    const { minHeight } = screen.getByRole('button').props.style;
+    expect(minHeight).toBe(layout.actionMinHeight);
+    expect(minHeight).toBeGreaterThanOrEqual(layout.touchMin);
   });
 });
 
