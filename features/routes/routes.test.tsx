@@ -87,7 +87,11 @@ const renderWithServices = async (routes: RoutesProvider, ui: React.ReactElement
   const result = render(
     <QueryClientProvider client={queryClient}>
       <SessionProvider auth={auth}>
-        <ServicesProvider baseUrl="https://example.test/functions/v1" routes={routes}>
+        <ServicesProvider
+          baseUrl="https://example.test/functions/v1"
+          routes={routes}
+          favourites={{ list: async () => null, recordUse: async () => undefined }}
+        >
           {ui}
         </ServicesProvider>
       </SessionProvider>

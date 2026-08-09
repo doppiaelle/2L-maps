@@ -4,6 +4,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { createAuthProvider } from './auth-adapter';
 import type { SupabaseAuthPort } from './auth-adapter';
+import { createFavouritesProvider } from './favourites-adapter';
+import type { FavouritesPort, FavouritesProvider } from './favourites-adapter';
 import { createRoutesProvider } from './routes-adapter';
 import type { RoutesPort, RoutesProvider } from './routes-adapter';
 import type { AuthProvider } from '@/lib/providers/types';
@@ -149,4 +151,21 @@ export function createPostgrestPort(client: SupabaseClient): RoutesPort {
 export function createSupabaseRoutes(config: SupabaseConfig | null): RoutesProvider | null {
   if (config === null) return null;
   return createRoutesProvider(createPostgrestPort(createSupabaseClient(config)));
+}
+
+/** The address book. Its one write is an RPC rather than an update, so the
+ *  increment is atomic and the owner comes from the session. */
+export function createSupabaseFavourites(config: SupabaseConfig | null): FavouritesProvider | null {
+  if (config === null) return null;
+
+  const client = createSupabaseClient(config);
+  const port: FavouritesPort = {
+    select: createPostgrestPort(client).select,
+    recordUse: async (placeId) => {
+      const { error } = await client.rpc('record_place_use', { p_place_id: placeId });
+      return { error: error === null ? null : { message: error.message } };
+    },
+  };
+
+  return createFavouritesProvider(port);
 }

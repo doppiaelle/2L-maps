@@ -6,6 +6,7 @@ import { createGeocodingProvider } from '@/lib/api/geocoding-adapter';
 import { createQuotaProvider } from '@/lib/api/quota-adapter';
 import type { QuotaProvider } from '@/lib/api/quota-adapter';
 import { createRoutingProvider } from '@/lib/api/routing-adapter';
+import type { FavouritesProvider } from '@/lib/supabase/favourites-adapter';
 import type { RoutesProvider } from '@/lib/supabase/routes-adapter';
 import type { GeocodingProvider, RoutingProvider } from '@/lib/providers/types';
 
@@ -50,6 +51,8 @@ export interface Services {
    * the same reason: a caller must handle absence anyway.
    */
   readonly routes: RoutesProvider;
+  /** The address book, over PostgREST for the same reason as `routes`. */
+  readonly favourites: FavouritesProvider;
 }
 
 const ServicesContext = createContext<Services | null>(null);
@@ -66,6 +69,8 @@ export interface ServicesProviderProps {
    * §0 rule 2).
    */
   readonly routes: RoutesProvider | null;
+  /** The address book, built at the composition root for the same reason. */
+  readonly favourites: FavouritesProvider | null;
   /** Substituted in tests; production passes nothing and uses the real one. */
   readonly fetchImpl?: typeof fetch;
   readonly children: React.ReactNode;
@@ -74,6 +79,7 @@ export interface ServicesProviderProps {
 export function ServicesProvider({
   baseUrl,
   routes,
+  favourites,
   fetchImpl,
   children,
 }: ServicesProviderProps): React.JSX.Element {
@@ -88,7 +94,7 @@ export function ServicesProvider({
   const hasSession = session !== null;
 
   const services = useMemo<Services | null>(() => {
-    if (baseUrl === null || routes === null || !hasSession) return null;
+    if (baseUrl === null || routes === null || favourites === null || !hasSession) return null;
 
     const client = new ApiClient({
       baseUrl,
@@ -101,8 +107,9 @@ export function ServicesProvider({
       geocoding: createGeocodingProvider({ client }),
       quota: createQuotaProvider({ client }),
       routes,
+      favourites,
     };
-  }, [baseUrl, routes, hasSession, fetchImpl, sessionRef]);
+  }, [baseUrl, routes, favourites, hasSession, fetchImpl, sessionRef]);
 
   return <ServicesContext.Provider value={services}>{children}</ServicesContext.Provider>;
 }

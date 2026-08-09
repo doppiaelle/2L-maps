@@ -15,6 +15,7 @@ import { PERSISTED_STORES } from '@/features/stores';
 import { createQueryClient } from '@/lib/query/client';
 import {
   createSupabaseAuth,
+  createSupabaseFavourites,
   createSupabaseRoutes,
   functionsBaseUrl,
   readSupabaseConfig,
@@ -48,6 +49,7 @@ const queryClient = createQueryClient();
 const supabaseConfig = readSupabaseConfig();
 const auth = createSupabaseAuth(supabaseConfig);
 const routes = createSupabaseRoutes(supabaseConfig);
+const favourites = createSupabaseFavourites(supabaseConfig);
 const baseUrl = functionsBaseUrl(supabaseConfig);
 
 export default function RootLayout(): React.JSX.Element {
@@ -74,7 +76,7 @@ export default function RootLayout(): React.JSX.Element {
               is a session: every endpoint behind them is authenticated, and a
               query firing during the cold-start gap would cache the signed-out
               answer and leave a paying user on the free allowances. */}
-          <ServicesProvider baseUrl={baseUrl} routes={routes}>
+          <ServicesProvider baseUrl={baseUrl} routes={routes} favourites={favourites}>
             <DeepLinkProvider port={linking}>
               <StatusBar style="auto" />
               <RestorationGate />
