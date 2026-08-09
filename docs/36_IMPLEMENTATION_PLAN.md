@@ -112,7 +112,8 @@ and this document inherits that. No re-statement of any requirement, schema or b
 | 4d | `feat/w4d-appmap` | `<AppMap>` over `react-native-maps`, route geometry, map style | §6 W4 | ✅ |
 | 4e | `feat/w4e-feedback` | `<UndoToast>`, `<StatusChip>`, `<MetricPair>`, `<Skeleton>`, `<StateView>` | §6 W4 | ✅ |
 | 5a | `feat/w5-screens` | Router tree, guards, deep links, restoration, sign-in | §6 W5 | ✅ |
-| 5b | `feat/w5b-plan` | The sheet and the ten screens' contents | §6 W5 | ⏳ |
+| 5b | `feat/w5b-plan` | The sheet, the plan state machine, `<PlanView>` | §6 W5 | ✅ |
+| 5c | `feat/w5c-data` | Query hooks, Plan's data wiring, the modal contents | §6 W5 | ⏳ |
 | 6 | `feat/w6-delivery` | EAS, Fastlane, CI, store preparation | §6 W6 | ⏳ |
 | 7 | `docs/go-live-runbook` | **Go-live runbook** — every external account, key and limit, step by step | §6 W7 | ⏳ |
 
@@ -450,6 +451,49 @@ specifies 56: 44 is the floor any control must clear, 56 is what this one is, an
 
 **`expo-splash-screen` was not added as a dependency.** `expo-router` re-exports it, and it
 already owns the splash lifecycle — a second copy of the module would race it.
+
+### Wave 5b closed — recorded 2026-08-09
+
+**Done.** `<RouteSheet>` with its three detents and snapping, `lib/route/plan-state.ts` for the
+screen's eleven states, `<RouteSummaryHeader>`, and `<PlanView>` composing map, sheet, list,
+header and action. **817 tests.**
+
+**Snapping is a pure function, because it is the part that is wrong in most sheets.** A sheet
+that only snaps to the nearest detent ignores a deliberate flick; one that only follows velocity
+jumps two detents from a nudge. Both feel broken in a way nobody can describe afterwards, and
+neither is visible in review. The tie case resolves to the *lower* detent: at an exact midpoint
+the user has not committed, and revealing less is the recoverable mistake.
+
+**Two native modules had to be mocked, and one of them earns more than it costs.**
+`react-native-gesture-handler` had to be — the real package imports React Native's deprecated
+Switch spec and the bundled codegen plugin dies parsing it, taking the whole suite with it. The
+mock records the pan handlers, so a synthetic release can be delivered and the velocity sign
+asserted: the gesture reports positive when the finger moves *down*, the snapping function takes
+it positive when the sheet *grows*, and inverting that gives a sheet that closes when flicked
+open. That now has a test rather than needing a thumb on a device. Reanimated is mocked by hand
+rather than through its own `mock.js`, which loads the real entry point and pulls in the worklets
+ESM build; the export that matters is `runOnJS`, which under the real implementation schedules
+onto a thread Jest never drives — a gesture callback would silently never run and the test would
+pass for the wrong reason.
+
+**Animation timing stays uncovered, and both mocks say so.** The 300 ms detent budget needs
+hardware ([ADR-0014](adr/0014-android-first-verification.md)).
+
+**One inconsistency found and left standing, deliberately.** `DraftRoute`'s docblock promises
+that "`entryOrder` on each stop preserves the original" order, and `Stop` in
+[`types/domain.ts`](../types/domain.ts) has no such field — only `position`. The database has
+both `entry_order` and `optimized_order` ([`12_DATABASE.md`](12_DATABASE.md)), so the schema is
+right and the client type is short of it. Nothing can currently distinguish an order the user
+typed from one an optimization produced, which is exactly what "Already the fastest order"
+depends on. It is recorded rather than patched at the end of a wave: it changes a stored shape
+and belongs in the same change as the query layer that reads it.
+
+**Plan's data wiring is wave 5c, not an oversight.** `<PlanView>` is complete and tested against
+every state; the screen behind it needs `stops` joined to `places_cache` for addresses — which is
+the correct architecture, `place_id` being the durable key and the address arriving from the
+cached places query (ADR-0007, ADR-0008). That join is a React Query hook that does not exist
+yet, and faking it in the screen would have made the tests describe something the product does
+not do.
 
 ### How the app is actually tried — decided 2026-08-07
 
