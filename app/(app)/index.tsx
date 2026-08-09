@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useColorScheme, useWindowDimensions } from 'react-native';
 
 import { usePendingDeepLinkContext } from '@/features/navigation/deep-link-provider';
@@ -10,10 +10,12 @@ import { PlanView } from '@/features/route-planning/PlanView';
 import { useOptimizeRoute } from '@/features/route-planning/use-optimize-route';
 import { useDraftRouteStore, useRouteProgressStore, useUiStore } from '@/features/stores';
 import { readMapIds } from '@/lib/config/map-ids';
-import { formatDistance } from '@/lib/format/units';
+import { formatDistance, formatDuration } from '@/lib/format/units';
 import { buildPlanRows, placeIdsToResolve, straightLineMeters } from '@/lib/route/plan-rows';
+import { buildRouteGeometry } from '@/lib/map/route-geometry';
 import { actionIntentOf, planStateOf } from '@/lib/route/plan-state';
 import { summarise } from '@/lib/route/progress';
+import { wasAlreadyOptimal } from '@/lib/route/draft';
 
 /**
  * Plan — the primary screen.
@@ -34,6 +36,7 @@ export default function PlanScreen(): React.JSX.Element {
 
   const pending = usePendingDeepLinkContext();
   const draft = useDraftRouteStore((store) => store.draft);
+  const result = useDraftRouteStore((store) => store.result);
   const progress = useRouteProgressStore((store) => store.progress);
   const detent = useUiStore((store) => store.detent);
   const setDetent = useUiStore((store) => store.setDetent);
@@ -71,18 +74,37 @@ export default function PlanScreen(): React.JSX.Element {
 
   const completed = progress === null ? 0 : summarise(progress, draft.stops).completed;
 
-  // A straight-line total while the route is only a draft: a number is more
-  // useful than a blank, and `<RouteSummaryHeader>` labels it as an estimate.
-  // No duration to go with it — a straight-line *time* would be a road estimate
-  // we did not make.
-  const metres = straightLineMeters(markers);
+  // Decoded once, here, and memoised — never per render. A 25-stop polyline is
+  // long enough that decoding it every frame is the most common cause of map
+  // jank in this class of app (docs/24_PERFORMANCE.md).
+  const geometry = useMemo(() => (result === null ? null : buildRouteGeometry(result)), [result]);
+
+  // Real figures once a result exists; a straight-line total before that,
+  // labelled as an estimate by `<RouteSummaryHeader>`. A number is more useful
+  // than a blank — but a straight-line *time* would be a road estimate we did
+  // not make, so a draft gets no duration at all.
+  const metres =
+    result !== null && !result.isDegraded
+      ? result.totalDistanceMeters
+      : straightLineMeters(markers);
   const distance =
     metres === null
       ? null
       : {
           value: formatDistance(metres, 'metric'),
-          spoken: `${formatDistance(metres, 'metric')} in a straight line`,
+          spoken:
+            result !== null && !result.isDegraded
+              ? formatDistance(metres, 'metric')
+              : `${formatDistance(metres, 'metric')} in a straight line`,
         };
+
+  const duration =
+    result !== null && !result.isDegraded
+      ? {
+          value: formatDuration(result.totalDurationSeconds),
+          spoken: formatDuration(result.totalDurationSeconds),
+        }
+      : null;
 
   const state = planStateOf({
     isLoading: places.isLoading && draft.stops.length > 0,
@@ -92,7 +114,7 @@ export default function PlanScreen(): React.JSX.Element {
     isOptimizing,
     hasResult: draft.isOptimized,
     isDegraded: draft.isDegraded,
-    wasAlreadyOptimal: false,
+    wasAlreadyOptimal: wasAlreadyOptimal(draft),
     lastFailure: failure === null ? null : failure.kind === 'offline' ? 'offline' : 'upstream',
   });
 
@@ -102,9 +124,9 @@ export default function PlanScreen(): React.JSX.Element {
       intent={actionIntentOf(state, availability)}
       stops={rows}
       markers={markers}
-      route={null}
+      route={geometry}
       distance={distance}
-      duration={null}
+      duration={duration}
       detent={detent}
       onDetentChange={setDetent}
       selectedStopId={selectedStopId}

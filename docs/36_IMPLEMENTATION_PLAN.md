@@ -605,6 +605,27 @@ cache nobody reads — and Query's model would fight all three.
 from the places query on Plan (ADR-0007). Inventing one at selection would create a coordinate
 with no refresh date, which is the one thing the expiry rule cannot handle.
 
+### The route reaches the map — recorded 2026-08-09
+
+The optimization result is held on the draft store and Plan draws it. **893 tests.** The core
+loop is now whole: add stops, optimize, see the route.
+
+**The result is held in memory and never persisted, and that is a terms decision rather than a
+storage one.** It carries Google-derived geometry — the encoded polyline and the per-leg figures
+— and a client-side store has no expiry mechanism to hold it under the thirty-day rule
+([ADR-0007](adr/0007-place-id-durable-coordinates-perishable.md)). The server keeps it with a
+purge job; here it is re-read after a cold start instead, which costs one request and removes the
+question entirely. A test asserts it never reaches storage, because the field being outside
+`partialize` is exactly the kind of thing a later edit undoes without noticing.
+
+**The polyline is decoded once, on receipt, and memoised.** Decoding per render is the most
+common cause of map jank in this class of app, and it is invisible until a twenty-five-stop route
+meets a mid-range Android.
+
+**A degraded result still shows no duration.** T0 produces an order, not a road time, so the
+distance shown is the straight-line total and the duration stays absent rather than being
+invented — the same rule the draft follows, for the same reason.
+
 ### How the app is actually tried — decided 2026-08-07
 
 Recorded because it changed the shape of several documents, and because my first answer on it was

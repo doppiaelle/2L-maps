@@ -87,8 +87,9 @@ export function useOptimizeRoute(): OptimizeState {
     onSuccess: (outcome) => {
       if (outcome.ok !== true) return;
 
-      const result = outcome.result;
-      applyResult(result.orderedStopIds, result.isDegraded);
+      // The whole result, not just the order: the geometry is what the map
+      // draws, and it is held in memory rather than persisted (ADR-0007).
+      applyResult(outcome.result);
 
       // The server counts; we re-read rather than decrement. A local tally
       // eventually disagrees with the number the user is held to.

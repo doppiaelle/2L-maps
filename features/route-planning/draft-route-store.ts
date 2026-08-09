@@ -15,7 +15,7 @@ import {
   type DraftRefusal,
   type DraftRoute,
 } from '@/lib/route/draft';
-import type { RouteShape, Stop } from '@/types';
+import type { OptimizationResult, RouteShape, Stop } from '@/types';
 
 /**
  * The draft route store.
@@ -51,6 +51,20 @@ export interface DraftRouteState {
   readonly draft: DraftRoute;
   readonly lastRefusal: LastRefusal | null;
   readonly undoable: UndoEntry | null;
+  /**
+   * The last optimization result, **held in memory only**.
+   *
+   * Deliberately outside `partialize`. It carries Google-derived geometry — the
+   * encoded polyline and per-leg figures — and a client-side store has no expiry
+   * mechanism to hold it under the thirty-day rule
+   * ([ADR-0007](../../docs/adr/0007-place-id-durable-coordinates-perishable.md)).
+   * The server keeps it with a purge job; here it is re-read rather than cached,
+   * which costs a request after a cold start and removes the whole question.
+   *
+   * Cleared by every structural edit, because the geometry described an order
+   * that no longer exists.
+   */
+  readonly result: OptimizationResult | null;
 
   // Actions
   reset: (routeId: string) => void;
@@ -61,7 +75,7 @@ export interface DraftRouteState {
   setStopLabel: (stopId: string, label: string | null) => void;
   setRouteShape: (shape: RouteShape) => void;
   setOrigin: (placeId: string | null, isCurrentLocation: boolean) => void;
-  applyResult: (orderedStopIds: readonly string[], isDegraded: boolean) => void;
+  applyResult: (result: OptimizationResult) => void;
   clearRefusal: () => void;
 
   // Derived, exposed so components never recompute domain rules themselves
@@ -134,16 +148,17 @@ export function createDraftRouteStore(storage?: DraftStorage) {
         draft: emptyDraft('draft'),
         lastRefusal: null,
         undoable: null,
+        result: null,
 
         reset: (routeId) => {
-          set({ draft: emptyDraft(routeId), lastRefusal: null, undoable: null });
+          set({ draft: emptyDraft(routeId), lastRefusal: null, undoable: null, result: null });
         },
 
         addStopToDraft: (stop) => {
           const result = addStop(get().draft, stop);
           set(
             result.ok
-              ? { draft: result.draft, lastRefusal: null }
+              ? { draft: result.draft, lastRefusal: null, result: null }
               : { lastRefusal: { action: 'add', refusal: result.refusal } },
           );
         },
@@ -155,6 +170,8 @@ export function createDraftRouteStore(storage?: DraftStorage) {
               ? {
                   draft: result.draft,
                   lastRefusal: null,
+                  // The geometry described an order that no longer exists.
+                  result: null,
                   // Held so the toast can offer undo. A destructive action is
                   // undoable, not confirmed (CLAUDE.md §7 rule 7).
                   undoable: { stop: result.removed, atIndex: result.atIndex },
@@ -173,7 +190,7 @@ export function createDraftRouteStore(storage?: DraftStorage) {
           const result = moveStop(get().draft, fromIndex, toIndex);
           set(
             result.ok
-              ? { draft: result.draft, lastRefusal: null }
+              ? { draft: result.draft, lastRefusal: null, result: null }
               : { lastRefusal: { action: 'move', refusal: result.refusal } },
           );
         },
@@ -188,7 +205,7 @@ export function createDraftRouteStore(storage?: DraftStorage) {
         },
 
         setRouteShape: (shape) => {
-          set({ draft: setShape(get().draft, shape) });
+          set({ draft: setShape(get().draft, shape), result: null });
         },
 
         setOrigin: (placeId, isCurrentLocation) => {
@@ -203,11 +220,15 @@ export function createDraftRouteStore(storage?: DraftStorage) {
               isOptimized: false,
               isDegraded: false,
             },
+            result: null,
           });
         },
 
-        applyResult: (orderedStopIds, isDegraded) => {
-          set({ draft: applyOptimizedOrder(get().draft, orderedStopIds, isDegraded) });
+        applyResult: (result) => {
+          set({
+            draft: applyOptimizedOrder(get().draft, result.orderedStopIds, result.isDegraded),
+            result,
+          });
         },
 
         clearRefusal: () => {

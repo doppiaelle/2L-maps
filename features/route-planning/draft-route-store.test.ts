@@ -112,7 +112,12 @@ describe('what invalidates an optimization result', () => {
   const optimized = () => {
     const store = newStore();
     for (const id of ['a', 'b', 'c']) store.getState().addStopToDraft(stop(id));
-    store.getState().applyResult(['c', 'b', 'a'], true);
+    store.getState().applyResult({
+      tier: 'T0',
+      isDegraded: true,
+      orderedStopIds: ['c', 'b', 'a'],
+      totalDistanceMeters: 1200,
+    });
     return store;
   };
 
@@ -292,5 +297,61 @@ describe('reading a draft written by an older build', () => {
 
     expect(migrated.draft.stops[0]?.entryOrder).toBe(2);
     expect(migrated.draft.isOptimized).toBe(true);
+  });
+});
+
+describe('the optimization result itself', () => {
+  const result = {
+    tier: 'T1',
+    isDegraded: false,
+    orderedStopIds: ['b', 'a'],
+    legs: [],
+    totalDistanceMeters: 12_000,
+    totalDurationSeconds: 1800,
+    unreachableStopIds: [],
+  } as const;
+
+  const withResult = () => {
+    const store = newStore();
+    for (const id of ['a', 'b']) store.getState().addStopToDraft(stop(id));
+    store.getState().applyResult(result);
+    return store;
+  };
+
+  it('is held so the map has geometry to draw', () => {
+    expect(withResult().getState().result).toEqual(result);
+  });
+
+  it('is never written to storage', () => {
+    // It carries Google-derived geometry, and a client store has no expiry
+    // mechanism to hold it under the thirty-day rule (ADR-0007). The server
+    // keeps it with a purge job; here it is re-read rather than cached.
+    const store = withResult();
+    expect(Object.keys(store.getState())).toContain('result');
+
+    const persisted = JSON.stringify(store.persist.getOptions().partialize?.(store.getState()));
+    expect(persisted).not.toContain('totalDurationSeconds');
+    expect(persisted).toContain('routeId');
+  });
+
+  it('is discarded by a hand reorder, which the geometry no longer describes', () => {
+    const store = withResult();
+    store.getState().moveStopTo(0, 1);
+
+    expect(store.getState().result).toBeNull();
+  });
+
+  it('is discarded by removing a stop', () => {
+    const store = withResult();
+    store.getState().removeStopById('a');
+
+    expect(store.getState().result).toBeNull();
+  });
+
+  it('survives a relabel, which changes no order', () => {
+    const store = withResult();
+    store.getState().setStopLabel('a', 'Warehouse');
+
+    expect(store.getState().result).not.toBeNull();
   });
 });
