@@ -105,6 +105,7 @@ owning your area (see §Areas below) → [`29`](29_DEFINITION_OF_DONE.md).
 | 27 | [Play Store](27_PLAY_STORE.md) | Data Safety, testing tracks, release |
 | 29 | [Definition of Done](29_DEFINITION_OF_DONE.md) | When a change is actually finished |
 | 36 | [Implementation Plan](36_IMPLEMENTATION_PLAN.md) | **Live status.** Wave order, branches, gates, environment limits |
+| 37 | [Go-Live Runbook](37_GO_LIVE_RUNBOOK.md) | **Instructions.** Every account, key and limit, in the order that caps spend first |
 
 ### Architecture Decision Records
 
@@ -214,11 +215,12 @@ template, and pushed.
 | 5 — Delivery | `22`, `25`, `26`, `27`, `29`, `README` | ✅ Complete |
 | 6 — Consolidation | Cross-link and consistency audit | ✅ Complete |
 
-**File count.** The approved set is 42 documents: the 33 named in the brief, 8 extensions, and
+**File count.** The approved set is 43 documents: the 33 named in the brief, 8 extensions,
 `36_IMPLEMENTATION_PLAN.md` added when implementation began ([ADR-0013](adr/0013-implementation-execution-model.md)),
-counting `adr/` as one entry. On disk that is **57 files** — 39 in `docs/`, 16 in `docs/adr/`,
-and `CLAUDE.md` and `README.md` at the root — because the single ADR entry expands to sixteen
-records. Both numbers are correct; they count different things.
+and `37_GO_LIVE_RUNBOOK.md` added when the code was complete against its contracts and nothing
+was yet connected — counting `adr/` as one entry. On disk that is **58 files** — 40 in `docs/`,
+16 in `docs/adr/`, and `CLAUDE.md` and `README.md` at the root — because the single ADR entry
+expands to sixteen records. Both numbers are correct; they count different things.
 
 **Audit results, wave 6.**
 

@@ -113,9 +113,9 @@ and this document inherits that. No re-statement of any requirement, schema or b
 | 4e | `feat/w4e-feedback` | `<UndoToast>`, `<StatusChip>`, `<MetricPair>`, `<Skeleton>`, `<StateView>` | §6 W4 | ✅ |
 | 5a | `feat/w5-screens` | Router tree, guards, deep links, restoration, sign-in | §6 W5 | ✅ |
 | 5b | `feat/w5b-plan` | The sheet, the plan state machine, `<PlanView>` | §6 W5 | ✅ |
-| 5c | `feat/w5c-data` | Stored-shape fix, query hooks, Plan's data wiring, the modal contents | §6 W5 | 🔵 |
-| 6 | `feat/w6-delivery` | EAS, Fastlane, CI, store preparation | §6 W6 | ⏳ |
-| 7 | `docs/go-live-runbook` | **Go-live runbook** — every external account, key and limit, step by step | §6 W7 | ⏳ |
+| 5c | `feat/w5c-data` | Stored-shape fix, query hooks, Plan's data wiring, the screens | §6 W5 | ✅ |
+| 6 | `feat/w6-delivery` | EAS profiles, remaining CI, Maestro flows, store declarations | §6 W6 | ✅ |
+| 7 | `docs/go-live-runbook` | **Go-live runbook** — every external account, key and limit, step by step | §6 W7 | ✅ |
 
 **Decisions taken at implementation start, and open to revision:**
 
@@ -651,6 +651,35 @@ Android spec fails codegen and takes the suite with it — the same failure `rea
 has. The toggle is written by hand instead, which is the right answer twice over: a control that
 cannot be tested has no business on the screen that decides where a driver's day is sent, and
 ours carries the design system's label and states its own role.
+
+### Waves 5c, 6 and 7 closed — recorded 2026-08-09
+
+**913 tests.** The journey runs end to end, the delivery configuration exists, and the go-live
+runbook is written.
+
+**Wave 5c** finished with the mid-route controls, the paywall, the summary and Settings. Which
+stop is being marked comes from `next`, not from `stops[completed]`: once anything has been
+skipped, the order on screen and the order still to visit are different lists, and reading the
+wrong one marks the wrong door.
+
+**The paywall's wording is its whole risk.** Guideline 3.1.2 rejections come from trial
+disclosures that are missing or below the button, so the terms sit above the control in reading
+order *and* inside the accessibility label — a screen reader user hears the button without having
+read what is above it. The trial sentence disappears when no trial is on offer, because claiming
+one the store will not grant is a rejection and a lie in the same breath.
+
+**Wave 6's two most useful decisions are both refusals.** `migrate` and `release` are manual: a
+migration that runs on merge runs while somebody is asleep, and a tag that ships itself removes
+the one moment where a person re-reads 3.1.2 before a paywall change goes out. And `e2e` is
+on-demand only because those flows have never been run — a workflow that has never passed must
+not gate a merge, since a red build nobody trusts teaches everyone to merge through red.
+
+**Wave 7 is ordered so that no credential exists before the thing that caps its spend.** That is
+the document's only real structural decision, and it is the one that is expensive to retrofit: a
+Maps key with no quota is a credential that can bill unbounded amounts, and the risk starts when
+the key exists rather than when code calls it. The RLS proof is a blocking step with a stated
+observation — user B sees *zero rows* — because reading a policy is not testing one and the
+failure is silent.
 
 ### How the app is actually tried — decided 2026-08-07
 
