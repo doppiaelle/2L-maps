@@ -95,12 +95,16 @@ export function createRoutingProvider(options: RoutingAdapterOptions): RoutingPr
             latitude: request.originCoordinate?.latitude ?? null,
             longitude: request.originCoordinate?.longitude ?? null,
           },
-          stops: request.stopPlaceIds.map((placeId) => ({ placeId })),
+          // Each stop carries the client's own id, because the reply names the
+          // order with those ids. Sending only place ids would collapse two
+          // stops at the same address into one, and two deliveries in the same
+          // building is an ordinary Tuesday (docs/33_API_CONTRACTS.md).
+          stops: request.stops.map((stop) => ({ stopId: stop.id, placeId: stop.placeId })),
           isRoundTrip: request.shape === 'round-trip',
           departureTime: request.departureTime?.toISOString() ?? null,
           idempotencyKey: request.idempotencyKey,
         },
-        request.stopPlaceIds.length,
+        request.stops.length,
       ),
 
     awaitJob: (jobId: string, signal?: AbortSignal) =>

@@ -103,7 +103,7 @@ and this document inherits that. No re-statement of any requirement, schema or b
 | 0 | `feat/w0-foundation` | Expo 57 scaffold, TS strict, lint, Jest + RNTL + MSW, NativeWind, CI `verify` | §6 W0 | ✅ |
 | 1 | `feat/w1-domain` | All of `lib/` — pure domain logic | §6 W1 | ✅ |
 | 2a | `feat/w2-backend` | Migrations, RLS, purge, seven-step pipeline, validation, cache key | §6 W2a | ✅ |
-| 2b | `feat/w2b-upstream` | Six Deno entrypoints and their upstream adapters (incl. `/parse-addresses`) | §6 W2b | ⏳ |
+| 2b | `feat/w2b-upstream` | Seven Deno entrypoints, three upstream adapters, endpoint logic in `_shared/endpoints/` | §6 W2b | ✅ |
 | 3a | `feat/w3-data-layer` | Sync conflict resolution, route progress, the five facade interfaces | §6 W3a | ✅ |
 | 3b | `feat/w3b-adapters` | Edge Function client, all five concrete facade adapters, React Query policy, four Zustand stores | §6 W3b | ✅ |
 | 4 | `feat/w4-design-system` | Tokens, `<AppMap>`, components | §6 W4 | ⏳ |
@@ -211,7 +211,21 @@ owner, who bypasses RLS; and without the grants Supabase gives `authenticated` b
 role receives permission-denied rather than an RLS-filtered result. Either would have reported
 every policy as working.
 
-**Still to do in this wave.** The six Deno entrypoints and their upstream adapters, now including `/parse-addresses` (ADR-0016).
+**Done.** Three upstream adapters (Routes, Places, the address parser), the shared handler, and
+seven entrypoints. **508 tests.**
+
+**The rule that came out of this wave.** `supabase/functions/*/index.ts` is excluded from `tsc`
+because those files import Deno globals — so anything written in an entrypoint is unchecked by
+construction. I discovered this by putting ninety lines of routing logic in one and watching a
+property named `id_placeholder` typecheck cleanly. The rule is therefore not "entrypoints should
+be thin" but **an entrypoint contains no decisions**; logic lives in
+`supabase/functions/_shared/endpoints/`, which is typed and tested. The move paid immediately —
+`tsc` caught a client-only error code being used server-side the moment the file was covered.
+
+**A wave-2a defect, not a contract gap.** `/optimize`'s documented request has always carried
+`stopId` and `isPinned`; the schema written in wave 2a dropped both, leaving the server unable to
+name the stops it reorders. The first instinct was to add the field to the document. The document
+was right.
 Entrypoints were drafted and then removed rather than committed, because they imported modules
 that did not exist yet — a file with a dangling import is a placeholder wearing a costume, and
 the constitution forbids both. The upstream adapters are also the part decision I2 defers:

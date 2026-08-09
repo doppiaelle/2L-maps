@@ -18,8 +18,22 @@ import { MAX_STOPS, MIN_STOPS } from '../../../types/constants';
  *  alphabet, so a format change upstream does not reject valid input. */
 const placeId = z.string().min(1).max(512);
 
+/**
+ * A stop as the client sends it.
+ *
+ * `stopId` is the **client's** identifier and it is required, because the
+ * response returns the order as a list of these. Ordering by `placeId` instead would
+ * collapse two stops at the same address into one — two deliveries in the same
+ * building is an ordinary Tuesday, not an edge case — and ordering by position
+ * would make the reply meaningless the moment the client re-sorted anything.
+ */
 const stopInput = z.object({
+  stopId: z.string().min(1).max(64),
   placeId,
+  /** A stop the user has pinned in place. Carried now, honoured when pinning
+   *  ships — the field is documented, so accepting it costs nothing and
+   *  rejecting it would break a client that sends what the contract promises. */
+  isPinned: z.boolean().optional(),
   label: z.string().max(200).nullable().optional(),
   note: z.string().max(2000).nullable().optional(),
 });
@@ -86,6 +100,43 @@ export const geocodeRequestSchema = z.object({
 });
 
 export type GeocodeRequest = z.infer<typeof geocodeRequestSchema>;
+
+/**
+ * `/place-details` — the re-hydration path.
+ *
+ * `place_id` is storable indefinitely; the coordinates beside it expire after 30
+ * consecutive days and are then null (ADR-0007). This endpoint turns the durable
+ * keys back into a usable route, so its batch ceiling is the route ceiling.
+ */
+export const placeDetailsRequestSchema = z.object({
+  placeIds: z.array(placeId).min(1).max(MAX_STOPS),
+});
+
+export type PlaceDetailsRequest = z.infer<typeof placeDetailsRequestSchema>;
+
+/**
+ * `/parse-addresses` — unstructured input to candidate addresses (ADR-0016).
+ *
+ * `text` and `imageBase64` are mutually exclusive, and the refinement below is
+ * what makes that structural rather than a convention. Sending both would be
+ * ambiguous about which one to bill for, and ambiguity on a metered endpoint
+ * resolves in the expensive direction.
+ *
+ * The input bounds are cost controls, not politeness. Four thousand characters
+ * is a long pasted message; beyond it we are paying to parse a document the user
+ * did not mean to send.
+ */
+export const parseAddressesRequestSchema = z
+  .object({
+    text: z.string().min(1).max(4000).optional(),
+    imageBase64: z.string().min(1).max(7_000_000).optional(),
+    locale: z.string().max(35).nullable().optional(),
+  })
+  .refine((value) => (value.text === undefined) !== (value.imageBase64 === undefined), {
+    message: 'exactly one of text or imageBase64',
+  });
+
+export type ParseAddressesRequest = z.infer<typeof parseAddressesRequestSchema>;
 
 /**
  * The RevenueCat webhook.
