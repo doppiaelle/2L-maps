@@ -67,6 +67,18 @@ export const MARKER_CLUSTER_THRESHOLD = 15;
 /** Above this many rows, virtualisation is mandatory. */
 export const LIST_VIRTUALISATION_THRESHOLD = 20;
 
+/**
+ * How long an undo stays available after a destructive action
+ * (docs/06_UX_GUIDELINES.md P8).
+ *
+ * Long enough to read the toast, understand what happened and reach the control
+ * one-handed; short enough that it is gone before the next action. The window
+ * **pauses while the app is backgrounded**, so this is six seconds of the user's
+ * attention rather than six seconds of wall clock — an interruption is exactly
+ * when they most need the undo still to be there.
+ */
+export const UNDO_WINDOW_MS = 6000;
+
 // ─── Subscription ────────────────────────────────────────────────────────────
 // ADR-0002 · ADR-0015 · docs/20_SUBSCRIPTIONS.md
 

@@ -300,17 +300,22 @@ SDK's. A prop named after a `react-native-maps` concept is a leak that makes
 
 ## 13. Checklist
 
-- [ ] `<AppMap>` is the only importer of `react-native-maps`.
-- [ ] Every component implements every state listed for it.
-- [ ] Markers and rows memoised; 60 fps verified at 25 stops on a mid-range device.
+Ticked boxes are enforced by a test or a lint rule; unticked ones need hardware
+([ADR-0014](adr/0014-android-first-verification.md)) or a screen that does not exist yet.
+
+- [x] `<AppMap>` is the only importer of `react-native-maps`. — lint rule, `eslint.config.js`
+- [x] Every component implements every state listed for it. — one test per state
+- [x] Markers and rows memoised — `getItemLayout` supplied, `tracksViewChanges` disabled.
+      **60 fps at 25 stops is unverified**: it needs the physical device.
 - [ ] Gestures run on the native driver; verified with the JS thread deliberately blocked.
-- [ ] Every gesture action available without the gesture.
-- [ ] Accessibility labels composed and verified with VoiceOver and TalkBack.
-- [ ] Touch targets ≥ 44 pt including map markers.
-- [ ] Skeleton dimensions match real content.
-- [ ] Undo timer pauses on background.
-- [ ] Reduce Motion verified on every animated component.
-- [ ] No literal design values anywhere.
+- [ ] Every gesture action available without the gesture. — awaits the sheet
+- [x] Accessibility labels composed at the row rather than per sub-element.
+      **VoiceOver and TalkBack are unverified**: they need hardware.
+- [x] Touch targets ≥ 44 pt including map markers. — asserted in `AppMap.test.tsx`
+- [x] Skeleton dimensions match real content. — the skeleton takes the row height
+- [x] Undo timer pauses on background. — `lib/ui/undo-window.test.ts`
+- [x] Reduce Motion honoured by every animated component. — `<Skeleton>`, `<AppMap>` camera
+- [x] No literal design values anywhere. — the Tailwind theme is generated from the tokens
 
 ## 14. Roadmap
 
@@ -331,6 +336,9 @@ SDK's. A prop named after a `react-native-maps` concept is a leak that makes
 | 2026-08-06 | `<StateView>` requires an action prop | Enforces the no-dead-end rule mechanically | Design |
 | 2026-08-06 | Undo timer pauses on background | An interruption otherwise consumes the window silently | Design |
 | 2026-08-06 | Marker numbers update live during a drag | The feedback is the purpose of the interaction | Design |
+| 2026-08-09 | The selected marker is held out of clustering entirely, not extracted afterwards | Otherwise it can be the marker that keeps a cell above one and forces a cluster to exist around it | Implementation |
+| 2026-08-09 | A T0 route draws one dashed segment per pair, not one dashed path | A single path joins at the stops and reads as continuous, which is the impression a degraded result must not give | Implementation |
+| 2026-08-09 | An undecodable road polyline draws markers only, never connectors | Connectors are how a degraded result is shown; using them here would relabel a road route as T0 | Implementation |
 
 ## 16. Rationale
 
