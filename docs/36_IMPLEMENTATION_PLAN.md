@@ -117,6 +117,39 @@ and this document inherits that. No re-statement of any requirement, schema or b
 | 6 | `feat/w6-delivery` | EAS profiles, remaining CI, Maestro flows, store declarations | §6 W6 | ✅ |
 | 7 | `docs/go-live-runbook` | **Go-live runbook** — every external account, key and limit, step by step | §6 W7 | ✅ |
 
+### What is built, and what is specified but not built — audited 2026-08-09
+
+The table above says which *waves* closed. It does not say which *features* exist, and the two
+had begun to drift. This is the honest list, re-derived from the code rather than from memory.
+
+**Complete and wired:** the launch sequence and both guards, deep links, the map, the sheet, the
+plan state machine, add-stop search with its debounce and session token, optimization, the
+handoff and the provider picker, mid-route Done and Skip, the summary, Settings.
+
+**Written, tested, and never wired to anything:**
+
+| Thing | State | Consequence today |
+|---|---|---|
+| `BillingProvider` adapter | Complete with tests, never constructed | The paywall shows no products, because there are none to show |
+| `AdsProvider` adapter, `<AdSlot>` | Complete with tests, never rendered | The free tier of [ADR-0015](adr/0015-ad-supported-free-tier.md) shows no advertising at all |
+| Mutation queue store | Complete with tests, never read | Writes are not queued offline ([ADR-0008](adr/0008-offline-scope.md)) |
+
+**Specified and not built:**
+
+| Thing | Where specified | Consequence today |
+|---|---|---|
+| Route persistence | [`12_DATABASE.md`](12_DATABASE.md) | **Nothing is ever written to `routes` or `stops`.** The tables and their policies exist and no code inserts a row — client or Edge Function |
+| History | [`08_SCREEN_SPECIFICATIONS.md`](08_SCREEN_SPECIFICATIONS.md) §6 | A stub, and it would have nothing to list |
+| Recents and favourites | docs/08 §8 | The add-stop state machine handles them; the source is a hard-coded empty list, so the free path in the most expensive screen is inert |
+| Import, and AI-assisted entry | docs/08 §8, [ADR-0016](adr/0016-ai-assisted-stop-entry.md) | The `parse-addresses` Edge Function exists; no screen calls it |
+| Analytics events | [`21_ANALYTICS.md`](21_ANALYTICS.md) | No `lib/analytics` exists |
+| Offline detection | [`17_OFFLINE_MODE.md`](17_OFFLINE_MODE.md) | `isOffline` and the map's status are hard-coded optimistic, so every offline state is reachable in tests and unreachable in the app |
+
+**Why this list matters more than the wave table.** Every row above is a decision that was made
+correctly and then not connected. None of it is a defect in what exists; all of it is the
+difference between "the architecture supports this" and "the user can do this", and that
+difference is exactly what a status table hides.
+
 **Decisions taken at implementation start, and open to revision:**
 
 | # | Decision | Revisit when |
