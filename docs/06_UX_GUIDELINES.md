@@ -180,6 +180,13 @@ tap to protect against a rare mistake; undo costs only the user who made the mis
 
 Exception: account deletion, which is genuinely irreversible and confirms explicitly.
 
+**The window is `UNDO_WINDOW_MS` = 6 000 ms**, and it is **six seconds of the user's attention,
+not of wall clock**: it pauses while the app is backgrounded and resumes on return. Long enough
+to read the toast, understand what happened and reach the control one-handed; short enough to be
+gone before the next action. The pause is what makes the trade in this principle honest — an
+interruption is precisely when the mistake is noticed, and a window that drains during a phone
+call protects nobody.
+
 ### P9 — The map is quiet
 
 The map is background. Content floats above it on surfaces, never directly on tiles. The route
@@ -271,6 +278,7 @@ route appear as dismissible, non-blocking surfaces at the bottom of the screen.
 | 2026-08-06 | Undo adopted over confirmation | A dialog taxes every user to protect against a rare error | Design |
 | 2026-08-06 | 1-second progress delay | A flashing spinner reads as a glitch | Design |
 | 2026-08-06 | Blocking dialogs forbidden during a route | The user is driving | Design |
+| 2026-08-09 | Undo window fixed at 6 000 ms, paused while backgrounded | P8 had no duration anywhere, and a component was about to invent one. Six seconds is a read-plus-reach; pausing is what stops an interruption consuming the window silently | Design |
 
 ## 14. Rationale
 

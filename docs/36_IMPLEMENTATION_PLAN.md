@@ -106,7 +106,11 @@ and this document inherits that. No re-statement of any requirement, schema or b
 | 2b | `feat/w2b-upstream` | Seven Deno entrypoints, three upstream adapters, endpoint logic in `_shared/endpoints/` | §6 W2b | ✅ |
 | 3a | `feat/w3-data-layer` | Sync conflict resolution, route progress, the five facade interfaces | §6 W3a | ✅ |
 | 3b | `feat/w3b-adapters` | Edge Function client, all five concrete facade adapters, React Query policy, four Zustand stores | §6 W3b | ✅ |
-| 4 | `feat/w4-design-system` | Tokens, `<AppMap>`, components | §6 W4 | ⏳ |
+| 4a | `feat/w4-design-system` | Tokens, contrast enforcement, generated Tailwind theme | §6 W4 | ✅ |
+| 4b | `feat/w4b-components` | `<PrimaryAction>`, `<StopRow>`, `<AdSlot>` | §6 W4 | ✅ |
+| 4c | `feat/w4c-map-list` | Marker clustering, the virtualised `<StopList>` | §6 W4 | ✅ |
+| 4d | `feat/w4d-appmap` | `<AppMap>` over `react-native-maps`, route geometry, map style | §6 W4 | ✅ |
+| 4e | `feat/w4e-feedback` | `<UndoToast>`, `<StatusChip>`, `<MetricPair>`, `<Skeleton>`, `<StateView>` | §6 W4 | ✅ |
 | 5 | `feat/w5-screens` | Expo Router, the ten screens | §6 W5 | ⏳ |
 | 6 | `feat/w6-delivery` | EAS, Fastlane, CI, store preparation | §6 W6 | ⏳ |
 | 7 | `docs/go-live-runbook` | **Go-live runbook** — every external account, key and limit, step by step | §6 W7 | ⏳ |
@@ -384,6 +388,39 @@ patched, and the substitution is visible in the call signature.
 the request, so a superseded keystroke was paid for. And TypeScript narrowed `signal.aborted` to
 false after that guard and never widened it, because control-flow analysis cannot see the signal
 change mid-flight — which is exactly when a cancellation happens.
+
+### Wave 4 closed — recorded 2026-08-09
+
+**Done.** Tokens with their contrast enforced by test, a Tailwind theme generated from them,
+then `<PrimaryAction>`, `<StopRow>`, `<AdSlot>`, marker clustering, the virtualised `<StopList>`,
+`<AppMap>`, and the feedback set — `<UndoToast>`, `<StatusChip>`, `<MetricPair>`, `<Skeleton>`,
+`<StateView>`. **699 tests.**
+
+**Three real contrast failures, found by measuring rather than by looking.** The accent recorded
+in [`07_DESIGN_SYSTEM.md`](07_DESIGN_SYSTEM.md) as "darkened to reach 4.5:1" measured 3.00:1
+with a white label, and 2.80:1 against `bg` — below even the 3:1 interface threshold. `danger`
+measured 4.44:1 on its own tinted background. Near enough to pass a glance; not near enough to
+pass the rule. The tokens and the document are both corrected, and the document records what the
+old value actually measured rather than silently showing a new hex.
+
+**`<AppMap>` is where the facade earns itself.** `react-native-maps` is imported in exactly one
+file, and the component decides nothing: clustering, route geometry, stroke style and Map ID
+resolution are pure functions in `lib/map/`, tested without a renderer. What is left in the
+component is driving the SDK — the one part that cannot be unit tested and the one part an Expo
+upgrade breaks. That is risk C6 reduced to a single file.
+
+**Two specification gaps the components found.** The wave-4c clusterer had no notion of
+selection, while [`14_GOOGLE_MAPS_INTEGRATION.md`](14_GOOGLE_MAPS_INTEGRATION.md) §7 requires
+that a selected stop is never folded into a cluster — the user selected it, and a map that
+answers by hiding it has not answered. And the undo window had no documented duration anywhere,
+so one is now decided and recorded in [`06_UX_GUIDELINES.md`](06_UX_GUIDELINES.md) rather than
+invented in a component.
+
+**The map's failure states are bounded, not blank.** Offline and load failure both say the same
+thing — the stops, the order and the handoff do not depend on tiles rendering — because that is
+the product's actual behaviour and it is the sentence the user needs. A missing or revoked Map ID
+falls back to Google's default style rather than to a blank map, which is the mitigation risk C15
+promised and which now has a test.
 
 ### How the app is actually tried — decided 2026-08-07
 
