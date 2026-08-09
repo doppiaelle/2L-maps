@@ -26,6 +26,7 @@ const stop = (id: string, position: number): Stop => ({
   label: null,
   note: null,
   position,
+  entryOrder: position,
   coordinate: null,
   isCompleted: false,
 });

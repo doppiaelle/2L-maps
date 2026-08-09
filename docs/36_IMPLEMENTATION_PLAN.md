@@ -113,7 +113,7 @@ and this document inherits that. No re-statement of any requirement, schema or b
 | 4e | `feat/w4e-feedback` | `<UndoToast>`, `<StatusChip>`, `<MetricPair>`, `<Skeleton>`, `<StateView>` | §6 W4 | ✅ |
 | 5a | `feat/w5-screens` | Router tree, guards, deep links, restoration, sign-in | §6 W5 | ✅ |
 | 5b | `feat/w5b-plan` | The sheet, the plan state machine, `<PlanView>` | §6 W5 | ✅ |
-| 5c | `feat/w5c-data` | Query hooks, Plan's data wiring, the modal contents | §6 W5 | ⏳ |
+| 5c | `feat/w5c-data` | Stored-shape fix, query hooks, Plan's data wiring, the modal contents | §6 W5 | 🔵 |
 | 6 | `feat/w6-delivery` | EAS, Fastlane, CI, store preparation | §6 W6 | ⏳ |
 | 7 | `docs/go-live-runbook` | **Go-live runbook** — every external account, key and limit, step by step | §6 W7 | ⏳ |
 
@@ -494,6 +494,35 @@ the correct architecture, `place_id` being the durable key and the address arriv
 cached places query (ADR-0007, ADR-0008). That join is a React Query hook that does not exist
 yet, and faking it in the screen would have made the tests describe something the product does
 not do.
+
+### The stored shape corrected — recorded 2026-08-09
+
+The inconsistency wave 5b recorded is fixed, and fixing it turned up a second one
+underneath it.
+
+**`Stop.entryOrder` now exists**, matching `stops.entry_order`, which the schema has always
+had ([`12_DATABASE.md`](12_DATABASE.md)). `DraftRoute.isOptimized` joins it, because comparing
+the current order to the entry order cannot answer the question on its own: an optimization that
+changes nothing is a real and common outcome, and it has to be reported as an answer rather than
+as "no optimization has happened". Every structural edit clears the flag; a relabel does not.
+Setting a new origin clears it too — which stop is nearest depends on where the user starts.
+
+**The second one: `formatted_address` is purged with the coordinates.** The schema says so —
+"Google-derived, same rule" — and the purge job nulls it alongside `lat` and `lng`. So a saved
+route older than thirty days arrives holding a `place_id`, the user's own label, and no address
+at all. `<StopRow>` required an address string, which means that row would have rendered an
+empty line. It is now nullable through the row and the list: the user's label carries the row
+when there is one, and when there is not, the row says the address needs refreshing rather than
+showing nothing. ADR-0007's "never assume a coordinate is present" applies to the address the
+cache carried with it.
+
+**The persisted draft is versioned and migrated.** Nothing has shipped, so no user is affected —
+but a store whose shape changed and whose contents live on the device needs the migration anyway
+(`CLAUDE.md` §11), and a dev build with a stored draft would otherwise sort stops by `undefined`.
+The migration validates as it reads: a draft written before `entryOrder` had exactly one order,
+so its positions become its entry order, and `isOptimized` is never assumed true — an old draft
+cannot prove an optimization produced its order, and claiming one would put "Already the fastest
+order" on a list the user typed themselves.
 
 ### How the app is actually tried — decided 2026-08-07
 

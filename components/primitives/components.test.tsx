@@ -224,3 +224,43 @@ describe('an empty slot is layout, not content', () => {
     expect(screen.getByTestId('ad-slot').props.accessibilityElementsHidden).toBe(false);
   });
 });
+
+describe('a stop whose address has been purged', () => {
+  // `formatted_address` is Google-derived and is purged on the same 30-day rule
+  // as the coordinates (docs/12_DATABASE.md), so an old saved route arrives
+  // holding only a `place_id` and whatever the user called it.
+
+  it('is carried by the user’s own label, which never expires', () => {
+    render(
+      <StopRow
+        position={1}
+        address={null}
+        label="Warehouse"
+        state="pending"
+        hasCoordinate={false}
+        meta={null}
+        onPress={() => undefined}
+      />,
+    );
+
+    expect(screen.getByText('Warehouse')).toBeTruthy();
+  });
+
+  it('says so plainly when there is no label either', () => {
+    // An empty line reads as a bug in the list rather than as a stop that needs
+    // re-resolving.
+    render(
+      <StopRow
+        position={1}
+        address={null}
+        label={null}
+        state="pending"
+        hasCoordinate={false}
+        meta={null}
+        onPress={() => undefined}
+      />,
+    );
+
+    expect(screen.getAllByText('Address needs refreshing').length).toBeGreaterThan(0);
+  });
+});

@@ -33,7 +33,10 @@ import { LIST_VIRTUALISATION_THRESHOLD } from '@/types';
 export interface StopListItem {
   readonly id: string;
   readonly position: number;
-  readonly address: string;
+  /** Null once the 30-day purge has taken it with the coordinates
+   *  (docs/12_DATABASE.md). The row still renders — the user's label carries it,
+   *  or it says the address needs refreshing. */
+  readonly address: string | null;
   readonly label: string | null;
   readonly state: StopState;
   readonly hasCoordinate: boolean;

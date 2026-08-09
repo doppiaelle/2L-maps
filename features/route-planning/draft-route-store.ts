@@ -75,6 +75,58 @@ export const DRAFT_ROUTE_STORAGE_KEY = 'draft-route';
  *  storage is chosen once, at composition, rather than imported here. */
 export type DraftStorage = PersistStorage<Pick<DraftRouteState, 'draft'>>;
 
+/**
+ * Bumped whenever the persisted draft's shape changes.
+ *
+ * Version 1 adds `entryOrder` to each stop and `isOptimized` to the draft. A
+ * stored draft written before them is not corrupt — it is simply short of two
+ * fields, and reading it without filling them would sort stops by `undefined`
+ * and claim an order nobody optimized.
+ */
+export const DRAFT_SCHEMA_VERSION = 1;
+
+/**
+ * Fill in what an older stored draft is missing.
+ *
+ * Returns `unknown` in, typed state out, and validates as it goes: persisted
+ * data is a boundary like any other (`CLAUDE.md` §3), and this one is under the
+ * user's own filesystem rather than ours. Anything unreadable falls back to an
+ * empty draft — losing an old draft is bad, and restoring a broken one into the
+ * screen the user works in is worse.
+ */
+export function migrateDraft(persisted: unknown, _version: number): { draft: DraftRoute } {
+  const draft = (persisted as { draft?: unknown } | null)?.draft;
+  // `emptyDraft('draft')` matches the store's own initial value: the id is
+  // replaced by `reset` the moment a real route is opened, and inventing a
+  // different one here would make an unreadable draft look like a saved route.
+  if (draft === null || typeof draft !== 'object') return { draft: emptyDraft('draft') };
+
+  const shaped = draft as Partial<DraftRoute> & { stops?: unknown };
+  const stops = Array.isArray(shaped.stops) ? (shaped.stops as Partial<Stop>[]) : [];
+
+  return {
+    draft: {
+      routeId: typeof shaped.routeId === 'string' ? shaped.routeId : 'draft',
+      originPlaceId: typeof shaped.originPlaceId === 'string' ? shaped.originPlaceId : null,
+      originIsCurrentLocation: shaped.originIsCurrentLocation !== false,
+      shape: shaped.shape === 'round-trip' ? 'round-trip' : 'one-way',
+      // A draft written before `entryOrder` existed had exactly one order, so
+      // its current positions *are* its entry order. Defaulting to the index is
+      // the only answer that cannot invent history.
+      stops: stops.map((stop, index) => ({
+        ...(stop as Stop),
+        position: index,
+        entryOrder: typeof stop.entryOrder === 'number' ? stop.entryOrder : index,
+      })),
+      // Never assumed true: an old draft cannot prove an optimization produced
+      // its order, and claiming one would put "Already the fastest order" on a
+      // list the user typed themselves.
+      isOptimized: shaped.isOptimized === true,
+      isDegraded: shaped.isDegraded === true,
+    },
+  };
+}
+
 export function createDraftRouteStore(storage?: DraftStorage) {
   return create<DraftRouteState>()(
     persist(
@@ -147,7 +199,8 @@ export function createDraftRouteStore(storage?: DraftStorage) {
               originPlaceId: placeId,
               originIsCurrentLocation: isCurrentLocation,
               // A new origin invalidates the order: which stop is nearest depends
-              // on where the user starts.
+              // on where the user starts. Both flags go, not just the label.
+              isOptimized: false,
               isDegraded: false,
             },
           });
@@ -171,6 +224,8 @@ export function createDraftRouteStore(storage?: DraftStorage) {
         // not state: restoring them would show the user a toast for something
         // they did before the app was killed.
         partialize: (state) => ({ draft: state.draft }),
+        version: DRAFT_SCHEMA_VERSION,
+        migrate: migrateDraft,
       },
     ),
   );

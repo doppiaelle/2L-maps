@@ -32,8 +32,19 @@ export interface Stop {
   /** User-authored. User content, stored indefinitely. */
   readonly label: string | null;
   readonly note: string | null;
-  /** Zero-based position in the route as the user arranged it. */
+  /** Zero-based position in the route as it currently stands. After an
+   *  optimization this is the optimized order. */
   readonly position: number;
+  /**
+   * Zero-based position as the user originally entered it, preserved across
+   * optimization.
+   *
+   * Mirrors `stops.entry_order` in the schema (docs/12_DATABASE.md), which has
+   * always had both. Without it nothing can distinguish an order the user typed
+   * from one the optimizer produced — and that distinction is what "Already the
+   * fastest order" and the renumbering animation both rest on.
+   */
+  readonly entryOrder: number;
   /** Null whenever the cache has expired or was never populated (ADR-0007). */
   readonly coordinate: CoordinateCache | null;
   readonly isCompleted: boolean;

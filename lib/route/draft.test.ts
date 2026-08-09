@@ -11,6 +11,7 @@ import {
   removeStop,
   restoreStop,
   setShape,
+  wasAlreadyOptimal,
 } from './draft';
 
 /**
@@ -25,6 +26,7 @@ const stop = (id: string, placeId = `place-${id}`): Stop => ({
   label: null,
   note: null,
   position: 0,
+  entryOrder: 0,
   coordinate: null,
   isCompleted: false,
 });
@@ -222,5 +224,98 @@ describe('immutability', () => {
 
     expect(ids(before)).toEqual(snapshot);
     expect(before.isDegraded).toBe(false);
+  });
+});
+
+describe('an order the optimizer left alone', () => {
+  const withStops = (count: number) => {
+    let draft = emptyDraft('route-1');
+    for (let i = 0; i < count; i += 1) {
+      const result = addStop(draft, stop(`s${i}`));
+      if (!result.ok) throw new Error('expected the stop to be added');
+      draft = result.draft;
+    }
+    return draft;
+  };
+
+  it('is not claimed before any optimization has happened', () => {
+    // "Already the fastest order" is an answer. Saying it about an order nobody
+    // has checked would be a claim we cannot support.
+    expect(wasAlreadyOptimal(withStops(3))).toBe(false);
+  });
+
+  it('is reported when the result returns the same order', () => {
+    // A real and common outcome, and the user paid for it — so it is an answer,
+    // not the absence of one (docs/08_SCREEN_SPECIFICATIONS.md §7).
+    const applied = applyOptimizedOrder(withStops(3), ['s0', 's1', 's2'], false);
+    expect(applied.isOptimized).toBe(true);
+    expect(wasAlreadyOptimal(applied)).toBe(true);
+  });
+
+  it('is not reported when the result reorders anything', () => {
+    const applied = applyOptimizedOrder(withStops(3), ['s2', 's0', 's1'], false);
+    expect(wasAlreadyOptimal(applied)).toBe(false);
+  });
+
+  it('keeps the entry order through an optimization', () => {
+    // It is what the current order is measured against; renumbering it would
+    // make every order look original.
+    const applied = applyOptimizedOrder(withStops(3), ['s2', 's0', 's1'], false);
+    const entryOrders = applied.stops.map((s) => `${s.id}:${s.entryOrder}`);
+    expect(entryOrders).toEqual(['s2:2', 's0:0', 's1:1']);
+  });
+});
+
+describe('what a hand edit does to an optimization', () => {
+  const optimized = () => {
+    let draft = emptyDraft('route-1');
+    for (const id of ['a', 'b', 'c']) {
+      const result = addStop(draft, stop(id));
+      if (!result.ok) throw new Error('expected the stop to be added');
+      draft = result.draft;
+    }
+    return applyOptimizedOrder(draft, ['c', 'a', 'b'], false);
+  };
+
+  it('is discarded by adding a stop', () => {
+    // The optimizer's answer described a route that no longer exists.
+    const result = addStop(optimized(), stop('d'));
+    expect(result.ok && result.draft.isOptimized).toBe(false);
+  });
+
+  it('is discarded by removing one', () => {
+    const result = removeStop(optimized(), 'a');
+    expect(result.ok && result.draft.isOptimized).toBe(false);
+  });
+
+  it('is discarded by a hand reorder', () => {
+    const result = moveStop(optimized(), 0, 2);
+    expect(result.ok && result.draft.isOptimized).toBe(false);
+  });
+
+  it('survives a relabel, which changes no order', () => {
+    const result = labelStop(optimized(), 'a', 'Warehouse');
+    expect(result.ok && result.draft.isOptimized).toBe(true);
+  });
+});
+
+describe('entry order after a removal', () => {
+  it('never gives two stops the same entry position', () => {
+    // Derived from the highest so far rather than from the length, so removing
+    // a stop and adding another cannot collide.
+    let draft = emptyDraft('route-1');
+    for (const id of ['a', 'b']) {
+      const added = addStop(draft, stop(id));
+      if (!added.ok) throw new Error('expected the stop to be added');
+      draft = added.draft;
+    }
+    const removed = removeStop(draft, 'a');
+    if (!removed.ok) throw new Error('expected the stop to be removed');
+
+    const added = addStop(removed.draft, stop('c'));
+    if (!added.ok) throw new Error('expected the stop to be added');
+
+    const orders = added.draft.stops.map((s) => s.entryOrder);
+    expect(new Set(orders).size).toBe(orders.length);
   });
 });

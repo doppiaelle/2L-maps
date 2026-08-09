@@ -13,17 +13,24 @@ import { layout } from '@/lib/design/tokens';
  * single most common way a list stops being usable for them.
  *
  * **A missing coordinate is shown, not hidden.** Coordinates expire at 30 days
- * by design ([ADR-0007](../../docs/adr/0007-place-id-durable-coordinates-perishable.md)),
- * and a stop whose coordinate has gone still has its address and its `place_id`.
+ * by design ([ADR-0007](../../docs/adr/0007-place-id-durable-coordinates-perishable.md)).
  * Hiding that would leave the user to discover it at the moment Waze refuses the
  * handoff — in the van, mid-route.
+ *
+ * **The address can be absent, and the row still has to say something useful.**
+ * `formatted_address` is Google-derived and is purged on the same 30-day rule as
+ * the coordinates ([`docs/12_DATABASE.md`](../../docs/12_DATABASE.md)), so an old
+ * saved route arrives holding only a `place_id` and whatever the user called it.
+ * The user's own label survives indefinitely and carries the row when it does;
+ * when there is neither, the row says so rather than rendering an empty line.
  */
 
 export type StopState = 'pending' | 'completed' | 'skipped' | 'unreachable';
 
 export interface StopRowProps {
   readonly position: number;
-  readonly address: string;
+  /** Null once the 30-day purge has taken it with the coordinates. */
+  readonly address: string | null;
   /** User-authored, and shown above the address when present. */
   readonly label: string | null;
   readonly state: StopState;
@@ -57,7 +64,11 @@ export function StopRow({
   testID,
 }: StopRowProps): React.JSX.Element {
   const presentation = PRESENTATION[state];
-  const title = label ?? address;
+  // The user's own words first, then Google's, then an honest admission. A row
+  // that renders an empty line for a purged address looks like a bug in the list
+  // rather than a stop that needs re-resolving.
+  const title = label ?? address ?? 'Address needs refreshing';
+  const subtitle = label !== null ? address : null;
 
   return (
     <Pressable
@@ -101,9 +112,9 @@ export function StopRow({
           </Text>
         </View>
 
-        {label !== null && (
+        {subtitle !== null && (
           <Text className="text-caption text-text-secondary" numberOfLines={2}>
-            {address}
+            {subtitle}
           </Text>
         )}
 

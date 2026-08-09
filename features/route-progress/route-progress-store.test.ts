@@ -15,6 +15,7 @@ const stop = (id: string, position = 0): Stop => ({
   label: null,
   note: null,
   position,
+  entryOrder: position,
   coordinate: {
     latitude: 45.7,
     longitude: 9.7,

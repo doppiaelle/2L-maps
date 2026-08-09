@@ -21,6 +21,18 @@ export interface DraftRoute {
   /** In the order the user arranged them. After optimization this is the
    *  optimized order; `entryOrder` on each stop preserves the original. */
   readonly stops: readonly Stop[];
+  /**
+   * True when the current order came from an optimization.
+   *
+   * Separate from comparing the order to `entryOrder`, because an optimization
+   * that changes nothing is a real and common outcome — the user's order was
+   * already the fastest — and it has to be reported as an answer rather than as
+   * "no optimization has happened".
+   *
+   * Cleared by every structural edit, since a hand reorder replaces the
+   * optimizer's answer with the user's own.
+   */
+  readonly isOptimized: boolean;
   /** True when the current order came from a T0 result, so the UI keeps saying
    *  so for as long as that order is on screen (CLAUDE.md §7 rule 6). */
   readonly isDegraded: boolean;
@@ -33,6 +45,7 @@ export function emptyDraft(routeId: string): DraftRoute {
     originIsCurrentLocation: true,
     shape: 'one-way',
     stops: [],
+    isOptimized: false,
     isDegraded: false,
   };
 }
@@ -48,7 +61,13 @@ export type DraftResult =
 /** Renumber positions so they stay contiguous from zero after any structural
  *  edit. A gap is invisible until something renders by index and skips a row. */
 function renumber(stops: readonly Stop[]): readonly Stop[] {
+  // `entryOrder` is deliberately untouched: it is what the current order is
+  // measured against, and renumbering it would make every order look original.
   return stops.map((stop, index) => ({ ...stop, position: index }));
+}
+
+function nextEntryOrder(stops: readonly Stop[]): number {
+  return stops.reduce((highest, stop) => Math.max(highest, stop.entryOrder), -1) + 1;
 }
 
 /**
@@ -67,9 +86,14 @@ export function addStop(draft: DraftRoute, stop: Stop): DraftResult {
     ok: true,
     draft: {
       ...draft,
-      stops: renumber([...draft.stops, stop]),
+      // Entry order is assigned here rather than by the caller: only the draft
+      // knows what has been entered before. Derived from the highest so far, not
+      // from the length, so removing a stop and adding another cannot produce
+      // two stops claiming the same entry position.
+      stops: renumber([...draft.stops, { ...stop, entryOrder: nextEntryOrder(draft.stops) }]),
       // The order is no longer the one the optimizer produced, so the result no
       // longer describes this route.
+      isOptimized: false,
       isDegraded: false,
     },
   };
@@ -103,7 +127,7 @@ export function removeStop(
   const stops = draft.stops.filter((stop) => stop.id !== stopId);
   return {
     ok: true,
-    draft: { ...draft, stops: renumber(stops), isDegraded: false },
+    draft: { ...draft, stops: renumber(stops), isOptimized: false, isDegraded: false },
     removed,
     atIndex,
   };
@@ -134,9 +158,9 @@ export function moveStop(draft: DraftRoute, fromIndex: number, toIndex: number):
 
   return {
     ok: true,
-    // A hand reorder replaces the optimizer's order, so the degraded label goes
-    // with it — the label described an order that no longer exists.
-    draft: { ...draft, stops: renumber(stops), isDegraded: false },
+    // A hand reorder replaces the optimizer's order, so both flags go with it —
+    // they described an order that no longer exists.
+    draft: { ...draft, stops: renumber(stops), isOptimized: false, isDegraded: false },
   };
 }
 
@@ -181,14 +205,14 @@ export function applyOptimizedOrder(
   // Whatever the result did not mention keeps its relative order at the end.
   ordered.push(...byId.values());
 
-  return { ...draft, stops: renumber(ordered), isDegraded };
+  return { ...draft, stops: renumber(ordered), isOptimized: true, isDegraded };
 }
 
 /** Toggling round trip invalidates any cached result: the optimal order genuinely
  *  differs between the two (docs/15_ROUTE_OPTIMIZATION.md). */
 export function setShape(draft: DraftRoute, shape: RouteShape): DraftRoute {
   if (shape === draft.shape) return draft;
-  return { ...draft, shape, isDegraded: false };
+  return { ...draft, shape, isOptimized: false, isDegraded: false };
 }
 
 export type DraftReadiness =
@@ -210,4 +234,20 @@ export function readiness(draft: DraftRoute): DraftReadiness {
 /** How many more stops fit. Shown as the limit approaches, not once it is hit. */
 export function remainingCapacity(draft: DraftRoute): number {
   return Math.max(0, MAX_STOPS - draft.stops.length);
+}
+
+/**
+ * Whether the optimizer looked at this order and left it alone.
+ *
+ * Only meaningful once `isOptimized` is true. It is a *result*, not the absence
+ * of one — "Already the fastest order" is the answer the user paid for, and
+ * showing nothing instead would read as the optimization having failed
+ * (docs/08_SCREEN_SPECIFICATIONS.md §7).
+ */
+export function wasAlreadyOptimal(draft: DraftRoute): boolean {
+  if (!draft.isOptimized) return false;
+  return draft.stops.every((stop, index) => {
+    const asEntered = [...draft.stops].sort((a, b) => a.entryOrder - b.entryOrder)[index];
+    return asEntered?.id === stop.id;
+  });
 }

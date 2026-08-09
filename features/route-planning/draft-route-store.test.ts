@@ -1,6 +1,6 @@
 import type { Stop } from '@/types';
 
-import { createDraftRouteStore, memoryDraftStorage } from './draft-route-store';
+import { createDraftRouteStore, memoryDraftStorage, migrateDraft } from './draft-route-store';
 
 /**
  * The store's job is to hold state and expose actions. The rules it enforces are
@@ -15,6 +15,7 @@ const stop = (id: string): Stop => ({
   label: null,
   note: null,
   position: 0,
+  entryOrder: 0,
   coordinate: null,
   isCompleted: false,
 });
@@ -205,5 +206,91 @@ describe('reset', () => {
     expect(store.getState().draft.stops).toEqual([]);
     expect(store.getState().undoable).toBeNull();
     expect(store.getState().lastRefusal).toBeNull();
+  });
+});
+
+describe('reading a draft written by an older build', () => {
+  // Persisted data is a boundary like any other (CLAUDE.md §3), and this one
+  // sits on the user's own filesystem rather than ours.
+
+  it('gives every stop an entry order when the stored draft has none', () => {
+    // A draft written before `entryOrder` existed had exactly one order, so its
+    // positions *are* its entry order. Any other default invents history.
+    const migrated = migrateDraft(
+      {
+        draft: {
+          routeId: 'route-1',
+          originPlaceId: null,
+          originIsCurrentLocation: true,
+          shape: 'one-way',
+          stops: [
+            {
+              id: 'a',
+              placeId: 'p-a',
+              label: null,
+              note: null,
+              position: 0,
+              coordinate: null,
+              isCompleted: false,
+            },
+            {
+              id: 'b',
+              placeId: 'p-b',
+              label: null,
+              note: null,
+              position: 1,
+              coordinate: null,
+              isCompleted: false,
+            },
+          ],
+          isDegraded: false,
+        },
+      },
+      0,
+    );
+
+    expect(migrated.draft.stops.map((stop) => stop.entryOrder)).toEqual([0, 1]);
+  });
+
+  it('never claims an old draft was optimized', () => {
+    // It cannot prove it, and claiming one would put "Already the fastest order"
+    // on a list the user typed themselves.
+    const migrated = migrateDraft({ draft: { routeId: 'r', stops: [] } }, 0);
+    expect(migrated.draft.isOptimized).toBe(false);
+  });
+
+  it('falls back to an empty draft rather than restoring nonsense', () => {
+    // Losing an old draft is bad; restoring a broken one into the screen the
+    // user works in is worse.
+    for (const stored of [null, undefined, { draft: 'not an object' }, {}]) {
+      expect(migrateDraft(stored, 0).draft.stops).toEqual([]);
+    }
+  });
+
+  it('keeps an entry order that was already stored', () => {
+    const migrated = migrateDraft(
+      {
+        draft: {
+          routeId: 'route-1',
+          stops: [
+            {
+              id: 'a',
+              placeId: 'p-a',
+              label: null,
+              note: null,
+              position: 0,
+              entryOrder: 2,
+              coordinate: null,
+              isCompleted: false,
+            },
+          ],
+          isOptimized: true,
+        },
+      },
+      1,
+    );
+
+    expect(migrated.draft.stops[0]?.entryOrder).toBe(2);
+    expect(migrated.draft.isOptimized).toBe(true);
   });
 });
