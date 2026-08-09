@@ -1,0 +1,67 @@
+name: e2e
+
+# Maestro against an emulator, running the three journeys of
+# docs/03_USER_JOURNEYS.md.
+#
+# **Not yet enabled on merge**, and the reason is honest rather than temporary:
+# these flows have never been run, because this project has had no device or
+# emulator to run them on (ADR-0014). A workflow that has never passed must not
+# be allowed to fail a merge — a red build nobody trusts is worse than no build,
+# because it teaches everyone to merge through red.
+#
+# It runs on demand so the first person with hardware can prove it, and the
+# `push` trigger goes in as part of that same change.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  maestro:
+    name: journeys on an emulator
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - run: npm ci
+
+      - name: Prebuild Android
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Build the debug APK
+        run: ./android/gradlew -p android assembleDebug
+
+      - name: Install Maestro
+        run: |
+          curl -Ls https://get.maestro.mobile.dev | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+
+      - name: Run the journeys
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          # Hardware acceleration off is slow and reliable; on is fast and flaky
+          # on hosted runners, and a flaky E2E suite is one nobody reads.
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: |
+            adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+            maestro test .maestro/
+
+      - name: Upload the recordings
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maestro-output
+          path: ~/.maestro/tests
+          retention-days: 7

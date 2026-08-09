@@ -1,0 +1,27 @@
+# J2 — an optimization that comes back degraded.
+#
+# The rule under test is the one the product's honesty rests on: a T0 result
+# never looks like a T1 result (CLAUDE.md §7 rule 6). Run with the device in
+# aeroplane mode after the stops are entered, so the local solver answers.
+appId: com.doppiaelle.twolmaps
+---
+- launchApp:
+    clearState: true
+
+- tapOn:
+    id: 'plan-add-stop'
+- inputText: 'Via Roma'
+- tapOn:
+    id: 'add-stop-option'
+- tapOn:
+    id: 'plan-add-stop'
+- inputText: 'Piazza Vecchia'
+- tapOn:
+    id: 'add-stop-option'
+
+# Cut the network here, by hand or with `adb shell svc data disable`.
+- tapOn:
+    id: 'plan-action'
+
+# The label is the assertion. Its absence is the defect this flow exists for.
+- assertVisible: 'Estimated without traffic'

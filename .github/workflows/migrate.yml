@@ -1,0 +1,63 @@
+name: migrate
+
+# Applies database migrations and regenerates the TypeScript types from the live
+# schema (docs/25_DEPLOYMENT.md §7).
+#
+# Deliberately manual. A migration that runs automatically on merge is a
+# migration that runs while somebody is asleep, and this schema carries a purge
+# job and RLS policies whose failure mode is silent
+# (docs/12_DATABASE.md). The gate is a person, and this workflow is the lever.
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Which project to migrate
+        required: true
+        type: choice
+        options: [staging, production]
+
+concurrency:
+  # Never two migrations against one project. A partially applied schema is the
+  # one state neither the app nor a rollback can reason about.
+  group: migrate-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    name: apply migrations
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Push migrations
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: supabase db push --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}"
+
+      - name: Regenerate database types
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          supabase gen types typescript \
+            --project-id "${{ secrets.SUPABASE_PROJECT_REF }}" \
+            > types/database.generated.ts
+
+      # Types are generated, never hand-written (CLAUDE.md §3). A diff here means
+      # the schema moved without the repository following, which is exactly the
+      # drift that makes a "typed" client a lie.
+      - name: Fail if the generated types are out of date
+        run: git diff --exit-code types/database.generated.ts

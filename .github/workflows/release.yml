@@ -1,0 +1,63 @@
+name: release
+
+# The production build and its submission (docs/25_DEPLOYMENT.md §7).
+#
+# **Manual, and gated on a person.** The product owner decides when a release
+# happens; a tag that ships itself removes the one moment where somebody reads
+# the changelog and the App Store guidelines before a paywall change goes out
+# (CLAUDE.md §13 rule 7).
+#
+# Android only. macOS runners bill at 10×, which would turn 2,000 free minutes
+# into roughly 200 effective ones (docs/31_COST_MODEL.md) — one reason iOS is
+# deferred rather than merely unverified.
+
+on:
+  workflow_dispatch:
+    inputs:
+      track:
+        description: Play track to submit to
+        required: true
+        type: choice
+        options: [internal, alpha, beta, production]
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: production build and submit
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Release notes come from the changelog, which needs history.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # The same gate as every push. A release that skips it is a release that
+      # ships whatever the last merge happened to leave behind.
+      - name: Verify
+        run: npm run verify
+
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Build
+        run: eas build --platform android --profile production --non-interactive --wait
+
+      - name: Submit
+        run: |
+          eas submit --platform android --profile production --non-interactive \
+            --what-to-submit latest
+        env:
+          EAS_SUBMIT_ANDROID_TRACK: ${{ inputs.track }}

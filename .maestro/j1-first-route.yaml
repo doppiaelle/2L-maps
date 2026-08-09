@@ -1,0 +1,41 @@
+# J1 — a first route, from nothing to a handoff.
+#
+# The journey the three-tap guarantee is measured against
+# (docs/03_USER_JOURNEYS.md, CLAUDE.md §7 rule 1). The tap count is asserted by
+# the flow's own shape: every `tapOn` between launch and `Start` is one of them.
+appId: com.doppiaelle.twolmaps
+---
+- launchApp:
+    clearState: true
+
+# Tap 1 — add a stop.
+- assertVisible:
+    id: 'plan-screen'
+- tapOn:
+    id: 'plan-add-stop'
+- assertVisible:
+    id: 'add-stop-input'
+- inputText: 'Via Roma'
+- assertVisible:
+    id: 'add-stop-option'
+- tapOn:
+    id: 'add-stop-option'
+
+# A second stop, because one stop is not a route.
+- tapOn:
+    id: 'plan-add-stop'
+- inputText: 'Piazza Vecchia'
+- tapOn:
+    id: 'add-stop-option'
+
+# Tap 2 — optimize. The control says what it will do before it does it.
+- assertVisible: 'Optimize'
+- tapOn:
+    id: 'plan-action'
+
+# Tap 3 — start. The label having changed is the proof the result landed.
+- assertVisible: 'Start'
+- tapOn:
+    id: 'plan-action'
+# The boundary. What happens after this is Google Maps, and Maestro cannot see
+# inside it — that verification is a human with a phone.

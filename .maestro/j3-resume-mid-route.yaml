@@ -1,0 +1,38 @@
+# J3 — a route resumed after the process died.
+#
+# The one piece of state this product cannot reconstruct
+# (docs/10_NAVIGATION_FLOW.md §9, row 1). Kill the app mid-route and it must come
+# back to the same stop, with no intermediate render of an empty Plan.
+appId: com.doppiaelle.twolmaps
+---
+- launchApp:
+    clearState: true
+
+- tapOn:
+    id: 'plan-add-stop'
+- inputText: 'Via Roma'
+- tapOn:
+    id: 'add-stop-option'
+- tapOn:
+    id: 'plan-add-stop'
+- inputText: 'Piazza Vecchia'
+- tapOn:
+    id: 'add-stop-option'
+- tapOn:
+    id: 'plan-action'
+- tapOn:
+    id: 'plan-action'
+
+# Back from the navigation app, mark the first stop.
+- launchApp
+- assertVisible: 'Done'
+- tapOn:
+    id: 'plan-action'
+
+# Kill it outright, not background it.
+- stopApp
+- launchApp
+
+# The route is still underway, at the stop it was left at. "STOP 2 OF 2" rather
+# than an empty Plan is the whole assertion.
+- assertVisible: 'Done'
