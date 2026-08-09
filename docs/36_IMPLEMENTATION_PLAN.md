@@ -555,6 +555,28 @@ offline story ([ADR-0008](adr/0008-offline-scope.md)) — and a test that does n
 holds the suite open long after its assertions pass. And a test that leaves a request in flight
 waits out the client's own ten-second timeout. Both looked like a hanging suite and neither was.
 
+### Plan wired to real data — recorded 2026-08-09
+
+`buildPlanRows` performs the join the product rests on, and Plan now reads it. **857 tests.**
+
+**Which coordinate wins is a domain rule, and it cuts both ways.** A fresh cached coordinate
+beats a round trip — the map draws on the first frame instead of waiting for the network — and a
+freshly resolved one beats a stale cache, because drawing a driver's route from month-old data is
+the failure ADR-0007 exists to prevent. Preferring either unconditionally is wrong in a way that
+only shows up on somebody's working day.
+
+**Only expired place ids are asked about**, deduplicated. Asking for all of them on every launch
+is a billed batch for data already held, and the same address twice in a day — a morning delivery
+and an afternoon collection — is one lookup.
+
+**A stop's state comes from progress, never from its stored flag.** `isCompleted` is what the
+server last saw; the progress store is what happened since, including the marks made with no
+signal at all.
+
+**The draft shows a straight-line distance and no duration.** A number is more useful than a
+blank, and `<RouteSummaryHeader>` labels it as an estimate — but a straight-line *time* would be
+a road estimate we did not make, so there isn't one.
+
 ### How the app is actually tried — decided 2026-08-07
 
 Recorded because it changed the shape of several documents, and because my first answer on it was

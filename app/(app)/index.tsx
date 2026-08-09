@@ -1,45 +1,124 @@
+import { router } from 'expo-router';
 import { useEffect } from 'react';
-import { Text, View } from 'react-native';
+import { useColorScheme, useWindowDimensions } from 'react-native';
 
 import { usePendingDeepLinkContext } from '@/features/navigation/deep-link-provider';
 import { useLaunchDestination } from '@/features/navigation/use-launch-destination';
-import { useRouteProgressStore } from '@/features/stores';
-import { MAX_STOPS } from '@/types';
+import { useResolvedPlaces } from '@/features/places/use-resolved-places';
+import { useOptimizeAvailability, useUsageQuota } from '@/features/quota/use-usage-quota';
+import { PlanView } from '@/features/route-planning/PlanView';
+import { useOptimizeRoute } from '@/features/route-planning/use-optimize-route';
+import { useDraftRouteStore, useRouteProgressStore, useUiStore } from '@/features/stores';
+import { readMapIds } from '@/lib/config/map-ids';
+import { formatDistance } from '@/lib/format/units';
+import { buildPlanRows, placeIdsToResolve, straightLineMeters } from '@/lib/route/plan-rows';
+import { actionIntentOf, planStateOf } from '@/lib/route/plan-state';
+import { summarise } from '@/lib/route/progress';
 
 /**
- * Plan — the primary screen ([`docs/08_SCREEN_SPECIFICATIONS.md`](../../docs/08_SCREEN_SPECIFICATIONS.md) §7).
+ * Plan — the primary screen.
  *
- * **It is never navigated to.** It is the root of the signed-in group, and every
- * other surface in the product is a modal over it — which is what makes the
- * three-tap guarantee reachable at all (`CLAUDE.md` §7 rule 1). A transition on
- * the critical path would spend one of those three taps on movement.
+ * **Composition only** (`CLAUDE.md` §1). Every decision visible on this file's
+ * surface is imported: `buildPlanRows` performs the join, `planStateOf` says
+ * which of the eleven states this is, `actionIntentOf` says what the control
+ * offers, `optimizeAvailability` says on what terms. What is left is reading and
+ * handing over.
  *
- * The map and the sheet land in wave 5b; what is wired here is the launch
- * decision, which is what everything above it depends on.
+ * **It is never navigated to.** It is the root of the signed-in group and
+ * everything else is a modal over it, which is what makes three taps to an
+ * optimized route reachable at all (`CLAUDE.md` §7 rule 1).
  */
 export default function PlanScreen(): React.JSX.Element {
+  const { height } = useWindowDimensions();
+  const scheme = useColorScheme();
+
   const pending = usePendingDeepLinkContext();
-  const hasRouteInProgress = useRouteProgressStore((state) => state.progress !== null);
+  const draft = useDraftRouteStore((store) => store.draft);
+  const progress = useRouteProgressStore((store) => store.progress);
+  const detent = useUiStore((store) => store.detent);
+  const setDetent = useUiStore((store) => store.setDetent);
+  const selectedStopId = useUiStore((store) => store.selectedStopId);
+  const selectStop = useUiStore((store) => store.selectStop);
+  const clearSelection = useUiStore((store) => store.clearSelection);
 
   const destination = useLaunchDestination({
     isStoreHydrated: true,
-    hasRouteInProgress,
+    hasRouteInProgress: progress !== null,
     pendingDeepLink: pending.target,
   });
 
   useEffect(() => {
-    // Cleared once honoured. Leaving it set would re-open the same route every
-    // time this screen re-renders, including after the user navigated away from
-    // it deliberately.
+    // Cleared once honoured. Leaving it set would re-open the same route on
+    // every render, including after the user navigated away deliberately.
     if (destination.kind === 'plan' && destination.mode === 'opened-route') pending.clear();
   }, [destination, pending]);
 
+  // One `now` for the whole render, so a stop cannot be judged fresh in the list
+  // and expired on the map because the clock moved between two calls.
+  const now = new Date();
+
+  const places = useResolvedPlaces(placeIdsToResolve(draft.stops, now));
+  const { rows, markers } = buildPlanRows({
+    stops: draft.stops,
+    resolved: places.byPlaceId,
+    progress,
+    now,
+  });
+
+  const quota = useUsageQuota();
+  const availability = useOptimizeAvailability(draft.stops.length, quota);
+  const { optimize, isOptimizing, failure } = useOptimizeRoute();
+
+  const completed = progress === null ? 0 : summarise(progress, draft.stops).completed;
+
+  // A straight-line total while the route is only a draft: a number is more
+  // useful than a blank, and `<RouteSummaryHeader>` labels it as an estimate.
+  // No duration to go with it — a straight-line *time* would be a road estimate
+  // we did not make.
+  const metres = straightLineMeters(markers);
+  const distance =
+    metres === null
+      ? null
+      : {
+          value: formatDistance(metres, 'metric'),
+          spoken: `${formatDistance(metres, 'metric')} in a straight line`,
+        };
+
+  const state = planStateOf({
+    isLoading: places.isLoading && draft.stops.length > 0,
+    stopCount: draft.stops.length,
+    completedCount: completed,
+    isRouteUnderway: progress !== null,
+    isOptimizing,
+    hasResult: draft.isOptimized,
+    isDegraded: draft.isDegraded,
+    wasAlreadyOptimal: false,
+    lastFailure: failure === null ? null : failure.kind === 'offline' ? 'offline' : 'upstream',
+  });
+
   return (
-    <View className="flex-1 bg-bg items-center justify-center px-screen-padding">
-      <Text className="text-title-lg text-text-primary">2L Maps</Text>
-      <Text className="text-body text-text-secondary mt-space-2 text-center">
-        Plan a route of up to {MAX_STOPS} stops
-      </Text>
-    </View>
+    <PlanView
+      state={state}
+      intent={actionIntentOf(state, availability)}
+      stops={rows}
+      markers={markers}
+      route={null}
+      distance={distance}
+      duration={null}
+      detent={detent}
+      onDetentChange={setDetent}
+      selectedStopId={selectedStopId}
+      onSelectStop={selectStop}
+      onClearSelection={clearSelection}
+      onPrimaryAction={optimize}
+      onAddStop={() => {
+        router.push('/add-stop');
+      }}
+      theme={scheme === 'dark' ? 'dark' : 'light'}
+      mapIds={readMapIds()}
+      mapStatus="ready"
+      screenHeight={height}
+      testID="plan-screen"
+    />
   );
 }
