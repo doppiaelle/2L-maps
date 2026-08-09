@@ -138,20 +138,31 @@ selected marker and the completed stop. A proposal for a second accent is a prop
 
 | Token | Light | Dark | Use |
 |---|---|---|---|
-| `accent` | `#0FA97E` | `#2FD3A5` | Primary action, active route, selected marker |
-| `accent-pressed` | `#0C8A66` | `#26B98F` | Pressed state |
+| `accent` | `#0A7D5C` | `#2FD3A5` | Primary action, active route, selected marker |
+| `accent-pressed` | `#08694D` | `#26B98F` | Pressed state |
 | `accent-subtle` | `#E6F7F1` | `#12332A` | Accent-tinted backgrounds |
 | `accent-on` | `#FFFFFF` | `#04231A` | Text and icons on an accent fill |
 
 The dark-theme mint is deliberately lighter and more saturated. The light-theme value is
-darkened from the reference to reach 4.5:1 against `surface` — the reference's mint was chosen
-against a dark background and fails contrast on white.
+darkened from the reference — twice.
+
+**Corrected 2026-08-09, and worth recording how.** This table previously read `#0FA97E` with the
+claim that it reached 4.5:1 against `surface`. It reaches **3.00:1**: a white label on it fails
+the text threshold, and as a control it fails even the 3:1 interface threshold against `bg`
+(2.80:1). The claim had been in the document since the palette was written and nothing had ever
+measured it. `lib/design/tokens.test.ts` now computes every ratio from the shipped values, and it
+failed on the first run — which is the only reason this is a correction rather than an
+accessibility defect in a released build.
+
+The values below measure **5.12:1** and **6.69:1** with a white label, and **4.77:1** against
+`bg`. `danger` moved for the same reason: `#D92D20` measured 4.44:1 on `danger-subtle`, close
+enough to pass a glance and not close enough to pass the rule.
 
 ### Semantic — red and support
 
 | Token | Light | Dark | Use |
 |---|---|---|---|
-| `danger` | `#D92D20` | `#FF5C4D` | Errors, destructive actions, unreachable stops |
+| `danger` | `#D0271B` | `#FF5C4D` | Errors, destructive actions, unreachable stops |
 | `danger-subtle` | `#FEF3F2` | `#3A1512` | Error backgrounds |
 | `warning` | `#B54708` | `#F79009` | Degraded results, quota approaching |
 | `info` | `#3538CD` | `#8098F9` | Neutral informational states only |
