@@ -36,7 +36,10 @@ export interface RoutingRequest {
   readonly routeId: string;
   readonly originPlaceId: PlaceId | null;
   readonly originCoordinate: LatLng | null;
-  readonly stopPlaceIds: readonly PlaceId[];
+  /** Each stop's client id alongside its place id. The result names the order
+   *  with these ids, so sending only place ids would collapse two stops at the
+   *  same address — two deliveries in one building — into one. */
+  readonly stops: readonly { readonly id: string; readonly placeId: PlaceId }[];
   readonly shape: RouteShape;
   readonly departureTime: Date | null;
   /** Makes a retry after a timeout free rather than a second billed call. */

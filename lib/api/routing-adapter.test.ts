@@ -47,7 +47,7 @@ const request = (stopCount: number) => ({
   routeId: 'route-1',
   originPlaceId: 'place-origin',
   originCoordinate: null,
-  stopPlaceIds: Array.from({ length: stopCount }, (_, i) => `place-${i}`),
+  stops: Array.from({ length: stopCount }, (_, i) => ({ id: `stop-${i}`, placeId: `place-${i}` })),
   shape: 'one-way' as const,
   departureTime: null,
   idempotencyKey: 'idem-12345678',

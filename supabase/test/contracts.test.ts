@@ -27,7 +27,10 @@ import {
 const validOptimize = {
   routeId: '2b6e1d84-7c9a-4c1e-9f0a-1d2c3b4a5e6f',
   origin: { placeId: 'place-origin', isCurrentLocation: false },
-  stops: [{ placeId: 'place-a' }, { placeId: 'place-b' }],
+  stops: [
+    { stopId: 'stop-a', placeId: 'place-a' },
+    { stopId: 'stop-b', placeId: 'place-b' },
+  ],
   isRoundTrip: false,
 };
 
@@ -40,18 +43,21 @@ describe('/optimize input', () => {
     // The client's check states the limit before it is reached, for the user's
     // benefit. This one is the enforcement: a client can be modified, and above
     // 25 stops the request escalates to a tier that bills per stop.
-    const tooFew = { ...validOptimize, stops: [{ placeId: 'only-one' }] };
+    const tooFew = { ...validOptimize, stops: [{ stopId: 'stop-a', placeId: 'only-one' }] };
     const tooMany = {
       ...validOptimize,
-      stops: Array.from({ length: MAX_STOPS + 1 }, (_, i) => ({ placeId: `p-${i}` })),
+      stops: Array.from({ length: MAX_STOPS + 1 }, (_, i) => ({
+        stopId: `s-${i}`,
+        placeId: `p-${i}`,
+      })),
     };
     const exactlyMax = {
       ...validOptimize,
-      stops: Array.from({ length: MAX_STOPS }, (_, i) => ({ placeId: `p-${i}` })),
+      stops: Array.from({ length: MAX_STOPS }, (_, i) => ({ stopId: `s-${i}`, placeId: `p-${i}` })),
     };
     const exactlyMin = {
       ...validOptimize,
-      stops: Array.from({ length: MIN_STOPS }, (_, i) => ({ placeId: `p-${i}` })),
+      stops: Array.from({ length: MIN_STOPS }, (_, i) => ({ stopId: `s-${i}`, placeId: `p-${i}` })),
     };
 
     expect(parseRequest(optimizeRequestSchema, tooFew).ok).toBe(false);

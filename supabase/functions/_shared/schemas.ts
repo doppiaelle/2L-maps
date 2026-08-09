@@ -18,8 +18,22 @@ import { MAX_STOPS, MIN_STOPS } from '../../../types/constants';
  *  alphabet, so a format change upstream does not reject valid input. */
 const placeId = z.string().min(1).max(512);
 
+/**
+ * A stop as the client sends it.
+ *
+ * `stopId` is the **client's** identifier and it is required, because the
+ * response returns the order as a list of these. Ordering by `placeId` instead would
+ * collapse two stops at the same address into one — two deliveries in the same
+ * building is an ordinary Tuesday, not an edge case — and ordering by position
+ * would make the reply meaningless the moment the client re-sorted anything.
+ */
 const stopInput = z.object({
+  stopId: z.string().min(1).max(64),
   placeId,
+  /** A stop the user has pinned in place. Carried now, honoured when pinning
+   *  ships — the field is documented, so accepting it costs nothing and
+   *  rejecting it would break a client that sends what the contract promises. */
+  isPinned: z.boolean().optional(),
   label: z.string().max(200).nullable().optional(),
   note: z.string().max(2000).nullable().optional(),
 });
