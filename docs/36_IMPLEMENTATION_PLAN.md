@@ -524,6 +524,37 @@ so its positions become its entry order, and `isOptimized` is never assumed true
 cannot prove an optimization produced its order, and claiming one would put "Already the fastest
 order" on a list the user typed themselves.
 
+### The query layer — recorded 2026-08-09
+
+`/usage-quota` gets an adapter of its own, and the three hooks the screens need exist:
+allowance, place resolution, optimization. **842 tests.**
+
+**A defect the tests found before a device could have.** The quota query fired during the
+cold-start gap before the session had been read, came back unauthenticated, cached that, and left
+the interface showing free allowances until something invalidated it — for a paying user, on
+every launch. The fix is to say what was already true: every endpoint behind these facades is
+authenticated, so `useServices()` returns null until there is a session. A client with no token
+is not a usable service.
+
+**An unmentioned limit is unknown, never zero.** `/usage-quota` returns limits by name, and the
+server tunes the free tier against realised ad revenue ([ADR-0015](adr/0015-ad-supported-free-tier.md))
+— so it must be able to move one number without restating the rest. Reading an absent limit as
+zero would tell a paying user they had run out of something nobody had measured.
+
+**No optimistic reorder.** The order on screen is untouched until a result arrives and not at all
+if one does not. A route that rearranged itself and then failed would leave a driver holding an
+order nobody chose, and "undo the optimistic update" is precisely the path that goes wrong under
+the timeout that caused it.
+
+**Quota is invalidated after a success, never decremented locally.** The server counts; a client
+keeping its own tally eventually disagrees with the number the user is actually held to.
+
+**Two test-harness lessons worth keeping.** React Query's garbage-collection timers are held for
+this product's deliberately long retention — twenty-four hours, because that retention *is* the
+offline story ([ADR-0008](adr/0008-offline-scope.md)) — and a test that does not clear the cache
+holds the suite open long after its assertions pass. And a test that leaves a request in flight
+waits out the client's own ten-second timeout. Both looked like a hanging suite and neither was.
+
 ### How the app is actually tried — decided 2026-08-07
 
 Recorded because it changed the shape of several documents, and because my first answer on it was
