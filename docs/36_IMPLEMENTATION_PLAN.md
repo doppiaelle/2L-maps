@@ -577,6 +577,34 @@ signal at all.
 blank, and `<RouteSummaryHeader>` labels it as an estimate — but a straight-line *time* would be
 a road estimate we did not make, so there isn't one.
 
+### Add stop — recorded 2026-08-09
+
+The first of the three taps, and the screen where the product's largest cost line is either
+controlled or not. **888 tests.**
+
+**Most of `lib/places/search.ts` is about when *not* to ask.** Nothing below three characters,
+nothing at all while offline, and recents and favourites always above search results — a reused
+`place_id` is free and a search is not, so the cheapest interaction is also the one nearest the
+thumb. The ordering *is* the cost decision, made visible.
+
+**A full route is refused before the attempt**, at the *plan's* ceiling rather than the
+product's. Letting a user search, choose, and only then be told the route is full wastes a billed
+request and their time.
+
+**Three cost rules meet in `usePlaceSearch`**, and each is invisible when missing: the debounce
+is a spend control before it is a performance one; the session token spans the search and rotates
+only after a selection, because Google bills a session as one unit and rotating per keystroke
+pays per keystroke while looking identical from outside; and a superseded request is *cancelled*,
+because ignoring the answer still pays for it.
+
+It is deliberately not a React Query hook. This is a keystroke stream with a lifecycle — a token
+that must not rotate mid-search and a request that must be aborted rather than resolve into a
+cache nobody reads — and Query's model would fight all three.
+
+**A stop is added with no coordinate.** The durable key is the `place_id`; the coordinate arrives
+from the places query on Plan (ADR-0007). Inventing one at selection would create a coordinate
+with no refresh date, which is the one thing the expiry rule cannot handle.
+
 ### How the app is actually tried — decided 2026-08-07
 
 Recorded because it changed the shape of several documents, and because my first answer on it was
