@@ -80,7 +80,7 @@ thumb during a gesture is a control the user misses while driving.
 | Sign in | `(auth)/sign-in` | Apple / Google authentication |
 | Paywall | `(app)/paywall` | Trial start; modal |
 | **Plan** | `(app)/index` | **The product.** Map + sheet |
-| Add stop | `(app)/add-stop` | Modal: search, favourites, recents |
+| Add stop | `(app)/add-stop` | Modal: search plus the address book |
 | Import list | `(app)/import` | Modal: paste or CSV |
 | Stop detail | sheet-within-sheet | Label, note, actions |
 | Provider picker | `(app)/provider` | Modal, first run |
@@ -161,20 +161,39 @@ moves it — its position is learned once and stays true.
 
 ### Add stop (modal)
 
-Search field focused on open. Below it, in priority order: **recents**, then **favourites**,
-then autocomplete results once three characters are typed.
+Search field focused on open. Below it, in priority order: **Recent**, then **Saved**, then
+autocomplete results once three characters are typed.
 
-Recents and favourites come first because reuse is free and search costs money
+Recent and Saved come first because reuse is free and search costs money
 ([`31_COST_MODEL.md`](31_COST_MODEL.md)) — the cheapest interaction is also the fastest.
+
+**They are two sections of one address book, not two stores.**
+[`12_DATABASE.md`](12_DATABASE.md) has a single `favourites` table — "the address book" — with
+`use_count`, `last_used_at` and an index built for exactly this query. The split is derived, not
+stored: **Recent** is what was used inside the coordinate window, **Saved** is everything older.
+An earlier version of this document described them as separate lists, which would have given the
+same address two places to live and two counts to disagree about.
+
+The window is the same 30 days as [ADR-0007](adr/0007-place-id-durable-coordinates-perishable.md).
+That is not a coupling — past it the coordinates for that place have been purged anyway, so the
+sections also happen to divide "instant" from "may need one lookup".
+
+**Every added stop is recorded, including one found by search.** A book that only remembers what
+was already in it never fills, and a place found by search is the one most worth remembering: it
+has just cost the most it ever will.
+
+An entry whose coordinates have been purged and that the user never named has nothing readable
+left, so it is not offered — and not deleted. The `place_id` is durable; the next resolution of
+that place refills the cache and the row returns with its street on it.
 
 | State | Appearance |
 |---|---|
-| Initial | Recents and favourites. No network call has been made |
-| Typing, under 3 characters | Recents and favourites still shown. No request |
+| Initial | Recent and Saved. No network call has been made |
+| Typing, under 3 characters | Recent and Saved still shown, narrowed locally. No request |
 | Searching | Skeleton rows below the existing list, which stays visible |
 | Results | Primary text bold, secondary text in `text-secondary`, matching the third reference's row rhythm |
 | No results | "No match" plus an option to add the text as a manual label |
-| Offline | Search disabled with a reason; recents and favourites remain searchable locally |
+| Offline | Search disabled with a reason; the address book remains searchable locally |
 | At 25 stops | Adding is blocked **before the attempt**, with the limit explained |
 
 ### Import list (modal)

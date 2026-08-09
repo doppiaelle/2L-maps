@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { useColorScheme } from 'react-native';
 
 import { AddStopView } from '@/features/places/AddStopView';
+import { useAddressBook } from '@/features/places/use-address-book';
 import { usePlaceSearch } from '@/features/places/use-place-search';
 import { useUsageQuota } from '@/features/quota/use-usage-quota';
 import { useDraftRouteStore } from '@/features/stores';
@@ -27,14 +28,16 @@ export default function AddStopScreen(): React.JSX.Element {
   const addStopToDraft = useDraftRouteStore((store) => store.addStopToDraft);
   const { allowances } = useUsageQuota();
   const search = usePlaceSearch();
+  const book = useAddressBook();
 
   const state = searchStateOf({
     query: search.query,
-    // Recents and favourites arrive with their own query in a later change;
-    // until then the free options are empty and the state machine is unchanged
-    // by that — it already treats an empty list as "nothing to reuse".
-    recents: [],
-    favourites: [],
+    // The two sections of one address book, split by when each place was last
+    // used (`lib/places/address-book.ts`). Both are free to reuse and both are
+    // readable with no signal, which is what makes this modal useful in a
+    // basement car park.
+    recents: book.recent,
+    favourites: book.saved,
     results: search.results,
     isSearching: search.isSearching,
     isOffline: false,
@@ -57,6 +60,12 @@ export default function AddStopScreen(): React.JSX.Element {
       coordinate: null,
       isCompleted: false,
     });
+
+    // Recorded whatever the source. A book that only remembers what was already
+    // in it never fills up, and a place found by search is exactly the one worth
+    // remembering — it has just cost the most it ever will
+    // (`docs/31_COST_MODEL.md` §8).
+    book.record(option.placeId);
 
     // Ends the billed session, then returns to the working surface. The user
     // adds one stop and is back on Plan — the second of the three taps.

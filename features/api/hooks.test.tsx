@@ -55,6 +55,8 @@ afterEach(() => {
  * that refuses everything is honest about that — a real one would let a test
  * pass by accident on a path it never meant to exercise.
  */
+const stubFavourites = { list: async () => null, recordUse: async () => undefined };
+
 const stubRoutes = {
   save: async () => ({ ok: false, failure: { kind: 'failed' } }) as const,
   list: async () => null,
@@ -73,6 +75,7 @@ function renderWithServices(fetchImpl: typeof fetch, ui: React.ReactElement) {
         <ServicesProvider
           baseUrl="https://example.test/functions/v1"
           routes={stubRoutes}
+          favourites={stubFavourites}
           fetchImpl={fetchImpl}
         >
           {ui}
