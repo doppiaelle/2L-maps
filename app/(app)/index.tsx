@@ -9,6 +9,8 @@ import { useResolvedPlaces } from '@/features/places/use-resolved-places';
 import { useOptimizeAvailability, useUsageQuota } from '@/features/quota/use-usage-quota';
 import { PlanView } from '@/features/route-planning/PlanView';
 import { useOptimizeRoute } from '@/features/route-planning/use-optimize-route';
+import { useOpenRoute } from '@/features/routes/use-open-route';
+import { useRouteSync } from '@/features/routes/use-route-sync';
 import { useDraftRouteStore, useRouteProgressStore, useUiStore } from '@/features/stores';
 import { readMapIds } from '@/lib/config/map-ids';
 import { formatDistance, formatDuration } from '@/lib/format/units';
@@ -53,11 +55,25 @@ export default function PlanScreen(): React.JSX.Element {
     pendingDeepLink: pending.target,
   });
 
+  // Writes on meaningful events — optimized, started, each stop marked,
+  // finished — and never on a keystroke. The local store already holds the
+  // draft; what this adds is History and the second device.
+  useRouteSync();
+
+  const { open: openRoute } = useOpenRoute();
+
   useEffect(() => {
     // Cleared once honoured. Leaving it set would re-open the same route on
     // every render, including after the user navigated away deliberately.
-    if (destination.kind === 'plan' && destination.mode === 'opened-route') pending.clear();
-  }, [destination, pending]);
+    if (destination.kind !== 'plan' || destination.mode !== 'opened-route') return;
+
+    const routeId = destination.routeId;
+    pending.clear();
+    // `decideLaunch` resolved the link to a route id and nothing read it, so a
+    // `twolmaps://route/{id}` link landed the user on whatever draft they
+    // happened to have — which looks exactly like the link having been ignored.
+    if (routeId !== null) void openRoute(routeId);
+  }, [destination, pending, openRoute]);
 
   // One `now` for the whole render, so a stop cannot be judged fresh in the list
   // and expired on the map because the clock moved between two calls.

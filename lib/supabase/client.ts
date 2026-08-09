@@ -4,6 +4,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { createAuthProvider } from './auth-adapter';
 import type { SupabaseAuthPort } from './auth-adapter';
+import { createRoutesProvider } from './routes-adapter';
+import type { RoutesPort, RoutesProvider } from './routes-adapter';
 import type { AuthProvider } from '@/lib/providers/types';
 
 /**
@@ -41,6 +43,19 @@ export function readSupabaseConfig(
   return { url, anonKey };
 }
 
+/**
+ * Where the Edge Functions live, or null when this build has no project.
+ *
+ * Derived from the project URL rather than configured separately, because they
+ * are the same project and a second variable is a second thing to get wrong —
+ * in a way that produces a working sign-in and a dead Optimize button, which is
+ * the hardest kind of misconfiguration to diagnose from a phone.
+ */
+export function functionsBaseUrl(config: SupabaseConfig | null): string | null {
+  if (config === null) return null;
+  return `${config.url.replace(/\/+$/, '')}/functions/v1`;
+}
+
 export function createSupabaseClient(config: SupabaseConfig): SupabaseClient {
   return createClient(config.url, config.anonKey, {
     auth: {
@@ -71,4 +86,67 @@ export function createSupabaseAuth(config: SupabaseConfig | null): AuthProvider 
   // the adapter honest about what it depends on.
   const client = createSupabaseClient(config);
   return createAuthProvider(client.auth as unknown as SupabaseAuthPort);
+}
+
+/**
+ * The query builder, narrowed to the four operations the routes adapter uses.
+ *
+ * This is the only place the chainable PostgREST surface appears. It is a
+ * composition root in the same sense as `supabase/functions/_shared/context.ts`
+ * — no decisions, nothing branching, nothing worth a test — precisely so that
+ * everything above it can be tested against `RoutesPort` without a project.
+ *
+ * The chain is built here rather than passed around because a half-built query
+ * is a value with no meaning: `from('routes').select()` executes when awaited,
+ * and handing one to another module makes it possible to await it twice.
+ */
+export function createPostgrestPort(client: SupabaseClient): RoutesPort {
+  return {
+    upsert: async (table, rows) => {
+      const { error } = await client.from(table).upsert(rows as never[]);
+      return { error: error === null ? null : { message: error.message } };
+    },
+
+    select: async (table, query) => {
+      let builder = client.from(table).select(query.columns);
+
+      for (const [column, value] of Object.entries(query.match ?? {})) {
+        builder = builder.eq(column, value);
+      }
+      if (query.in !== undefined) builder = builder.in(query.in.column, [...query.in.values]);
+      if (query.isNull !== undefined) builder = builder.is(query.isNull, null);
+      if (query.order !== undefined) {
+        builder = builder.order(query.order.column, { ascending: query.order.ascending });
+      }
+      if (query.limit !== undefined) builder = builder.limit(query.limit);
+
+      const { data, error } = await builder;
+      return { data, error: error === null ? null : { message: error.message } };
+    },
+
+    update: async (table, values, match) => {
+      let builder = client.from(table).update(values);
+      for (const [column, value] of Object.entries(match)) {
+        builder = builder.eq(column, value);
+      }
+      const { error } = await builder;
+      return { error: error === null ? null : { message: error.message } };
+    },
+
+    deleteRows: async (table, match) => {
+      let builder = client.from(table).delete();
+      for (const [column, value] of Object.entries(match)) {
+        builder = builder.eq(column, value);
+      }
+      const { error } = await builder;
+      return { error: error === null ? null : { message: error.message } };
+    },
+  };
+}
+
+/** Saved routes, or null when this build has no project — the same honest answer
+ *  `createSupabaseAuth` gives, for the same reason. */
+export function createSupabaseRoutes(config: SupabaseConfig | null): RoutesProvider | null {
+  if (config === null) return null;
+  return createRoutesProvider(createPostgrestPort(createSupabaseClient(config)));
 }

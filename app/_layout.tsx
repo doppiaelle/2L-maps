@@ -6,13 +6,19 @@ import { useEffect, useMemo } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import '../global.css';
+import { ServicesProvider } from '@/features/api/services-provider';
 import { SessionProvider, useSession } from '@/features/auth/session-provider';
 import { DeepLinkProvider } from '@/features/navigation/deep-link-provider';
 import type { DeepLinkPort } from '@/features/navigation/use-pending-deep-link';
 import { useStoresHydrated } from '@/features/navigation/use-launch-destination';
 import { PERSISTED_STORES } from '@/features/stores';
 import { createQueryClient } from '@/lib/query/client';
-import { createSupabaseAuth, readSupabaseConfig } from '@/lib/supabase/client';
+import {
+  createSupabaseAuth,
+  createSupabaseRoutes,
+  functionsBaseUrl,
+  readSupabaseConfig,
+} from '@/lib/supabase/client';
 
 /**
  * Root layout.
@@ -39,7 +45,10 @@ import { createSupabaseAuth, readSupabaseConfig } from '@/lib/supabase/client';
 void SplashScreen.preventAutoHideAsync();
 
 const queryClient = createQueryClient();
-const auth = createSupabaseAuth(readSupabaseConfig());
+const supabaseConfig = readSupabaseConfig();
+const auth = createSupabaseAuth(supabaseConfig);
+const routes = createSupabaseRoutes(supabaseConfig);
+const baseUrl = functionsBaseUrl(supabaseConfig);
 
 export default function RootLayout(): React.JSX.Element {
   const linking = useMemo<DeepLinkPort>(
@@ -61,10 +70,16 @@ export default function RootLayout(): React.JSX.Element {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <QueryClientProvider client={queryClient}>
         <SessionProvider auth={auth}>
-          <DeepLinkProvider port={linking}>
-            <StatusBar style="auto" />
-            <RestorationGate />
-          </DeepLinkProvider>
+          {/* Inside `SessionProvider`, because the services are null until there
+              is a session: every endpoint behind them is authenticated, and a
+              query firing during the cold-start gap would cache the signed-out
+              answer and leave a paying user on the free allowances. */}
+          <ServicesProvider baseUrl={baseUrl} routes={routes}>
+            <DeepLinkProvider port={linking}>
+              <StatusBar style="auto" />
+              <RestorationGate />
+            </DeepLinkProvider>
+          </ServicesProvider>
         </SessionProvider>
       </QueryClientProvider>
     </GestureHandlerRootView>

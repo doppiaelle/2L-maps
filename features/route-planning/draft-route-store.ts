@@ -68,6 +68,17 @@ export interface DraftRouteState {
 
   // Actions
   reset: (routeId: string) => void;
+  /**
+   * Replace the draft wholesale with one loaded from the server.
+   *
+   * The one action that takes a whole `DraftRoute` rather than an intent, and it
+   * earns the exception: it is not an edit but a *restoration*, and there is no
+   * smaller vocabulary for "this is now a different route". The invariants still
+   * hold because the value came out of `fromRows`, which builds them.
+   *
+   * The result is cleared with it — the geometry described a different route.
+   */
+  replaceDraft: (draft: DraftRoute) => void;
   addStopToDraft: (stop: Stop) => void;
   removeStopById: (stopId: string) => void;
   undoRemove: () => void;
@@ -152,6 +163,10 @@ export function createDraftRouteStore(storage?: DraftStorage) {
 
         reset: (routeId) => {
           set({ draft: emptyDraft(routeId), lastRefusal: null, undoable: null, result: null });
+        },
+
+        replaceDraft: (draft) => {
+          set({ draft, lastRefusal: null, undoable: null, result: null });
         },
 
         addStopToDraft: (stop) => {

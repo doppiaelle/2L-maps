@@ -1,3 +1,6 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createJSONStorage } from 'zustand/middleware';
+
 import { createDraftRouteStore } from './route-planning/draft-route-store';
 import { createPreferencesStore } from './preferences/preferences-store';
 import { createRouteProgressStore } from './route-progress/route-progress-store';
@@ -16,10 +19,31 @@ import { createUiStore } from './ui/ui-store';
  * a store holding unrelated concerns is a god object (`CLAUDE.md` §4).
  */
 
-export const useDraftRouteStore = createDraftRouteStore();
-export const useRouteProgressStore = createRouteProgressStore();
-export const usePreferencesStore = createPreferencesStore();
-export const useMutationQueueStore = createMutationQueueStore();
+/**
+ * Where persisted state actually goes.
+ *
+ * **Passing this is not optional, and omitting it is silent.** Each store
+ * factory takes its storage and falls back to zustand's default when it is not
+ * given one — and that default is `localStorage`, which React Native does not
+ * have. The stores were created without it, so every one of them was persisted
+ * in name only: `PERSISTED_STORES` was waited on at launch, `partialize` and
+ * `migrate` were written and tested, and nothing was ever written to a disk.
+ *
+ * The failure has no symptom until the app is killed, which is the one moment
+ * this product cannot afford it — the draft is the user's unsaved work and
+ * route progress is the state it cannot reconstruct
+ * (`docs/24_PERFORMANCE.md`, `docs/11_STATE_MANAGEMENT.md` §7).
+ *
+ * Typed per store because each one persists a different slice.
+ */
+const deviceStorage = <T>() => createJSONStorage<T>(() => AsyncStorage);
+
+export const useDraftRouteStore = createDraftRouteStore(deviceStorage());
+export const useRouteProgressStore = createRouteProgressStore(deviceStorage());
+export const usePreferencesStore = createPreferencesStore(deviceStorage());
+export const useMutationQueueStore = createMutationQueueStore(deviceStorage());
+// Not persisted: which sheet detent is open and which stop is selected are
+// moments, not state. Restoring them would reopen a sheet the user closed.
 export const useUiStore = createUiStore();
 
 /**
