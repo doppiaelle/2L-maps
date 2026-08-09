@@ -76,7 +76,9 @@ export function PrimaryAction({
         // control is busy instead of tapping it again (CLAUDE.md §10 rule 7).
         accessibilityState={{ disabled: !isPressable, busy: state.kind === 'working' }}
         accessibilityHint={reason ?? undefined}
-        style={{ minHeight: layout.touchMin }}
+        // 56, not the 44 pt floor: this control is pressed one-handed, in a van,
+        // often without looking straight at it (docs/09_COMPONENT_LIBRARY.md §7).
+        style={{ minHeight: layout.actionMinHeight }}
         className={
           isPressable
             ? 'bg-accent active:bg-accent-pressed rounded-lg items-center justify-center px-space-4'
