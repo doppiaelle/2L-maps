@@ -122,8 +122,19 @@ iOS submission — that is deferred ([ADR-0014](adr/0014-android-first-verificat
 7. **Credentials → Create credentials → API key.** Name it `maps-sdk-android`.
 8. **Restrict it immediately, before leaving the page.**
    - *Application restrictions* → Android apps → add package name `com.doppiaelle.twolmaps` and
-     the SHA-1 fingerprint. The `android-preview` workflow prints the SHA-1 on every run — take
-     it from there rather than hunting for it ([`25_DEPLOYMENT.md`](25_DEPLOYMENT.md) §6).
+     this SHA-1:
+
+     ```
+     5E:8F:16:06:2E:A3:CD:2C:4A:0D:54:78:76:BA:A6:F3:8C:AB:F6:25
+     ```
+
+     **You can register it now, before any build has run.** `assembleDebug` signs with
+     `android/app/debug.keystore`, which Expo's template ships as a fixed file rather than
+     generating per machine, so every build from every runner carries that fingerprint. It is
+     the standard Android debug fingerprint, it is not a secret, and it is *not* a release
+     credential — which is why it may only ever be paired with a key restricted to the Maps SDK.
+     The workflow prints the fingerprint on every run anyway, because "documented" and "what the
+     artifact was actually signed with" are two different claims.
    - *API restrictions* → Restrict key → **Maps SDK for Android only**.
 9. Create a second key, `maps-sdk-ios`, restricted to bundle ID `com.doppiaelle.twolmaps` and to
    Maps SDK for iOS only.
