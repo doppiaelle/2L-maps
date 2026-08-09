@@ -16,6 +16,18 @@ import type { ExpoConfig } from 'expo/config';
 const MAPS_API_KEY_IOS = process.env['EXPO_PUBLIC_MAPS_API_KEY_IOS'] ?? '';
 const MAPS_API_KEY_ANDROID = process.env['EXPO_PUBLIC_MAPS_API_KEY_ANDROID'] ?? '';
 
+/**
+ * Cloud-based Map Styling, one Map ID per theme (docs/14_GOOGLE_MAPS_INTEGRATION.md §6).
+ *
+ * These are identifiers, not credentials — they name a style in the Cloud
+ * console and grant nothing. Unset is a supported state: `mapIdFor` in
+ * `lib/map/style.ts` treats the empty string as absent, and the map falls back
+ * to Google's default style rather than rendering blank. That fallback is the
+ * mitigation for risk C15, where the styles live outside version control.
+ */
+const MAP_ID_LIGHT = process.env['EXPO_PUBLIC_MAP_ID_LIGHT'] ?? '';
+const MAP_ID_DARK = process.env['EXPO_PUBLIC_MAP_ID_DARK'] ?? '';
+
 /** Navigation providers we hand off to. iOS caps this list at 50 and App Review
  *  questions unexplained entries, so it is never widened casually (CLAUDE.md §13). */
 const NAVIGATION_URL_SCHEMES = ['comgooglemaps', 'waze', 'maps'] as const;
@@ -50,6 +62,9 @@ const config: ExpoConfig = {
   plugins: ['expo-router', 'expo-localization'],
   experiments: {
     typedRoutes: true,
+  },
+  extra: {
+    mapIds: { light: MAP_ID_LIGHT, dark: MAP_ID_DARK },
   },
 };
 

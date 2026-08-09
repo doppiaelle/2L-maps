@@ -70,11 +70,20 @@ export interface Viewport {
  */
 export const GRID_DIVISIONS = 6;
 
+export interface PlanOptions {
+  /** Never hidden inside a cluster (docs/14_GOOGLE_MAPS_INTEGRATION.md §7). The
+   *  user selected it; a map that answers by folding it away has not answered. */
+  readonly selectedStopId?: string | null;
+  readonly threshold?: number;
+}
+
 export function planMarkers(
   markers: readonly MarkerInput[],
   viewport: Viewport,
-  threshold: number = MARKER_CLUSTER_THRESHOLD,
+  options: PlanOptions = {},
 ): MapPlan {
+  const { selectedStopId = null, threshold = MARKER_CLUSTER_THRESHOLD } = options;
+
   const drawable: DrawnMarker[] = [];
   const undrawableStopIds: string[] = [];
 
@@ -98,7 +107,20 @@ export function planMarkers(
     return { pins: drawable, undrawableStopIds, isClustered: false };
   }
 
-  return { pins: cluster(drawable, viewport), undrawableStopIds, isClustered: true };
+  // The selected stop is drawn individually, whatever the count. It is held out
+  // of the grid entirely rather than pulled back out afterwards, so it also
+  // cannot be the marker that keeps a cell above one and forces a cluster to
+  // exist around it. It is appended last, which is also its raised z-index: the
+  // map SDK draws in array order, so last is on top.
+  const selected = drawable.find((m) => m.stopId === selectedStopId);
+  const clusterable = selected === undefined ? drawable : drawable.filter((m) => m !== selected);
+
+  const pins = cluster(clusterable, viewport);
+  return {
+    pins: selected === undefined ? pins : [...pins, selected],
+    undrawableStopIds,
+    isClustered: true,
+  };
 }
 
 function cluster(markers: readonly DrawnMarker[], viewport: Viewport): readonly DrawnPin[] {
@@ -220,6 +242,38 @@ export function boundsFor(coordinates: readonly LatLng[], sheetFraction = 0.4): 
       latitude: south - latSpan * (0.1 + sheetFraction),
       longitude: west - lngSpan * 0.1,
     },
+  };
+}
+
+/**
+ * Centre and span, which is how a map SDK expresses where the camera is.
+ *
+ * Converted at the boundary rather than carried around, so nothing above the
+ * facade has to remember that a delta is the *whole* span and not half of it —
+ * the mistake that halves every viewport and clusters everything into one pin.
+ */
+export interface CameraRegion {
+  readonly latitude: number;
+  readonly longitude: number;
+  readonly latitudeDelta: number;
+  readonly longitudeDelta: number;
+}
+
+export function regionToViewport(region: CameraRegion): Viewport {
+  const halfLat = region.latitudeDelta / 2;
+  const halfLng = region.longitudeDelta / 2;
+  return {
+    northEast: { latitude: region.latitude + halfLat, longitude: region.longitude + halfLng },
+    southWest: { latitude: region.latitude - halfLat, longitude: region.longitude - halfLng },
+  };
+}
+
+export function viewportToRegion(viewport: Viewport): CameraRegion {
+  return {
+    latitude: (viewport.northEast.latitude + viewport.southWest.latitude) / 2,
+    longitude: (viewport.northEast.longitude + viewport.southWest.longitude) / 2,
+    latitudeDelta: viewport.northEast.latitude - viewport.southWest.latitude,
+    longitudeDelta: viewport.northEast.longitude - viewport.southWest.longitude,
   };
 }
 
