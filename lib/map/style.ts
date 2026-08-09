@@ -1,0 +1,163 @@
+import { colours, mapColours, ROUTE_DASH_PATTERN, stroke } from '@/lib/design/tokens';
+import type { ThemeName } from '@/lib/design/tokens';
+
+/**
+ * How the map is styled, decided outside the map component.
+ *
+ * The base style is Cloud-based Map Styling, referenced by Map ID, one per theme
+ * ([`docs/14_GOOGLE_MAPS_INTEGRATION.md`](../../docs/14_GOOGLE_MAPS_INTEGRATION.md) §6).
+ * That is **risk C15**: the styles live in the Google Cloud console, outside
+ * version control, so a console edit changes the shipped app with no code review
+ * and a revoked Map ID would otherwise change the map's appearance silently.
+ *
+ * The mitigation this file implements is the one the document promises: an
+ * absent or unusable Map ID falls back to Google's default style, with no
+ * user-facing error. A default-styled map is a working map; a blank one is not.
+ */
+
+export interface MapIdConfig {
+  readonly light: string | null;
+  readonly dark: string | null;
+}
+
+/**
+ * The Map ID for a theme, or null to let the SDK use its default style.
+ *
+ * The empty string is treated as absent on purpose. `process.env['…'] ?? ''` is
+ * how an unset build variable arrives, and passing `''` to the SDK as a Map ID
+ * is the failure this function exists to prevent — it is not "no style", it is
+ * an unresolvable one.
+ */
+export function mapIdFor(theme: ThemeName, config: MapIdConfig): string | null {
+  const configured = config[theme];
+  if (configured === null) return null;
+
+  const trimmed = configured.trim();
+  return trimmed === '' ? null : trimmed;
+}
+
+/**
+ * How the route line is drawn.
+ *
+ * The casing is a second, wider line drawn underneath rather than an outline:
+ * the SDK has no outline on a polyline, and the width difference is what
+ * produces the 1 pt border the design document specifies. It exists in light
+ * theme only — mint on paper-white is this system's weakest contrast pairing,
+ * and the casing is also what keeps the route readable over the red-orange
+ * traffic layer (docs/07_DESIGN_SYSTEM.md §Map-specific).
+ */
+export interface RouteStroke {
+  readonly colour: string;
+  readonly width: number;
+  readonly casing: { readonly colour: string; readonly width: number } | null;
+  /** Null for a solid line. Present only for a degraded route, where the dash is
+   *  the signal that no road routing happened. */
+  readonly dashPattern: readonly number[] | null;
+}
+
+export function routeStroke(theme: ThemeName, isDegraded: boolean): RouteStroke {
+  const palette = colours[theme];
+
+  if (isDegraded) {
+    // `warning`, never `danger`: a degraded result is a lower-confidence answer,
+    // not an error, and red would misrepresent it (docs/07_DESIGN_SYSTEM.md).
+    // No casing — the dash is already carrying the distinction, and a casing on
+    // a dashed line reads as noise rather than as emphasis.
+    return {
+      colour: palette.warning,
+      width: stroke.routeDegraded,
+      casing: null,
+      dashPattern: [...ROUTE_DASH_PATTERN],
+    };
+  }
+
+  const casingColour = mapColours[theme].routeCasing;
+  return {
+    colour: palette.accent,
+    width: stroke.route,
+    casing: casingColour === null ? null : { colour: casingColour, width: stroke.routeCasing },
+    dashPattern: null,
+  };
+}
+
+/**
+ * How one marker is drawn.
+ *
+ * Never colour alone (`CLAUDE.md` §10 rule 4): every state carries a glyph or a
+ * shape difference as well as a fill, so the map is readable with deuteranopia.
+ * Pairing the two here — rather than in the component — is what stops one of
+ * them being updated without the other.
+ */
+export interface MarkerStyle {
+  readonly fill: string;
+  readonly border: string;
+  readonly foreground: string;
+  /** Replaces the ordinal when present. A completed stop shows a checkmark, an
+   *  unreachable one a warning glyph. */
+  readonly glyph: string | null;
+  /** The word a screen reader would use, kept beside the appearance it belongs
+   *  to. The map itself is one accessibility element, but a stop's state is also
+   *  spoken in the list, and the two must not drift apart. */
+  readonly spoken: string;
+}
+
+export type MarkerState = 'pending' | 'completed' | 'skipped' | 'unreachable';
+
+export function markerStyle(
+  theme: ThemeName,
+  state: MarkerState,
+  isSelected: boolean,
+): MarkerStyle {
+  const palette = colours[theme];
+
+  // Selection wins over state for the fill, because selection is what the user
+  // just did and the map has to answer that first. The glyph is kept, so a
+  // selected completed stop still shows its checkmark.
+  const base: Record<MarkerState, MarkerStyle> = {
+    pending: {
+      fill: palette.surface,
+      border: palette.textPrimary,
+      foreground: palette.textPrimary,
+      glyph: null,
+      spoken: 'not yet visited',
+    },
+    completed: {
+      fill: palette.accent,
+      border: palette.accent,
+      foreground: palette.accentOn,
+      glyph: '✓',
+      spoken: 'completed',
+    },
+    skipped: {
+      fill: palette.surface,
+      border: palette.textSecondary,
+      foreground: palette.textSecondary,
+      glyph: '→',
+      spoken: 'skipped',
+    },
+    unreachable: {
+      fill: palette.surface,
+      border: palette.danger,
+      foreground: palette.danger,
+      glyph: '!',
+      spoken: 'unreachable',
+    },
+  };
+
+  const style = base[state];
+  if (!isSelected) return style;
+
+  return {
+    ...style,
+    fill: palette.accent,
+    border: palette.accent,
+    foreground: palette.accentOn,
+    spoken: `${style.spoken}, selected`,
+  };
+}
+
+/** Selected markers are enlarged and raised (docs/14 §7). The hit area does not
+ *  change with them — it is 44 pt at every size (`CLAUDE.md` §10 rule 2). */
+export const MARKER_SIZE = 32;
+export const MARKER_SIZE_SELECTED = 40;
+export const CLUSTER_SIZE = 40;

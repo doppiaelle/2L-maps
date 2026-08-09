@@ -1,4 +1,11 @@
-import { boundsFor, GRID_DIVISIONS, overlapsAtScale, planMarkers } from './clustering';
+import {
+  boundsFor,
+  GRID_DIVISIONS,
+  overlapsAtScale,
+  planMarkers,
+  regionToViewport,
+  viewportToRegion,
+} from './clustering';
 import type { MarkerInput, Viewport } from './clustering';
 import { MARKER_CLUSTER_THRESHOLD } from '@/types';
 
@@ -123,6 +130,43 @@ describe('what a cluster carries', () => {
   });
 });
 
+describe('the selected stop', () => {
+  it('is never folded into a cluster', () => {
+    // The user selected it. A map that answers by hiding it has not answered
+    // (docs/14_GOOGLE_MAPS_INTEGRATION.md §7).
+    const plan = planMarkers(markers(30), bergamo, { selectedStopId: 'stop-7' });
+
+    const asMarker = plan.pins.find((p) => p.kind === 'marker' && p.stopId === 'stop-7');
+    expect(asMarker).toBeDefined();
+    for (const pin of plan.pins) {
+      if (pin.kind === 'cluster') expect(pin.stopIds).not.toContain('stop-7');
+    }
+  });
+
+  it('is drawn last, which is its raised z-index', () => {
+    // The SDK draws in array order, so a selected pin under a neighbouring
+    // cluster would be the one thing the user cannot see.
+    const plan = planMarkers(markers(30), bergamo, { selectedStopId: 'stop-7' });
+    const last = plan.pins[plan.pins.length - 1];
+
+    expect(last?.kind === 'marker' && last.stopId === 'stop-7').toBe(true);
+  });
+
+  it('still accounts for every stop', () => {
+    const plan = planMarkers(markers(30), bergamo, { selectedStopId: 'stop-7' });
+    const covered = plan.pins.flatMap((p) => (p.kind === 'cluster' ? p.stopIds : [p.stopId]));
+
+    expect(covered).toHaveLength(30);
+    expect(new Set(covered).size).toBe(30);
+  });
+
+  it('changes nothing below the threshold, where nothing is clustered anyway', () => {
+    const plan = planMarkers(markers(10), bergamo, { selectedStopId: 'stop-3' });
+    expect(plan.isClustered).toBe(false);
+    expect(plan.pins).toHaveLength(10);
+  });
+});
+
 describe('stability across camera moves', () => {
   it('returns pins in a deterministic order', () => {
     // React keys stay matched and the map does not re-mount pins that did not
@@ -179,6 +223,32 @@ describe('the bounds that fit a route', () => {
 
   it('has nothing to fit when there are no stops', () => {
     expect(boundsFor([])).toBeNull();
+  });
+});
+
+describe('the camera region conversion', () => {
+  it('treats a delta as the whole span, not half of it', () => {
+    // Halving this is the mistake that shrinks every viewport and clusters the
+    // whole route into one pin.
+    const viewport = regionToViewport({
+      latitude: 45.7,
+      longitude: 9.7,
+      latitudeDelta: 0.1,
+      longitudeDelta: 0.2,
+    });
+
+    expect(viewport.northEast.latitude).toBeCloseTo(45.75, 6);
+    expect(viewport.southWest.latitude).toBeCloseTo(45.65, 6);
+    expect(viewport.northEast.longitude).toBeCloseTo(9.8, 6);
+    expect(viewport.southWest.longitude).toBeCloseTo(9.6, 6);
+  });
+
+  it('round-trips', () => {
+    const region = viewportToRegion(bergamo);
+    const back = regionToViewport(region);
+
+    expect(back.northEast.latitude).toBeCloseTo(bergamo.northEast.latitude, 6);
+    expect(back.southWest.longitude).toBeCloseTo(bergamo.southWest.longitude, 6);
   });
 });
 

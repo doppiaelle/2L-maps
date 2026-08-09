@@ -87,6 +87,50 @@ const DARK: ColourTokens = {
 
 export const colours: Readonly<Record<ThemeName, ColourTokens>> = { light: LIGHT, dark: DARK };
 
+// ─── Map-specific colour ─────────────────────────────────────────────────────
+
+/**
+ * Colours that only ever reach the map SDK.
+ *
+ * Kept out of `ColourTokens` deliberately. Those become Tailwind class names,
+ * and these can never be one: a polyline takes a colour *prop*, not a class, so
+ * `route-casing` as a utility would be a name nothing could use. Separating them
+ * also keeps `routeCasing` nullable, which the light/dark asymmetry below needs
+ * and which the Tailwind scale could not express.
+ */
+export interface MapColourTokens {
+  /** Drawn beneath the route line, wider, in light theme only. Mint on
+   *  paper-white is this system's weakest contrast pairing, and the casing is
+   *  also what keeps the route readable over the red-orange traffic layer
+   *  (docs/07_DESIGN_SYSTEM.md §Map-specific). Null in dark, where the base map
+   *  already separates the line and a casing would only thicken it. */
+  readonly routeCasing: string | null;
+}
+
+export const mapColours: Readonly<Record<ThemeName, MapColourTokens>> = {
+  light: { routeCasing: 'rgba(11, 59, 46, 0.4)' },
+  dark: { routeCasing: null },
+};
+
+/**
+ * Stroke widths, in points.
+ *
+ * The casing is wider than the line rather than drawn as an outline: the map SDK
+ * has no outline on a polyline, so the casing is a second polyline underneath,
+ * and its width is what makes the 1 pt border the design document asks for.
+ */
+export const stroke = {
+  route: 5,
+  routeCasing: 7,
+  /** Straight connectors for a T0 result. Thinner than a road line, because it
+   *  is claiming less. */
+  routeDegraded: 4,
+} as const;
+
+/** On, off — in points. Long enough to read as deliberate at route zoom rather
+ *  than as a rendering artefact. */
+export const ROUTE_DASH_PATTERN = [10, 8] as const;
+
 // ─── Typography ──────────────────────────────────────────────────────────────
 
 export interface TypeToken {
