@@ -204,10 +204,17 @@ never on `message`.**
 
 // Response 200
 {
-  "resolved":   [{ "index": 0, "placeId": "ChIJ…", "formattedAddress": "…" }],
+  "resolved":   [{ "index": 0, "placeId": "ChIJ…", "formattedAddress": "…",
+                   "lat": 45.6983, "lng": 9.6773 }],
   "unresolved": [{ "index": 1, "input": "…", "reason": "NOT_FOUND" }]
 }
 ```
+
+**Coordinates are returned here** because the caller needs them immediately — an imported list
+has to appear on the map — and a second round trip to fetch what this call already resolved
+would be a billed request for data we just had. They are subject to the 30-day rule like every
+other coordinate ([ADR-0007](adr/0007-place-id-durable-coordinates-perishable.md)); `place_id`
+is the durable half of each row.
 
 | Property | Value |
 |---|---|
@@ -217,6 +224,38 @@ never on `message`.**
 | Cache | Per address, keyed by normalised input + region; TTL 24 h |
 | Quota | 1,500 per calendar month per user |
 | Partial success | **Always allowed.** Unresolved rows never fail the request |
+
+### `POST /place-details`
+
+The re-hydration path. `place_id` is stored indefinitely; the coordinates beside it expire after
+30 consecutive days and are then null. This endpoint turns the durable keys back into a usable
+route ([ADR-0007](adr/0007-place-id-durable-coordinates-perishable.md)).
+
+```jsonc
+// Request — batch, because twenty-five sequential lookups cost twenty-five times one batch
+{ "placeIds": ["ChIJ…", "ChIJ…"] }
+
+// Response 200
+{
+  "resolved":   [{ "placeId": "ChIJ…", "formattedAddress": "…",
+                   "lat": 45.6983, "lng": 9.6773 }],
+  "unresolved": [{ "placeId": "ChIJ…", "reason": "NOT_FOUND" }]
+}
+```
+
+| Property | Value |
+|---|---|
+| Batch maximum | `MAX_STOPS` per request |
+| Timeout | 5 s |
+| Retry | 5xx only; 1 attempt |
+| Cache | Per `place_id`; **TTL 30 days, never longer.** The cache expiry *is* the terms obligation, not a tuning knob |
+| Quota | Shares the geocoding allowance |
+| Partial success | Always allowed. A `place_id` Google no longer recognises is reported, never silently dropped — the stop stays in the route with no coordinate and the user is told which one needs re-entering |
+
+**`NOT_FOUND` here is a real state, not an error.** Places are demolished, merged and re-issued;
+a saved route from last year can contain a `place_id` that no longer resolves. The route survives
+minus that stop's geometry, which is why coordinates are nullable everywhere
+(`CLAUDE.md` §0 rule 3).
 
 ### `POST /parse-addresses`
 
@@ -261,9 +300,23 @@ fallback, and this response overrides them field by field.
 ```jsonc
 { "period": { "from": "2026-08-01", "to": "2026-08-31" },
   "plan": "free",
+  "status": "none",              // trial | active | lapsed | none
+  "trialEndsAt": null,
+  "renewsAt": null,
+  "dayPassExpiresAt": null,
   "limits": [{ "name": "optimizations", "used": 12, "limit": 15 },
              { "name": "autocompleteSessions", "used": 4, "limit": 10 }] }
 ```
+
+**Entitlement and allowances arrive together, in one call.** They are the same question asked
+twice — what may this user do — and splitting them would mean two round trips on every app start
+to render one screen. `plan` and `status` are distinct on purpose: a `lapsed` subscriber is on
+the `free` plan, not locked out ([ADR-0015](adr/0015-ad-supported-free-tier.md)).
+
+**This endpoint is the only thing the client trusts about entitlement.** The store SDK reports
+what the *device* believes; the two legitimately disagree after a refund, a family-sharing
+change, or a purchase made on another device, and when they do this response wins
+([ADR-0011](adr/0011-server-side-quota-enforcement.md)).
 
 ### `POST /revenuecat-webhook`
 
