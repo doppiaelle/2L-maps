@@ -105,7 +105,7 @@ and this document inherits that. No re-statement of any requirement, schema or b
 | 2a | `feat/w2-backend` | Migrations, RLS, purge, seven-step pipeline, validation, cache key | §6 W2a | ✅ |
 | 2b | `feat/w2b-upstream` | Six Deno entrypoints and their upstream adapters (incl. `/parse-addresses`) | §6 W2b | ⏳ |
 | 3a | `feat/w3-data-layer` | Sync conflict resolution, route progress, the five facade interfaces | §6 W3a | ✅ |
-| 3b | `feat/w3b-adapters` | Edge Function client, draft route and its store ✅ · concrete facade adapters and React Query ⏳ | §6 W3b | 🔵 |
+| 3b | `feat/w3b-adapters` | Edge Function client, all five concrete facade adapters, React Query policy, four Zustand stores | §6 W3b | ✅ |
 | 4 | `feat/w4-design-system` | Tokens, `<AppMap>`, components | §6 W4 | ⏳ |
 | 5 | `feat/w5-screens` | Expo Router, the ten screens | §6 W5 | ⏳ |
 | 6 | `feat/w6-delivery` | EAS, Fastlane, CI, store preparation | §6 W6 | ⏳ |
@@ -336,18 +336,29 @@ wave 4, which builds components against them.
 **Not covered by this gate:** nothing here touches the network or React. No hook, store or
 adapter exists yet.
 
-### Wave 3b progress — recorded 2026-08-07, **open**
+### Wave 3b closed — recorded 2026-08-08
 
 `main` carries this increment even though the wave is not closed. It is complete, tested and
 breaks nothing, and `main` is meant to be releasable rather than to mark my own bookkeeping —
 holding finished work on a branch to preserve a wave boundary would serve the ledger and not the
 project.
 
-**Done.** The typed Edge Function client, the draft-route domain, and the draft-route store.
-325 tests.
+**Done.** The typed Edge Function client and the draft-route domain and store, then the
+routing, geocoding, navigation, billing and advertising adapters, the React Query policy, and the
+route-progress, preferences, mutation-queue and UI stores. **441 tests.**
 
-**Still open.** The concrete facade adapters over the client, React Query with its persisted
-cache, and the remaining stores — route progress, preferences, mutation queue.
+**Two contract gaps surfaced by writing the adapters rather than by reading the document.**
+`/geocode` was specified to return a `place_id` and a formatted address and nothing else, while
+`resolveBatch` exists precisely to turn expired coordinates back into usable ones — so the facade
+needed a field the contract never promised. And `/place-details` appeared in the timeout table
+with its own budget and retry policy while being defined nowhere. Both are now specified in
+[`33_API_CONTRACTS.md`](33_API_CONTRACTS.md). Separately, the billing adapter was briefly written
+against an `/entitlement` endpoint that does not exist; it was folded into `/usage-quota`, which
+already returned the plan, rather than adding a seventh function for one read.
+
+This is the pattern worth naming for later waves: **an adapter is the first consumer that has to
+believe the contract**, and it finds the places where the document was written from the outside
+in.
 
 **MSW does not run here**, and [`22_TESTING.md`](22_TESTING.md) is corrected rather than
 quietly deviated from: v2 pulls ESM-only transitive dependencies that Jest's CommonJS runtime
