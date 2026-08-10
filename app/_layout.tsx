@@ -5,9 +5,11 @@ import * as Linking from 'expo-linking';
 import { SplashScreen, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo } from 'react';
+import { useColorScheme } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import '../global.css';
+import { ThemeVariables } from '@/components/design/ThemeVariables';
 import { ServicesProvider } from '@/features/api/services-provider';
 import { SessionProvider, useSession } from '@/features/auth/session-provider';
 import { DeepLinkProvider } from '@/features/navigation/deep-link-provider';
@@ -77,6 +79,11 @@ const favourites = createSupabaseFavourites(supabaseConfig);
 const baseUrl = functionsBaseUrl(supabaseConfig);
 
 export default function RootLayout(): React.JSX.Element {
+  // The device's setting, which is what every screen already reads for its
+  // inline colours. Binding the class-name variables from the same source is
+  // what stops the two halves of the palette disagreeing.
+  const scheme = useColorScheme();
+
   const linking = useMemo<DeepLinkPort>(
     () => ({
       getInitialURL: () => Linking.getInitialURL(),
@@ -94,29 +101,35 @@ export default function RootLayout(): React.JSX.Element {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
-        <ConnectivityProvider port={connectivity}>
-          <SessionProvider auth={auth}>
-            {/* Inside `SessionProvider`, because the services are null until
+      {/* Above every screen, because CSS variables inherit down the tree: this
+          is what gives `text-primary` and every other colour class a value, and
+          what makes those values follow the theme. Without it they resolve to
+          nothing (`components/design/ThemeVariables.tsx`). */}
+      <ThemeVariables theme={scheme === 'dark' ? 'dark' : 'light'}>
+        <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
+          <ConnectivityProvider port={connectivity}>
+            <SessionProvider auth={auth}>
+              {/* Inside `SessionProvider`, because the services are null until
                 there is a session: every endpoint behind them is authenticated,
                 and a query firing during the cold-start gap would cache the
                 signed-out answer and leave a paying user on the free
                 allowances. */}
-            <ServicesProvider baseUrl={baseUrl} routes={routes} favourites={favourites}>
-              {/* Both null: RevenueCat needs an account and three configured
+              <ServicesProvider baseUrl={baseUrl} routes={routes} favourites={favourites}>
+                {/* Both null: RevenueCat needs an account and three configured
                   products, AdMob needs an account and a certified CMP for the
                   EEA (ADR-0015). Absence is the ordinary case until they exist,
                   which is what keeps every screen that touches them working. */}
-              <MonetisationProvider billing={null} ads={null}>
-                <DeepLinkProvider port={linking}>
-                  <StatusBar style="auto" />
-                  <RestorationGate />
-                </DeepLinkProvider>
-              </MonetisationProvider>
-            </ServicesProvider>
-          </SessionProvider>
-        </ConnectivityProvider>
-      </PersistQueryClientProvider>
+                <MonetisationProvider billing={null} ads={null}>
+                  <DeepLinkProvider port={linking}>
+                    <StatusBar style="auto" />
+                    <RestorationGate />
+                  </DeepLinkProvider>
+                </MonetisationProvider>
+              </ServicesProvider>
+            </SessionProvider>
+          </ConnectivityProvider>
+        </PersistQueryClientProvider>
+      </ThemeVariables>
     </GestureHandlerRootView>
   );
 }

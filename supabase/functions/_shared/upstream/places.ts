@@ -125,6 +125,17 @@ export function createPlacesAdapter(options: PlacesAdapterOptions) {
           body: {
             input,
             sessionToken,
+            // **Addresses, not places.** Unrestricted, Places ranks localities
+            // and businesses alongside street addresses, and for the short input
+            // a driver actually types — "via roma" — the town wins. Every
+            // suggestion was a city or a region, which is useless to a product
+            // whose entire job is delivering to a door.
+            //
+            // `address` is the collection of precise street addresses. It
+            // excludes businesses by name, which is the deliberate trade: this
+            // routes vans to addresses, and a stop that resolves to "Bergamo"
+            // sends a driver to a town centre.
+            includedPrimaryTypes: ['address'],
             ...(opts.locale === undefined ? {} : { languageCode: opts.locale }),
             ...(opts.bias === undefined
               ? {}

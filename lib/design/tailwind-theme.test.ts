@@ -18,9 +18,34 @@ describe('every token reaches Tailwind', () => {
   it('exposes every colour, under the name the design document uses', () => {
     const scale = colourScale();
     expect(Object.keys(scale)).toHaveLength(Object.keys(colours.light).length);
-    expect(scale['text-primary']).toBe(colours.light.textPrimary);
-    expect(scale['accent-subtle']).toBe(colours.light.accentSubtle);
-    expect(scale['surface-raised']).toBe(colours.light.surfaceRaised);
+    expect(scale['text-primary']).toBe('var(--colour-text-primary)');
+    expect(scale['accent-subtle']).toBe('var(--colour-accent-subtle)');
+    expect(scale['surface-raised']).toBe('var(--colour-surface-raised)');
+  });
+
+  it('binds no colour class to a literal, in either theme', () => {
+    // The defect this replaces: the scale emitted `colours.light` values, so a
+    // class name meant "light's colour" in both themes. Backgrounds are set
+    // inline from `colours[theme]` and were correctly dark, so a dark phone drew
+    // near-black text on a near-black background — the design system rendering
+    // itself invisible on every screen.
+    for (const value of Object.values(colourScale())) {
+      expect(value).toMatch(/^var\(--colour-[a-z-]+\)$/);
+    }
+  });
+
+  it('gives every class a variable that actually exists', () => {
+    // The two halves were each correct and never checked against each other:
+    // `cssVariables()` carried both palettes, was documented as the mechanism,
+    // and was called from nowhere. A class pointing at an undeclared variable
+    // resolves to nothing, which is invisible rather than wrong-coloured.
+    const declared = new Set(Object.keys(cssVariables().light));
+
+    for (const reference of Object.values(colourScale())) {
+      const name = /^var\((?<variable>--colour-[a-z-]+)\)$/.exec(reference)?.groups?.['variable'];
+      expect(name).toBeDefined();
+      expect(declared.has(name ?? '')).toBe(true);
+    }
   });
 
   it('exposes every spacing and layout value', () => {
