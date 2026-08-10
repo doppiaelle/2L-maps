@@ -330,21 +330,6 @@ export interface MapBounds {
   readonly southWest: LatLng;
 }
 
-/**
- * What the product needs from a map, and nothing more.
- *
- * Interface segregation applied literally: `react-native-maps` offers far more
- * than this, and exposing the surplus would make the MapLibre migration in
- * ADR-0012 a rewrite of every screen instead of one adapter.
- */
-export interface AppMapHandle {
-  fitToBounds: (bounds: MapBounds, padding: { readonly bottom: number }) => void;
-  moveTo: (camera: MapCamera, animated: boolean) => void;
-  /** Snapshot for the shareable route preview. Google imagery carries attribution
-   *  obligations wherever it appears (risk C14). */
-  snapshot: () => Promise<string>;
-}
-
 export interface RouteGeometry {
   readonly legs: readonly Leg[];
   /** Decoded once at receipt and memoised; decoding per render is a top cause of

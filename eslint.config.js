@@ -18,7 +18,8 @@ const tseslint = require('typescript-eslint');
 const SDK_RESTRICTIONS = [
   {
     name: 'react-native-maps',
-    message: 'Import react-native-maps only inside the <AppMap> facade (ADR-0005).',
+    message:
+      'react-native-maps is no longer a dependency: the route preview is drawn (ADR-0021). Reinstating it means reversing that decision, not adding an import.',
   },
   {
     name: 'react-native-purchases',

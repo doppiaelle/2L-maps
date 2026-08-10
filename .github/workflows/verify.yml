@@ -59,17 +59,19 @@ jobs:
       # Risk C6 is a config plugin breaking `expo prebuild`, which dependency
       # resolution cannot see: the peer range was satisfied when it last fired.
       # Android prebuild is pure Node, so this gate runs without a Mac and
-      # catches an incompatible Expo SDK / react-native-maps pair at the commit
-      # that introduces it rather than several waves later (ADR-0005).
+      # catches a config plugin that no longer resolves at the commit that
+      # introduces it rather than several waves later (ADR-0005).
       - name: Prebuild (Android)
         run: npx expo prebuild --platform android --no-install --clean
 
-      - name: Assert the Maps key is wired from app.config.ts
-        env:
-          EXPO_PUBLIC_MAPS_API_KEY_ANDROID: AIza-CI-PLACEHOLDER
+      # There is no Maps key to assert any more: the preview is drawn and the
+      # client holds no Google credential at all (ADR-0021). What replaced that
+      # gate is the one below — the permissions the app *does* declare, which is
+      # now the whole of what the manifest has to get right.
+      - name: Assert the declared permissions are the ones we intend
         run: |
-          npx expo prebuild --platform android --no-install --clean
-          grep -q 'com.google.android.geo.API_KEY' android/app/src/main/AndroidManifest.xml
+          grep -q 'android.permission.ACCESS_FINE_LOCATION' android/app/src/main/AndroidManifest.xml
+          ! grep -q 'ACCESS_BACKGROUND_LOCATION' android/app/src/main/AndroidManifest.xml
 
   functions:
     name: the Edge Functions resolve under Deno

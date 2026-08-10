@@ -114,27 +114,21 @@ jobs:
       # artifact while the accounts do not exist yet.
       - name: Generate native project
         env:
-          EXPO_PUBLIC_MAPS_API_KEY_ANDROID: ${{ secrets.MAPS_API_KEY_ANDROID }}
           EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           # Unset is a supported state: the map falls back to Google's default
           # style rather than rendering blank (risk C15). The build does not fail
           # without them, and the difference is visible rather than reported.
-          EXPO_PUBLIC_MAP_ID_LIGHT: ${{ secrets.MAP_ID_LIGHT }}
-          EXPO_PUBLIC_MAP_ID_DARK: ${{ secrets.MAP_ID_DARK }}
         run: npx expo prebuild --platform android --no-install --clean
 
       - name: Build
         working-directory: android
         env:
-          EXPO_PUBLIC_MAPS_API_KEY_ANDROID: ${{ secrets.MAPS_API_KEY_ANDROID }}
           EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           # Unset is a supported state: the map falls back to Google's default
           # style rather than rendering blank (risk C15). The build does not fail
           # without them, and the difference is visible rather than reported.
-          EXPO_PUBLIC_MAP_ID_LIGHT: ${{ secrets.MAP_ID_LIGHT }}
-          EXPO_PUBLIC_MAP_ID_DARK: ${{ secrets.MAP_ID_DARK }}
         # **One ABI, not four.** Expo's template defaults to
         # `armeabi-v7a,arm64-v8a,x86,x86_64`, which compiles every native library
         # four times — and with the New Architecture that is a great deal of C++.

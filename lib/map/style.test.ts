@@ -1,31 +1,15 @@
-import { mapIdFor, markerStyle, routeStroke } from './style';
+import { markerStyle, routeStroke } from './style';
 import { colours } from '@/lib/design/tokens';
 
 /**
- * Risk C15 is that map styling lives in a console, outside version control. The
- * mitigation the documentation promises is a silent fall back to the default
- * style — so that fall back is tested, because an untested fallback is a blank
- * map waiting for a revoked Map ID.
+ * How a route and its stops are painted.
+ *
+ * The Map ID resolver used to live here, mitigating risk C15 — map styling in a
+ * Google console, outside version control. There is no console style left to
+ * fall back from: the preview is drawn from these tokens
+ * ([ADR-0021](../../docs/adr/0021-drawn-route-preview.md)), so what the map
+ * looks like is now entirely in this repository, which is what C15 wanted.
  */
-
-describe('resolving a Map ID', () => {
-  it('uses the one configured for the theme', () => {
-    expect(mapIdFor('dark', { light: 'light-id', dark: 'dark-id' })).toBe('dark-id');
-  });
-
-  it('falls back to the default style when none is configured', () => {
-    // Not a blank map and not an error: a default-styled map is a working map
-    // (docs/14_GOOGLE_MAPS_INTEGRATION.md §6).
-    expect(mapIdFor('light', { light: null, dark: null })).toBeNull();
-  });
-
-  it('treats an empty string as absent', () => {
-    // `process.env['…'] ?? ''` is how an unset build variable arrives. Passing
-    // that to the SDK is not "no style", it is an unresolvable one.
-    expect(mapIdFor('light', { light: '', dark: 'dark-id' })).toBeNull();
-    expect(mapIdFor('light', { light: '   ', dark: 'dark-id' })).toBeNull();
-  });
-});
 
 describe('the route line', () => {
   it('is mint with a casing in light theme', () => {

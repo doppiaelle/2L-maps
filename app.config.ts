@@ -3,30 +3,22 @@ import type { ExpoConfig } from 'expo/config';
 /**
  * Expo configuration.
  *
- * Only the Maps SDK rendering key is present in the client, restricted by bundle
- * ID and SHA-1 to the Maps SDK alone — see CLAUDE.md §9 and ADR-0006. Every other
- * Google call is made by a Supabase Edge Function and no other Google credential
- * exists in this file, in EAS secrets, or anywhere the bundle can reach.
+ * **There is now no Google credential in the client at all.** The Maps SDK
+ * rendering key was the one exception `CLAUDE.md` §9 rule 1 carved out, and it
+ * existed to let `react-native-maps` draw tiles. The preview is drawn from our
+ * own geometry ([ADR-0021](docs/adr/0021-drawn-route-preview.md)), there is no
+ * SDK left to authorise, and the key, its bundle-ID restriction and its SHA-1
+ * restriction are all gone with it. Every Google call is made by a Supabase Edge
+ * Function with a server-side key (ADR-0006).
+ *
+ * The Cloud Map IDs went the same way. They named a style in a console that no
+ * longer renders anything for us — which also closes risk C15, since what the
+ * preview looks like is now entirely in this repository.
  *
  * `LSApplicationQueriesSchemes` and the Android `<queries>` element are build-time
  * declarations: a navigation provider that is not listed here is invisible at
  * runtime with no error. See docs/16_INTERNAL_NAVIGATION.md and docs/18_PERMISSIONS.md.
  */
-
-const MAPS_API_KEY_IOS = process.env['EXPO_PUBLIC_MAPS_API_KEY_IOS'] ?? '';
-const MAPS_API_KEY_ANDROID = process.env['EXPO_PUBLIC_MAPS_API_KEY_ANDROID'] ?? '';
-
-/**
- * Cloud-based Map Styling, one Map ID per theme (docs/14_GOOGLE_MAPS_INTEGRATION.md §6).
- *
- * These are identifiers, not credentials — they name a style in the Cloud
- * console and grant nothing. Unset is a supported state: `mapIdFor` in
- * `lib/map/style.ts` treats the empty string as absent, and the map falls back
- * to Google's default style rather than rendering blank. That fallback is the
- * mitigation for risk C15, where the styles live outside version control.
- */
-const MAP_ID_LIGHT = process.env['EXPO_PUBLIC_MAP_ID_LIGHT'] ?? '';
-const MAP_ID_DARK = process.env['EXPO_PUBLIC_MAP_ID_DARK'] ?? '';
 
 /** Navigation providers we hand off to. iOS caps this list at 50 and App Review
  *  questions unexplained entries, so it is never widened casually (CLAUDE.md §13). */
@@ -46,18 +38,10 @@ const config: ExpoConfig = {
       LSApplicationQueriesSchemes: [...NAVIGATION_URL_SCHEMES],
       ITSAppUsesNonExemptEncryption: false,
     },
-    config: {
-      googleMapsApiKey: MAPS_API_KEY_IOS,
-    },
   },
   android: {
     package: 'com.doppiaelle.twolmaps',
     predictiveBackGestureEnabled: false,
-    config: {
-      googleMaps: {
-        apiKey: MAPS_API_KEY_ANDROID,
-      },
-    },
   },
   plugins: [
     'expo-router',
@@ -88,9 +72,6 @@ const config: ExpoConfig = {
   ],
   experiments: {
     typedRoutes: true,
-  },
-  extra: {
-    mapIds: { light: MAP_ID_LIGHT, dark: MAP_ID_DARK },
   },
 };
 

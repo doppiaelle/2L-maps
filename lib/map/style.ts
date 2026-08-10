@@ -2,41 +2,6 @@ import { colours, mapColours, ROUTE_DASH_PATTERN, stroke } from '@/lib/design/to
 import type { ThemeName } from '@/lib/design/tokens';
 
 /**
- * How the map is styled, decided outside the map component.
- *
- * The base style is Cloud-based Map Styling, referenced by Map ID, one per theme
- * ([`docs/14_GOOGLE_MAPS_INTEGRATION.md`](../../docs/14_GOOGLE_MAPS_INTEGRATION.md) §6).
- * That is **risk C15**: the styles live in the Google Cloud console, outside
- * version control, so a console edit changes the shipped app with no code review
- * and a revoked Map ID would otherwise change the map's appearance silently.
- *
- * The mitigation this file implements is the one the document promises: an
- * absent or unusable Map ID falls back to Google's default style, with no
- * user-facing error. A default-styled map is a working map; a blank one is not.
- */
-
-export interface MapIdConfig {
-  readonly light: string | null;
-  readonly dark: string | null;
-}
-
-/**
- * The Map ID for a theme, or null to let the SDK use its default style.
- *
- * The empty string is treated as absent on purpose. `process.env['…'] ?? ''` is
- * how an unset build variable arrives, and passing `''` to the SDK as a Map ID
- * is the failure this function exists to prevent — it is not "no style", it is
- * an unresolvable one.
- */
-export function mapIdFor(theme: ThemeName, config: MapIdConfig): string | null {
-  const configured = config[theme];
-  if (configured === null) return null;
-
-  const trimmed = configured.trim();
-  return trimmed === '' ? null : trimmed;
-}
-
-/**
  * How the route line is drawn.
  *
  * The casing is a second, wider line drawn underneath rather than an outline:
@@ -160,4 +125,3 @@ export function markerStyle(
  *  change with them — it is 44 pt at every size (`CLAUDE.md` §10 rule 2). */
 export const MARKER_SIZE = 32;
 export const MARKER_SIZE_SELECTED = 40;
-export const CLUSTER_SIZE = 40;
