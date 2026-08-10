@@ -70,3 +70,28 @@ jobs:
         run: |
           npx expo prebuild --platform android --no-install --clean
           grep -q 'com.google.android.geo.API_KEY' android/app/src/main/AndroidManifest.xml
+
+  bundle:
+    name: the JavaScript bundles (risk C6)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      # **Typecheck and tests do not bundle.** Jest transforms only the files a
+      # test imports; Metro walks every module in the dependency graph and runs
+      # the codegen Babel plugin over React Native's own source. A Babel preset
+      # pinned to the wrong Expo SDK is invisible to everything above and fatal
+      # here — and it used to be discovered fifteen minutes into a Gradle build,
+      # because the release build is the first thing that bundles.
+      #
+      # About a minute, on a Linux runner, on every push.
+      - name: Export the Android bundle
+        run: npx expo export --platform android --output-dir /tmp/expo-export
