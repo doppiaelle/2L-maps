@@ -217,6 +217,7 @@ function PlacesProbe({ ids }: { ids: readonly string[] }): React.JSX.Element {
         {[...places.byPlaceId.values()].map((p) => p.address).join('|')}
       </Text>
       <Text testID="unresolved">{places.unresolved.join('|')}</Text>
+      <Text testID="failure">{places.failure?.kind ?? 'none'}</Text>
     </>
   );
 }
@@ -263,17 +264,46 @@ describe('re-resolving a saved route’s addresses', () => {
     expect(screen.getByTestId('unresolved').props.children).toBe('p2');
   });
 
-  it('reports every id as unresolved when the request fails', async () => {
-    // A failure is not an empty answer. Treating it as one would show a route
-    // with no addresses and no explanation.
+  it('reports a failure as a failure, not as a list of unresolved ids', async () => {
+    // **These were the same thing and had to stop being.** A failed batch
+    // returned `{resolved: [], unresolved: everything}` as the query's *value*,
+    // so React Query saw a successful fetch: no retry ran, and the empty answer
+    // was cached for twenty-four hours. Every row said "Address needs
+    // refreshing" and nothing anywhere named the reason.
+    //
+    // `unresolved` now means only what the server actually answered about —
+    // ids Google itself could not place — and that distinction is what lets the
+    // screen offer a retry for one and not for the other.
     renderWithServices(
       () => Promise.reject(new Error('offline')),
       <PlacesProbe ids={['p1', 'p2']} />,
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId('unresolved').props.children).toBe('p1|p2');
+      expect(screen.getByTestId('failure').props.children).not.toBe('none');
     });
+    expect(screen.getByTestId('unresolved').props.children).toBe('');
+  });
+
+  it('reports no failure when the batch succeeded', async () => {
+    renderWithServices(
+      () =>
+        Promise.resolve(
+          jsonResponse({
+            resolved: [
+              { placeId: 'p1', formattedAddress: 'Via Uno, Bergamo', lat: 45.7, lng: 9.7 },
+            ],
+            unresolved: [{ placeId: 'p2' }],
+          }),
+        ),
+      <PlacesProbe ids={['p1', 'p2']} />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('resolved').props.children).toBe('Via Uno, Bergamo');
+    });
+    // An id the server could not place is not an error: the batch worked.
+    expect(screen.getByTestId('failure').props.children).toBe('none');
   });
 
   it('asks for nothing when there is nothing to ask about', async () => {

@@ -6,6 +6,8 @@ import type { StopListItem } from '@/components/lists/StopList';
 import { PrimaryAction } from '@/components/primitives/PrimaryAction';
 import type { PrimaryActionState } from '@/components/primitives/PrimaryAction';
 import { RouteSummaryHeader } from '@/components/route/RouteSummaryHeader';
+import { StatusChip } from '@/components/primitives/StatusChip';
+import type { AddressNotice } from '@/lib/places/notice';
 import { layout, radius, space } from '@/lib/design/tokens';
 import { metricsAreEstimated } from '@/lib/route/plan-state';
 import type { ActionIntent, PlanState } from '@/lib/route/plan-state';
@@ -76,6 +78,16 @@ export interface PlanViewProps {
   /** Mid-route only, beside **Done**. */
   onSkipStop?: () => void;
 
+  /**
+   * Why the addresses are missing, when they are, and what to do about it.
+   *
+   * Decided by `addressNoticeOf`, so the four causes stay four sentences rather
+   * than collapsing back into the single "Address needs refreshing" that every
+   * row used to show for all of them, with no way to refresh anything.
+   */
+  readonly addressNotice?: AddressNotice | null;
+  onRetryAddresses?: () => void;
+
   readonly testID?: string;
 }
 
@@ -94,6 +106,8 @@ export function PlanView({
   onImport,
   adSlot,
   onSkipStop,
+  addressNotice = null,
+  onRetryAddresses,
   testID,
 }: PlanViewProps): React.JSX.Element {
   const actionState = useMemo(() => toActionState(intent, state), [intent, state]);
@@ -117,6 +131,35 @@ export function PlanView({
           {...noteFor(state)}
         />
       </View>
+
+      {addressNotice !== null && (
+        <View
+          style={{ paddingHorizontal: layout.screenPadding, paddingBottom: space.space2 }}
+          testID="plan-address-notice"
+        >
+          <StatusChip
+            kind={addressNotice.kind === 'offline' ? 'offline' : 'quota'}
+            label={addressNotice.title}
+          />
+          <Text className="text-caption text-text-secondary mt-space-1">
+            {addressNotice.detail}
+          </Text>
+          {addressNotice.canRetry && onRetryAddresses !== undefined && (
+            <Pressable
+              onPress={onRetryAddresses}
+              accessibilityRole="button"
+              accessibilityLabel="Look up the missing addresses again"
+              style={{
+                minHeight: layout.touchMin,
+                justifyContent: 'center',
+              }}
+              testID="plan-retry-addresses"
+            >
+              <Text className="text-body-strong text-accent">Try again</Text>
+            </Pressable>
+          )}
+        </View>
+      )}
 
       {/* The list takes the space the header and action do not. It scrolls;
           they do not. */}

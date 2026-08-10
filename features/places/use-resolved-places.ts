@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useServices } from '@/features/api/services-provider';
 import type { LatLng } from '@/lib/geo/haversine';
 import { GC_TIME_MS, STALE_TIME_MS } from '@/lib/query/client';
+import type { GeocodingFailure } from '@/lib/providers/types';
 import type { PlaceId } from '@/types';
 
 /**
@@ -16,6 +17,13 @@ import type { PlaceId } from '@/types';
  * route arrives as ids, and this hook turns them back into something a driver
  * can read.
  *
+ * **What comes back is written into the stops** by the screen
+ * (`applyResolvedCoordinates`), which is what stops this hook being on the
+ * critical path of every render. Before that, a row's address and its marker
+ * both depended on a live round trip every single time — and because the query
+ * key is the *set* of ids, adding or removing one stop made it a query nobody
+ * had run, blanking every coordinate at once.
+ *
  * **The result is a partial answer, always.** `resolveBatch` reports resolved
  * and unresolved separately, and both are passed through: an import of thirty
  * addresses must not be thrown away because two could not be re-resolved
@@ -26,20 +34,55 @@ import type { PlaceId } from '@/types';
  * lets a driver read their day with no signal at all.
  */
 
-export interface ResolvedPlaces {
-  readonly byPlaceId: ReadonlyMap<PlaceId, { address: string; coordinate: LatLng }>;
-  /** Named rather than counted, so the screen can point at the rows that need
-   *  attention instead of saying "some stops could not be loaded". */
-  readonly unresolved: readonly PlaceId[];
-  readonly isLoading: boolean;
+export interface ResolvedPlace {
+  readonly address: string;
+  readonly coordinate: LatLng;
 }
 
-const EMPTY: ReadonlyMap<PlaceId, { address: string; coordinate: LatLng }> = new Map();
+export interface ResolvedPlaces {
+  readonly byPlaceId: ReadonlyMap<PlaceId, ResolvedPlace>;
+  /**
+   * Ids the server answered about and could not place.
+   *
+   * Distinct from a failure: these are the ones Google itself does not resolve,
+   * which happens to individual ids and not to the batch — most often an id the
+   * import flow got from the Geocoding API for an interpolated address, which
+   * Places Details cannot retrieve. Named rather than counted, so the screen can
+   * point at the rows that need attention.
+   */
+  readonly unresolved: readonly PlaceId[];
+  readonly isLoading: boolean;
+  /**
+   * Why the last attempt failed, or null.
+   *
+   * **This used to be indistinguishable from success.** A failed `resolveBatch`
+   * returned `{resolved: [], unresolved: everything}` as the query's *value*, so
+   * React Query saw a successful fetch: `shouldRetry` never engaged, the empty
+   * answer was cached for twenty-four hours, and every row on screen said
+   * "Address needs refreshing" with nothing anywhere naming the reason — an
+   * exhausted allowance and a dead radio produced the same silence.
+   */
+  readonly failure: GeocodingFailure | null;
+  /** Ask again. The only way out of the failed state that does not involve
+   *  deleting the stop and adding it back. */
+  retry: () => void;
+}
+
+const EMPTY: ReadonlyMap<PlaceId, ResolvedPlace> = new Map();
 
 export const placesQueryKey = (placeIds: readonly PlaceId[]) =>
   // Sorted so two screens asking for the same stops in a different order share
   // one cache entry and one billed batch.
   ['places', [...placeIds].sort().join(',')] as const;
+
+/** Carried on the thrown error so the hook can report *why* without the screen
+ *  having to parse a message. */
+class ResolveFailed extends Error {
+  constructor(readonly failure: GeocodingFailure) {
+    super('places could not be resolved');
+    this.name = 'ResolveFailed';
+  }
+}
 
 export function useResolvedPlaces(placeIds: readonly PlaceId[]): ResolvedPlaces {
   const services = useServices();
@@ -50,20 +93,27 @@ export function useResolvedPlaces(placeIds: readonly PlaceId[]): ResolvedPlaces 
     staleTime: STALE_TIME_MS.savedData,
     gcTime: GC_TIME_MS.savedData,
     queryFn: async () => {
-      if (services === null) return { resolved: [], unresolved: [...placeIds] };
+      if (services === null) throw new ResolveFailed({ kind: 'offline' });
 
       const result = await services.geocoding.resolveBatch(placeIds);
-      // A failure is not an empty answer. Reporting every id as unresolved lets
-      // the screen say the stops need refreshing rather than silently showing a
-      // route with no addresses.
-      if (!result.ok) return { resolved: [], unresolved: [...placeIds] };
+      // **Thrown, not returned.** A failure has to reach React Query as a
+      // failure or none of the machinery that exists for failures runs: no
+      // retry, no `isError`, and the empty answer cached as though it were the
+      // truth for a day.
+      if (!result.ok) throw new ResolveFailed(result.failure);
 
       return { resolved: result.resolved, unresolved: result.unresolved };
     },
   });
 
+  const failure = query.error instanceof ResolveFailed ? query.error.failure : null;
+
+  const retry = () => {
+    void query.refetch();
+  };
+
   if (query.data === undefined) {
-    return { byPlaceId: EMPTY, unresolved: [], isLoading: query.isLoading };
+    return { byPlaceId: EMPTY, unresolved: [], isLoading: query.isLoading, failure, retry };
   }
 
   const byPlaceId = new Map(
@@ -73,5 +123,5 @@ export function useResolvedPlaces(placeIds: readonly PlaceId[]): ResolvedPlaces 
     ]),
   );
 
-  return { byPlaceId, unresolved: query.data.unresolved, isLoading: false };
+  return { byPlaceId, unresolved: query.data.unresolved, isLoading: false, failure, retry };
 }

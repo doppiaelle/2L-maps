@@ -1,3 +1,5 @@
+import { isCoordinateFresh } from '@/lib/coordinates/staleness';
+import type { ResolvedPlace } from '@/lib/route/plan-rows';
 import { MAX_STOPS, MIN_STOPS, type RouteShape, type Stop } from '@/types';
 
 /**
@@ -131,6 +133,69 @@ export function removeStop(
     removed,
     atIndex,
   };
+}
+
+/**
+ * Write freshly resolved coordinates into the stops that were missing them.
+ *
+ * **This is the line whose absence made three separate defects.** Every stop the
+ * app creates is born with `coordinate: null` and nothing ever wrote one back,
+ * so a stop's address and its marker both depended on a live `/place-details`
+ * round trip, every single time. Three consequences, all reported from the
+ * device:
+ *
+ * - A row whose lookup had not landed — or had failed once — read "Address needs
+ *   refreshing" for ever, with no way to refresh it.
+ * - The places query is keyed on the *set* of place ids, so adding or removing
+ *   one stop made it a query nobody had run: every coordinate went null at once
+ *   and every marker vanished until the new batch arrived. With no signal they
+ *   never came back.
+ * - The same coordinates were re-bought on every cold start, which is an
+ *   allowance spent on data we already had (`docs/31_COST_MODEL.md`).
+ *
+ * The thirty-day rule is unaffected and is what makes this safe:
+ * `refreshedAt` is stamped now, `isCoordinateFresh` expires it on day 31, and
+ * the purge job clears it server-side
+ * ([ADR-0007](../../docs/adr/0007-place-id-durable-coordinates-perishable.md)).
+ * Caching a coordinate for up to thirty days is exactly what the terms permit;
+ * refusing to cache it at all was not caution, it was a defect.
+ *
+ * A stop whose coordinate is still fresh is left alone — including its
+ * `refreshedAt`, so re-resolving a neighbour cannot silently extend somebody
+ * else's window.
+ *
+ * Returns the same draft when nothing changed, so a store `set` can be skipped
+ * and a render avoided.
+ */
+export function applyResolvedCoordinates(
+  draft: DraftRoute,
+  resolved: ReadonlyMap<string, ResolvedPlace>,
+  now: Date,
+): DraftRoute {
+  if (resolved.size === 0) return draft;
+
+  let changed = false;
+  const refreshedAt = now.toISOString();
+
+  const stops = draft.stops.map((stop) => {
+    if (isCoordinateFresh(stop.coordinate, now)) return stop;
+
+    const place = resolved.get(stop.placeId);
+    if (place === undefined) return stop;
+
+    changed = true;
+    return {
+      ...stop,
+      coordinate: {
+        latitude: place.coordinate.latitude,
+        longitude: place.coordinate.longitude,
+        formattedAddress: place.address,
+        refreshedAt,
+      },
+    };
+  });
+
+  return changed ? { ...draft, stops } : draft;
 }
 
 /** Put a removed stop back where it was. */

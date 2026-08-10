@@ -5,6 +5,7 @@ import { isRouteId, newRouteId } from '@/lib/route/route-id';
 import {
   addStop,
   applyOptimizedOrder,
+  applyResolvedCoordinates,
   emptyDraft,
   labelStop,
   moveStop,
@@ -16,6 +17,7 @@ import {
   type DraftRefusal,
   type DraftRoute,
 } from '@/lib/route/draft';
+import type { ResolvedPlace } from '@/lib/route/plan-rows';
 import type { OptimizationResult, RouteShape, Stop } from '@/types';
 
 /**
@@ -88,6 +90,16 @@ export interface DraftRouteState {
   setRouteShape: (shape: RouteShape) => void;
   setOrigin: (placeId: string | null, isCurrentLocation: boolean) => void;
   applyResult: (result: OptimizationResult) => void;
+  /**
+   * Keep the coordinates a lookup just returned.
+   *
+   * The one write that stops a stop's address and marker depending on a live
+   * round trip every time the screen renders (`applyResolvedCoordinates`).
+   * Called by the screen when the places query lands, not by the query itself:
+   * `lib/` decides, the store holds, and a query that reached into a store would
+   * be server state writing into client state — the mistake `docs/11` §4 is about.
+   */
+  applyResolvedCoordinates: (resolved: ReadonlyMap<string, ResolvedPlace>, now: Date) => void;
   clearRefusal: () => void;
 
   // Derived, exposed so components never recompute domain rules themselves
@@ -246,6 +258,14 @@ export function createDraftRouteStore(storage?: DraftStorage) {
             },
             result: null,
           });
+        },
+
+        applyResolvedCoordinates: (resolved, now) => {
+          const draft = applyResolvedCoordinates(get().draft, resolved, now);
+          // Identity is the signal: `applyResolvedCoordinates` returns the same
+          // object when nothing needed writing, so an unchanged draft costs no
+          // render and no persistence write.
+          if (draft !== get().draft) set({ draft });
         },
 
         applyResult: (result) => {

@@ -26,6 +26,7 @@ import { dockItems, dockObstructionFraction, toggleSection } from '@/lib/ui/dock
 import { UndoToast } from '@/components/feedback/UndoToast';
 import { readMapIds } from '@/lib/config/map-ids';
 import { isOffline } from '@/lib/network/connectivity';
+import { addressNoticeOf } from '@/lib/places/notice';
 import { formatDistance, formatDuration } from '@/lib/format/units';
 import { buildPlanRows, placeIdsToResolve, straightLineMeters } from '@/lib/route/plan-rows';
 import { buildRouteGeometry } from '@/lib/map/route-geometry';
@@ -72,6 +73,7 @@ export default function PlanScreen(): React.JSX.Element {
   const undoRemove = useDraftRouteStore((store) => store.undoRemove);
   const moveStopTo = useDraftRouteStore((store) => store.moveStopTo);
   const resetDraft = useDraftRouteStore((store) => store.reset);
+  const applyResolvedCoordinates = useDraftRouteStore((store) => store.applyResolvedCoordinates);
 
   // What the undo toast is offering. Null means nothing was just removed —
   // the removal has already happened in the store, and `undoRemove` is what
@@ -118,6 +120,23 @@ export default function PlanScreen(): React.JSX.Element {
   const now = new Date();
 
   const places = useResolvedPlaces(placeIdsToResolve(draft.stops, now));
+
+  // What the lookup returned is kept, rather than re-bought on the next render,
+  // the next launch and every time the stop list changes shape. The thirty-day
+  // rule still governs it — `applyResolvedCoordinates` stamps `refreshedAt` and
+  // `isCoordinateFresh` expires it (ADR-0007).
+  //
+  // Keyed on the ids rather than on the map, which is a new object every render.
+  // The action is a no-op when nothing needed writing, so a stray run costs one
+  // comparison and no re-render.
+  const resolvedKey = [...places.byPlaceId.keys()].sort().join(',');
+  useEffect(() => {
+    if (places.byPlaceId.size === 0) return;
+    applyResolvedCoordinates(places.byPlaceId, new Date());
+    // `places.byPlaceId` is deliberately absent: its identity changes on every
+    // render and `resolvedKey` is the part that actually changed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resolvedKey, applyResolvedCoordinates]);
   const { rows, markers } = buildPlanRows({
     stops: draft.stops,
     resolved: places.byPlaceId,
@@ -317,6 +336,15 @@ export default function PlanScreen(): React.JSX.Element {
             onSkipStop={() => {
               advance('skipped');
             }}
+            // Four causes, four sentences, and a retry only where retrying can
+            // work. Every row used to say "Address needs refreshing" for all of
+            // them and offer no way to refresh anything.
+            addressNotice={addressNoticeOf({
+              failure: places.failure,
+              unresolvedCount: places.unresolved.length,
+              isLoading: places.isLoading,
+            })}
+            onRetryAddresses={places.retry}
             testID="plan-view"
           />
         </SectionPanel>

@@ -3,6 +3,7 @@ import { MAX_STOPS, MIN_STOPS, type Stop } from '@/types';
 import {
   addStop,
   applyOptimizedOrder,
+  applyResolvedCoordinates,
   emptyDraft,
   labelStop,
   moveStop,
@@ -12,6 +13,7 @@ import {
   restoreStop,
   setShape,
   wasAlreadyOptimal,
+  type DraftRoute,
 } from './draft';
 
 /**
@@ -317,5 +319,153 @@ describe('entry order after a removal', () => {
 
     const orders = added.draft.stops.map((s) => s.entryOrder);
     expect(new Set(orders).size).toBe(orders.length);
+  });
+});
+
+/**
+ * Keeping a coordinate the lookup just returned.
+ *
+ * The line whose absence produced three separate reports from the device: rows
+ * stuck on "Address needs refreshing", markers that vanished whenever the stop
+ * list changed shape, and the same coordinates re-bought on every cold start.
+ * Every stop was born with `coordinate: null` and nothing ever wrote one back.
+ */
+describe('writing resolved coordinates into the stops', () => {
+  const now = new Date('2026-08-10T09:00:00.000Z');
+
+  const stopNeeding = (id: string, placeId: string): Stop => ({
+    id,
+    placeId,
+    label: null,
+    note: null,
+    position: 0,
+    entryOrder: 0,
+    coordinate: null,
+    isCompleted: false,
+  });
+
+  const resolved = (entries: Record<string, [number, number, string]>) =>
+    new Map(
+      Object.entries(entries).map(([placeId, [latitude, longitude, address]]) => [
+        placeId,
+        { address, coordinate: { latitude, longitude } },
+      ]),
+    );
+
+  const draftOf = (stops: readonly Stop[]): DraftRoute => ({
+    ...emptyDraft('2b6e1d84-7c9a-4c1e-9f0a-1d2c3b4a5e6f'),
+    stops: [...stops],
+  });
+
+  it('fills a stop that had no coordinate', () => {
+    const draft = draftOf([stopNeeding('s1', 'p1')]);
+    const next = applyResolvedCoordinates(
+      draft,
+      resolved({ p1: [45.7, 9.7, 'Via Uno, Bergamo'] }),
+      now,
+    );
+
+    expect(next.stops[0]?.coordinate).toEqual({
+      latitude: 45.7,
+      longitude: 9.7,
+      formattedAddress: 'Via Uno, Bergamo',
+      refreshedAt: now.toISOString(),
+    });
+  });
+
+  it('stamps the moment it was written, which is what expires it', () => {
+    // The thirty-day rule is what makes keeping this legal at all (ADR-0007).
+    // A coordinate stored without a date is the one case the expiry cannot
+    // handle.
+    const next = applyResolvedCoordinates(
+      draftOf([stopNeeding('s1', 'p1')]),
+      resolved({ p1: [45.7, 9.7, 'Via Uno'] }),
+      now,
+    );
+    expect(next.stops[0]?.coordinate?.refreshedAt).toBe(now.toISOString());
+  });
+
+  it('leaves a stop whose coordinate is still fresh entirely alone', () => {
+    // Including its `refreshedAt`: re-resolving a neighbour must not silently
+    // extend somebody else's thirty-day window.
+    const fresh: Stop = {
+      ...stopNeeding('s1', 'p1'),
+      coordinate: {
+        latitude: 1,
+        longitude: 2,
+        formattedAddress: 'Old but valid',
+        refreshedAt: '2026-08-09T09:00:00.000Z',
+      },
+    };
+
+    const next = applyResolvedCoordinates(
+      draftOf([fresh]),
+      resolved({ p1: [45.7, 9.7, 'Newly resolved'] }),
+      now,
+    );
+
+    expect(next.stops[0]?.coordinate?.formattedAddress).toBe('Old but valid');
+    expect(next.stops[0]?.coordinate?.refreshedAt).toBe('2026-08-09T09:00:00.000Z');
+  });
+
+  it('replaces a coordinate that has expired', () => {
+    const stale: Stop = {
+      ...stopNeeding('s1', 'p1'),
+      coordinate: {
+        latitude: 1,
+        longitude: 2,
+        formattedAddress: 'Expired',
+        refreshedAt: '2026-06-01T09:00:00.000Z',
+      },
+    };
+
+    const next = applyResolvedCoordinates(
+      draftOf([stale]),
+      resolved({ p1: [45.7, 9.7, 'Fresh'] }),
+      now,
+    );
+
+    expect(next.stops[0]?.coordinate?.formattedAddress).toBe('Fresh');
+  });
+
+  it('touches only the stops the lookup answered about', () => {
+    const draft = draftOf([stopNeeding('s1', 'p1'), stopNeeding('s2', 'p2')]);
+    const next = applyResolvedCoordinates(draft, resolved({ p1: [45.7, 9.7, 'Via Uno'] }), now);
+
+    expect(next.stops[0]?.coordinate).not.toBeNull();
+    expect(next.stops[1]?.coordinate).toBeNull();
+  });
+
+  it('fills both stops when the same address appears twice', () => {
+    // A morning delivery and an afternoon collection at one address is a real
+    // working route, and it is one lookup for two stops.
+    const draft = draftOf([stopNeeding('s1', 'p1'), stopNeeding('s2', 'p1')]);
+    const next = applyResolvedCoordinates(draft, resolved({ p1: [45.7, 9.7, 'Via Uno'] }), now);
+
+    expect(next.stops[0]?.coordinate).not.toBeNull();
+    expect(next.stops[1]?.coordinate).not.toBeNull();
+  });
+
+  it('returns the very same draft when nothing needed writing', () => {
+    // Identity is the signal the store uses to skip a `set`, and therefore a
+    // render and a write to storage.
+    const draft = draftOf([stopNeeding('s1', 'p1')]);
+    expect(applyResolvedCoordinates(draft, new Map(), now)).toBe(draft);
+    expect(applyResolvedCoordinates(draft, resolved({ other: [1, 2, 'x'] }), now)).toBe(draft);
+  });
+
+  it('leaves the order and the optimization flags untouched', () => {
+    // This writes coordinates and nothing else. Clearing `isOptimized` here
+    // would throw away a result because an address was refreshed.
+    const draft: DraftRoute = {
+      ...draftOf([stopNeeding('s1', 'p1')]),
+      isOptimized: true,
+      isDegraded: true,
+    };
+    const next = applyResolvedCoordinates(draft, resolved({ p1: [45.7, 9.7, 'Via Uno'] }), now);
+
+    expect(next.isOptimized).toBe(true);
+    expect(next.isDegraded).toBe(true);
+    expect(next.stops.map((stop) => stop.id)).toEqual(draft.stops.map((stop) => stop.id));
   });
 });
