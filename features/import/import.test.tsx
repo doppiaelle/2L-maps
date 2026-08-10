@@ -72,15 +72,19 @@ describe('what the screen offers', () => {
     expect(screen.getByText('Paste a list to get started')).toBeTruthy();
   });
 
-  it('offers the model only when the split was the wrong tool', () => {
-    expect(renderView().queryByTestId('import-parse')).toBeNull();
-  });
-
-  it('offers it when the paste reads as prose', () => {
-    // A metered call, so it is offered rather than run — and offered with the
-    // free result already on screen, so the user can see what it replaces.
+  it('always offers to read the text, whatever shape it is in', () => {
+    // The control used to appear only when a heuristic guessed the paste was
+    // prose — so the case it exists for, a note with the addresses running
+    // together, was exactly the case where it stayed hidden.
     renderView({ canParse: true });
     expect(screen.getByTestId('import-parse')).toBeTruthy();
+  });
+
+  it('disables it rather than hiding it when there is nothing to read', () => {
+    // A control that vanishes teaches nothing. One that is visibly unavailable
+    // says the feature exists and what it is waiting for.
+    renderView({ canParse: false });
+    expect(screen.getByTestId('import-parse').props.accessibilityState.disabled).toBe(true);
   });
 
   it('states a failed lookup instead of appearing to ignore the tap', () => {
@@ -202,10 +206,9 @@ describe('the free split runs first', () => {
 
     const state = screen.getByTestId('probe').props.children as string;
     expect(state).toContain('Via Roma 1, Bergamo');
-    expect(state).toContain('"canParse":false');
   });
 
-  it('offers the model when the paste is prose', async () => {
+  it('offers to read any text at all, prose or not', async () => {
     await renderProbe(
       [
         'Ciao Marco come stai spero tutto bene volevo chiederti un favore',
@@ -219,6 +222,14 @@ describe('the free split runs first', () => {
       fireEvent.press(screen.getByTestId('paste'));
     });
 
+    expect(screen.getByTestId('probe').props.children).toContain('"canParse":true');
+  });
+
+  it('offers it for a tidy list too, because the splitter is not the only reader', async () => {
+    await renderProbe('Via Roma 1, Bergamo\nVia Milano 22, Bergamo');
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('paste'));
+    });
     expect(screen.getByTestId('probe').props.children).toContain('"canParse":true');
   });
 

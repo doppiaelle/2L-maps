@@ -7,20 +7,24 @@ import { parsePaste, type PasteCandidate } from '@/lib/import/paste';
 /**
  * Import state, and the decision about when to spend money on it.
  *
- * **The split runs first, always, and for free.** A driver's day usually arrives
- * as a list, and a list needs splitting rather than understanding — paying for
- * inference to do the work of a `split` is the sort of cost this product spends
- * its discipline avoiding ([`docs/31_COST_MODEL.md`](../../docs/31_COST_MODEL.md)).
+ * Two readers, ordered.
  *
- * **The model is offered, never run automatically**, and only when the split
- * says the text is prose. That is a metered call
- * ([ADR-0016](../../docs/adr/0016-ai-assisted-stop-entry.md)); spending on it is
- * the user's decision, taken with the free result already on screen so they can
- * see what it would be replacing.
+ * **The model reads everything, and it is the primary path.** An earlier version
+ * offered it only when a line-splitting heuristic decided the text looked like
+ * prose, which meant the interesting case — a note where the addresses run
+ * together without a line break each — landed on the splitter, produced one
+ * useless candidate, and the user had to notice a secondary link to get the tool
+ * that would actually have worked.
  *
- * **A failed parse leaves the free result standing.** The alternative — clearing
- * the screen because the paid attempt failed — takes away something that was
- * working in order to report that something else did not.
+ * The cost is a metered call per import ([ADR-0016](../../docs/adr/0016-ai-assisted-stop-entry.md)),
+ * accepted deliberately: an import is a rare, deliberate act — a few a day at
+ * most — and the alternative was a feature that failed on the material it exists
+ * for.
+ *
+ * **The splitter still runs, underneath, always.** It is free, instant, and it is
+ * what the screen shows when there is no model configured, when the call fails,
+ * and while the call is in flight. A paid attempt that fails must not take away
+ * a working answer that was already there.
  */
 
 export interface ImportProblem {
@@ -127,8 +131,10 @@ export function useImport(): ImportState {
     },
     candidates,
     problems,
-    // Only when the split says so, and only when there is a service to ask.
-    canParse: split.needsParsing && services !== null && !isParsing,
+    // Whenever there is something to read and something to read it with. The
+    // heuristic that used to gate this is gone: it hid the feature from exactly
+    // the material the feature is for.
+    canParse: text.trim() !== '' && services !== null && !isParsing,
     isParsing,
     parse: () => {
       if (services === null) return;

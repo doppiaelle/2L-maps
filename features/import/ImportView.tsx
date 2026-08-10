@@ -9,8 +9,14 @@ import type { PasteCandidate } from '@/lib/import/paste';
  * Import a list
  * ([`docs/08_SCREEN_SPECIFICATIONS.md`](../../docs/08_SCREEN_SPECIFICATIONS.md) §8).
  *
- * **Partial success is presented as success**, and that is the whole design of
- * this screen. Twenty-eight addresses read and three lines unreadable is a good
+ * **Reading the text is the primary action**, and adding what it found is the
+ * second. The button that used to say "this looks like a message" appeared only
+ * when a heuristic guessed the paste was prose — so the case it was built for,
+ * a note with the addresses running together, is exactly the case where it
+ * stayed hidden and the user got one useless candidate instead.
+ *
+ * **Partial success is presented as success**, and that is the other half of
+ * the design. Twenty-eight addresses read and three lines unreadable is a good
  * outcome: the primary action says "Add 28 stops" and is enabled, while the
  * three sit below in a section that names what is wrong with each. The failure
  * mode this avoids is the one where a screen refuses the batch because part of
@@ -32,8 +38,7 @@ export interface ImportViewProps {
    *  Each is shown with its own reason. */
   readonly problems: readonly { readonly text: string; readonly reason: string }[];
 
-  /** The paste reads as prose rather than a list, so splitting it is the wrong
-   *  tool and the model is offered instead. */
+  /** There is text to read and a service to read it with. */
   readonly canParse: boolean;
   readonly isParsing: boolean;
   onParse: () => void;
@@ -84,9 +89,9 @@ export function ImportView({
         // Not focused on open, unlike the search field. The user arrives here to
         // paste, and a keyboard covering the area they are pasting into is the
         // one thing in the way of that.
-        placeholder="One address per line"
+        placeholder="Paste anything — a list, or a message with the addresses in it"
         placeholderTextColor={palette.textSecondary}
-        accessibilityLabel="Paste your addresses, one per line"
+        accessibilityLabel="Paste your addresses, or a message containing them"
         style={{
           minHeight: 120,
           marginTop: space.space4,
@@ -100,29 +105,31 @@ export function ImportView({
         testID="import-input"
       />
 
-      {canParse && (
-        <Pressable
-          onPress={onParse}
-          disabled={isParsing}
-          accessibilityRole="button"
-          accessibilityLabel="Read the addresses out of this message"
-          accessibilityState={{ disabled: isParsing, busy: isParsing }}
-          style={{
-            minHeight: layout.touchMin,
-            marginTop: space.space3,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-          testID="import-parse"
-        >
-          {/* Offered rather than run automatically. It is a metered call, and
-              the split has already produced something usable in most cases —
-              spending on the rest is the user's decision (ADR-0016). */}
-          <Text className="text-body-strong text-accent">
-            {isParsing ? 'Reading…' : 'This looks like a message — read it for me'}
-          </Text>
-        </Pressable>
-      )}
+      {/* The prominent control, offered for any text at all. It reads a note
+          where the addresses run together as readily as a tidy list, which the
+          line splitter beneath cannot do. Tapped rather than automatic, because
+          it is a metered call and a keystroke must never be one (ADR-0016). */}
+      <Pressable
+        onPress={onParse}
+        disabled={!canParse}
+        accessibilityRole="button"
+        accessibilityLabel="Read the addresses out of this text"
+        accessibilityState={{ disabled: !canParse, busy: isParsing }}
+        style={{
+          minHeight: layout.actionMinHeight,
+          marginTop: space.space3,
+          borderRadius: radius.radiusLg,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: palette.surfaceRaised,
+          opacity: canParse ? 1 : 0.5,
+        }}
+        testID="import-parse"
+      >
+        <Text className="text-body-strong text-accent">
+          {isParsing ? 'Reading…' : 'Read the addresses'}
+        </Text>
+      </Pressable>
 
       <ScrollView style={{ flex: 1, marginTop: space.space4 }}>
         {count > 0 && (

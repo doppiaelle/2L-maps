@@ -235,6 +235,15 @@ export default function PlanScreen(): React.JSX.Element {
       onAddStop={() => {
         router.push('/add-stop');
       }}
+      onImport={() => {
+        router.push('/import');
+      }}
+      onOpenHistory={() => {
+        router.push('/history');
+      }}
+      onOpenSettings={() => {
+        router.push('/settings');
+      }}
       onSkipStop={() => {
         advance('skipped');
       }}
