@@ -93,5 +93,33 @@ jobs:
       # because the release build is the first thing that bundles.
       #
       # About a minute, on a Linux runner, on every push.
+      #
+      # The probe values are what make this more than a syntax check.
+      # `EXPO_PUBLIC_*` variables are not read at runtime — there is no
+      # environment on a phone — they are substituted into the bundle by Babel,
+      # and only where it can see the name: `process.env.FOO`. Read through a
+      # variable instead and the substitution silently does not happen, the
+      # build succeeds, and the app installs reporting itself unconfigured while
+      # the secrets sit correctly in CI.
+      #
+      # So the bundle is searched for the values that went in. Nothing else in
+      # the pipeline can tell the difference.
       - name: Export the Android bundle
+        env:
+          EXPO_PUBLIC_SUPABASE_URL: https://ci-probe-url.supabase.co
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ci-probe-anon-key
         run: npx expo export --platform android --output-dir /tmp/expo-export
+
+      - name: Assert the configuration reached the bundle
+        run: |
+          for probe in ci-probe-url ci-probe-anon-key; do
+            if ! grep -rqF "$probe" /tmp/expo-export/_expo/static/js/android/; then
+              echo "::error::\"$probe\" is missing from the bundle."
+              echo "An EXPO_PUBLIC_ variable is being read in a way Babel cannot"
+              echo "substitute. It must be a static member expression —"
+              echo "process.env.EXPO_PUBLIC_NAME — never env[name] or a spread of"
+              echo "process.env. See readSupabaseConfig in lib/supabase/client.ts."
+              exit 1
+            fi
+          done
+          echo "Both probe values are present: EXPO_PUBLIC_ substitution is working."

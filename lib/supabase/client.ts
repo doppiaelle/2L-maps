@@ -5,6 +5,7 @@ import * as WebBrowser from 'expo-web-browser';
 
 import { createAuthProvider } from './auth-adapter';
 import type { AuthBrowserPort, SupabaseAuthPort } from './auth-adapter';
+import { AUTH_REDIRECT_URL, type SupabaseConfig } from './config';
 import { createFavouritesProvider } from './favourites-adapter';
 import type { FavouritesPort, FavouritesProvider } from './favourites-adapter';
 import { createRoutesProvider } from './routes-adapter';
@@ -27,48 +28,6 @@ import type { AuthProvider } from '@/lib/providers/types';
  * with no `.env` looks like, and the app has to say so rather than crash on
  * import — a crash at module load has no screen to report itself on.
  */
-
-export interface SupabaseConfig {
-  readonly url: string;
-  readonly anonKey: string;
-}
-
-export function readSupabaseConfig(
-  env: Record<string, string | undefined> = process.env,
-): SupabaseConfig | null {
-  const url = env['EXPO_PUBLIC_SUPABASE_URL']?.trim() ?? '';
-  const anonKey = env['EXPO_PUBLIC_SUPABASE_ANON_KEY']?.trim() ?? '';
-
-  // Both or neither. Half a configuration produces a client that resolves every
-  // request to a network error, which reads to a user as "the app is broken"
-  // rather than "this build was never wired up".
-  if (url === '' || anonKey === '') return null;
-  return { url, anonKey };
-}
-
-/**
- * Where the Edge Functions live, or null when this build has no project.
- *
- * Derived from the project URL rather than configured separately, because they
- * are the same project and a second variable is a second thing to get wrong —
- * in a way that produces a working sign-in and a dead Optimize button, which is
- * the hardest kind of misconfiguration to diagnose from a phone.
- */
-export function functionsBaseUrl(config: SupabaseConfig | null): string | null {
-  if (config === null) return null;
-  return `${config.url.replace(/\/+$/, '')}/functions/v1`;
-}
-
-/**
- * Where the provider sends the user back.
- *
- * A literal rather than `Linking.createURL`, because the value has to match what
- * the auth server is configured to allow: it appears in `supabase/config.toml`
- * under `additional_redirect_urls`, and a mismatch is refused with an error page
- * in a browser the user did not ask to open. One string in two places that must
- * agree is better than a computed one in two places that might not.
- */
-export const AUTH_REDIRECT_URL = 'twolmaps://auth-callback';
 
 export function createSupabaseClient(config: SupabaseConfig): SupabaseClient {
   return createClient(config.url, config.anonKey, {

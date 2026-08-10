@@ -329,7 +329,7 @@ revisit.
 
 | Do this | Should happen | If it does not |
 |---|---|---|
-| Open the app, tap **Continue with Google** | A Google page opens; after choosing an account the app comes back signed in | Steps 5 and 8 |
+| Open the app, tap **Continue with Google** | A Google page opens; after choosing an account the app comes back signed in | See below |
 | Look at the map | Streets and labels | Key ⑥ — see §5 below |
 | Type three characters in **Add stop** | Address suggestions appear | Step 7 `GOOGLE_SERVER_API_KEY`, or Places API **(New)** not enabled |
 | Add two stops, tap **Optimize** | The order changes and a line draws | Routes API not enabled |
@@ -337,6 +337,20 @@ revisit.
 | Close the app fully, reopen it | The route is still there | Step 6a |
 | Open **History** | The route is listed | `migrate` did not run, or failed |
 | Add a stop, then reopen **Add stop** | It is there under Recent, instantly | Nothing — this one is local |
+
+### "Sign-in is not available in this build"
+
+This is not about Google or Supabase configuration. It means the app was built
+**without `SUPABASE_URL` and `SUPABASE_ANON_KEY`** — `readSupabaseConfig` returned null,
+so there is no auth client at all.
+
+Those two are *repository* secrets (step 6a), not environment secrets. If they were
+added after the build ran, or added to the `staging` environment by mistake, the build
+compiled them in as empty. Check the spelling, check the scope, and run
+`android-preview` again.
+
+"Sign-in did not complete" is the other message and means something different: the
+client exists and the round trip failed. That one points at steps 5 and 8.
 
 ## 5. A grey map
 
