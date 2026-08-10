@@ -6,6 +6,7 @@ import type { StopListItem } from '@/components/lists/StopList';
 import { AppMap } from '@/components/map/AppMap';
 import { PrimaryAction } from '@/components/primitives/PrimaryAction';
 import type { PrimaryActionState } from '@/components/primitives/PrimaryAction';
+import { MapControls } from '@/components/map/MapControls';
 import { RouteSummaryHeader } from '@/components/route/RouteSummaryHeader';
 import { RouteSheet } from '@/components/sheet/RouteSheet';
 import { layout, radius, space } from '@/lib/design/tokens';
@@ -57,6 +58,13 @@ export interface PlanViewProps {
 
   onPrimaryAction: () => void;
   onAddStop: () => void;
+  /** Import a pasted list. A modal over Plan and a sibling of add-stop
+   *  ([`docs/05_INFORMATION_ARCHITECTURE.md`](../../docs/05_INFORMATION_ARCHITECTURE.md) §5) —
+   *  it was previously reachable only from *inside* add-stop, which put a
+   *  first-class way of building a route behind a search that had to fail. */
+  onImport: () => void;
+  onOpenHistory: () => void;
+  onOpenSettings: () => void;
   /**
    * The advertising slot, or nothing.
    *
@@ -92,6 +100,9 @@ export function PlanView({
   onClearSelection,
   onPrimaryAction,
   onAddStop,
+  onImport,
+  onOpenHistory,
+  onOpenSettings,
   adSlot,
   onSkipStop,
   theme,
@@ -124,6 +135,16 @@ export function PlanView({
         onMapPress={onClearSelection}
         sheetFraction={sheetFraction}
         prefersReducedMotion={prefersReducedMotion}
+      />
+
+      <MapControls
+        onOpenHistory={onOpenHistory}
+        onOpenSettings={onOpenSettings}
+        // Hidden mid-route: the user is driving, and neither destination is
+        // something they should be one tap from (docs/05 §194).
+        isRouteInProgress={state.kind === 'in-progress'}
+        theme={theme}
+        testID="plan-map-controls"
       />
 
       <RouteSheet
@@ -176,22 +197,49 @@ export function PlanView({
             )}
 
             {/* Always reachable, at every detent and in every state that has a
-                list — adding a stop is the first of the three taps. */}
+                list — adding a stop is the first of the three taps.
+                **Import sits beside it**, because the two are the same choice:
+                one address or a whole day's worth. It used to be reachable only
+                from inside add-stop, which meant a user with a pasted list had
+                to open a search, fail to find what they wanted, and notice a
+                secondary link. */}
             {state.kind !== 'in-progress' && (
-              <Pressable
-                onPress={onAddStop}
-                accessibilityRole="button"
-                accessibilityLabel="Add a stop"
+              <View
                 style={{
-                  minHeight: layout.touchMin,
+                  flexDirection: 'row',
                   marginTop: space.space2,
-                  alignItems: 'center',
                   justifyContent: 'center',
+                  gap: space.space5,
                 }}
-                testID="plan-add-stop"
               >
-                <Text className="text-body text-accent">Add a stop</Text>
-              </Pressable>
+                <Pressable
+                  onPress={onAddStop}
+                  accessibilityRole="button"
+                  accessibilityLabel="Add a stop"
+                  style={{
+                    minHeight: layout.touchMin,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  testID="plan-add-stop"
+                >
+                  <Text className="text-body text-accent">Add a stop</Text>
+                </Pressable>
+
+                <Pressable
+                  onPress={onImport}
+                  accessibilityRole="button"
+                  accessibilityLabel="Paste a list of addresses"
+                  style={{
+                    minHeight: layout.touchMin,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  testID="plan-import"
+                >
+                  <Text className="text-body text-accent">Paste a list</Text>
+                </Pressable>
+              </View>
             )}
           </View>
         }
