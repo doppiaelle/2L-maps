@@ -106,6 +106,7 @@ owning your area (see §Areas below) → [`29`](29_DEFINITION_OF_DONE.md).
 | 29 | [Definition of Done](29_DEFINITION_OF_DONE.md) | When a change is actually finished |
 | 36 | [Implementation Plan](36_IMPLEMENTATION_PLAN.md) | **Live status.** Wave order, branches, gates, environment limits |
 | 37 | [Go-Live Runbook](37_GO_LIVE_RUNBOOK.md) | **Instructions.** Every account, key and limit, in the order that caps spend first |
+| 38 | [Quick Start Settings](38_QUICK_START_SETTINGS.md) | **Instructions, short.** The nine steps from nothing to the app on a phone — everything a first test does not need is left out |
 
 ### Architecture Decision Records
 
