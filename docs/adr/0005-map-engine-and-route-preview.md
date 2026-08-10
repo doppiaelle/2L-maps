@@ -85,6 +85,27 @@ console change alters the shipped app with no code review. Map IDs and their ver
 specified in [`14_GOOGLE_MAPS_INTEGRATION.md`](../14_GOOGLE_MAPS_INTEGRATION.md), and a
 fallback to the default style is mandatory if a Map ID fails to resolve.
 
+### Amended 2026-08-10 — the pairing extends past the native modules
+
+This ADR pins Expo and `react-native-maps` as a pair and treats `expo prebuild` as the gate.
+**That gate is necessary and it is not sufficient**, because the coupling is wider than the
+native modules: `babel-preset-expo` is versioned to the SDK too, and it was pinned at `~14.0.0`
+— an SDK 51 version — while the project ran SDK 57.
+
+Nothing caught it. Dependency resolution was satisfied, `npm ls` showed no conflict, typecheck
+passed, 1,112 tests passed, and `expo prebuild` completed. The two versions coexisted quietly:
+`babel-preset-expo@14` brought its own nested `@react-native/codegen@0.81.1` while React Native
+0.86.2 shipped 0.86.2 beside it.
+
+It surfaced only when Metro bundled for a release build — the first thing in the whole pipeline
+that walks React Native's own source through the codegen Babel plugin — and failed on an
+internal component whose event declaration the older parser could not read. Fifteen minutes into
+a Gradle build, on the first attempt to produce an installable artifact.
+
+**So `verify` now bundles.** `expo export --platform android` on every push, about a minute on a
+Linux runner. Typecheck and tests transform only what a test imports; bundling is the only thing
+that reads every module, and it was the only gate the pipeline did not have.
+
 ## Consequences
 
 **Positive.** Every map requirement in the brief is satisfiable with library support that
