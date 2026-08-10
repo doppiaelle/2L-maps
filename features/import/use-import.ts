@@ -57,9 +57,17 @@ export interface ImportState {
    */
   resolve: () => Promise<readonly { readonly placeId: string; readonly address: string }[]>;
   readonly isResolving: boolean;
-  /** The last thing that went wrong, so the screen states it rather than
-   *  appearing to ignore a tap. */
-  readonly failure: 'could-not-resolve' | null;
+  /**
+   * The last thing that went wrong, so the screen states it rather than
+   * appearing to ignore a tap.
+   *
+   * `could-not-parse` was missing and the omission was visible in use: the model
+   * call failed, the hook returned early, and the button had simply done
+   * nothing. The free splitter's result stayed on screen — correct behaviour —
+   * but nothing said the paid attempt had been tried and failed, so the feature
+   * read as broken rather than degraded (`CLAUDE.md` §0 rule 5).
+   */
+  readonly failure: 'could-not-resolve' | 'could-not-parse' | null;
 }
 
 export function useImport(): ImportState {
@@ -69,7 +77,7 @@ export function useImport(): ImportState {
   const [text, setText] = useState('');
   const [isParsing, setIsParsing] = useState(false);
   const [isResolving, setIsResolving] = useState(false);
-  const [failure, setFailure] = useState<'could-not-resolve' | null>(null);
+  const [failure, setFailure] = useState<ImportState['failure']>(null);
   /** Addresses the geocoder could not place. Usually a missing town rather than
    *  a place that does not exist, which is why they come back for correction. */
   const [unresolved, setUnresolved] = useState<readonly string[]>([]);
@@ -144,14 +152,20 @@ export function useImport(): ImportState {
         .parse({ kind: 'text', text })
         .then((outcome) => {
           setIsParsing(false);
-          // Left standing on failure. Clearing a working free result because a
-          // paid attempt failed takes away the thing that was working.
-          if (!outcome.ok) return;
+          if (!outcome.ok) {
+            // The free result is left standing — clearing a working answer
+            // because a paid attempt failed takes away the thing that worked —
+            // but the attempt is reported. Returning silently here is what made
+            // the button look dead.
+            setFailure('could-not-parse');
+            return;
+          }
           setParsed({ addresses: outcome.candidates, unparsed: outcome.unparsed });
           setEdits({});
         })
         .catch(() => {
           setIsParsing(false);
+          setFailure('could-not-parse');
         });
     },
     editProblem: (index, next) => {

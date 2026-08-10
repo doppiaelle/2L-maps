@@ -31,6 +31,7 @@ const renderView = (
       onQueryChange={noop}
       onSelect={noop}
       onAddManually={noop}
+      onRetry={noop}
       onDismiss={noop}
       theme="light"
       {...overrides}
@@ -101,6 +102,46 @@ describe('no match', () => {
 
     fireEvent.press(screen.getByTestId('add-stop-manual'));
     expect(added).toBe('Cascina vecchia');
+  });
+});
+
+describe('a search that failed', () => {
+  it('says the fault is ours, not the address', () => {
+    // "No match" told the user their address was wrong when the truth was that
+    // our server did not answer. They retype a correct address, it fails again,
+    // and the product looks broken (CLAUDE.md §0 rule 5).
+    renderView({ kind: 'failed', reason: 'unavailable', options: [] });
+
+    expect(screen.getByLabelText('Search is not responding')).toBeTruthy();
+    expect(screen.queryByTestId('add-stop-no-match')).toBeNull();
+  });
+
+  it('offers a retry where retrying can work', () => {
+    const onRetry = jest.fn();
+    renderView({ kind: 'failed', reason: 'unavailable', options: [] }, { onRetry });
+
+    fireEvent.press(screen.getByTestId('add-stop-retry'));
+    expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it('offers no retry against an exhausted allowance', () => {
+    // Pressing it would spend nothing and change nothing. A button that cannot
+    // help is worse than no button.
+    renderView({ kind: 'failed', reason: 'quota-exhausted', options: [] });
+
+    expect(screen.queryByTestId('add-stop-retry')).toBeNull();
+    expect(screen.getByLabelText('Search limit reached')).toBeTruthy();
+  });
+
+  it('keeps the free options visible underneath', () => {
+    // Reuse costs nothing and does not depend on the thing that just broke.
+    renderView({
+      kind: 'failed',
+      reason: 'unavailable',
+      options: [option('r1', 'Via Roma 1', 'recent')],
+    });
+
+    expect(screen.getAllByTestId('add-stop-option')).toHaveLength(1);
   });
 });
 

@@ -47,7 +47,7 @@ export interface ImportViewProps {
   readonly isResolving: boolean;
   /** Stated rather than swallowed. A tap that appears to do nothing is the
    *  failure mode `CLAUDE.md` §0 rule 5 exists to prevent. */
-  readonly failure: 'could-not-resolve' | null;
+  readonly failure: 'could-not-resolve' | 'could-not-parse' | null;
   onAdd: () => void;
   onDismiss: () => void;
   readonly theme: ThemeName;
@@ -186,8 +186,11 @@ export function ImportView({
 
       {failure !== null && (
         <Text className="text-body text-danger mt-space-3" testID="import-failure">
-          Could not look those addresses up just now. Your list is still here — try again in a
-          moment.
+          {failure === 'could-not-parse'
+            ? // Names what still works. The split-by-line result below is real and
+              // usable, so this is a degraded state rather than a dead end.
+              'Could not read the list with AI just now. The lines below were split without it — check them, or try again.'
+            : 'Could not look those addresses up just now. Your list is still here — try again in a moment.'}
         </Text>
       )}
 

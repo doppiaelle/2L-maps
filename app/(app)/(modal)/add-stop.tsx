@@ -43,6 +43,11 @@ export default function AddStopScreen(): React.JSX.Element {
     favourites: book.saved,
     results: search.results,
     isSearching: search.isSearching,
+    // The reason the last attempt failed, carried through instead of discarded.
+    // Without it a 404, a 402 or a dead network all reached this screen as an
+    // empty list and were shown as "no match" — the app blaming the address for
+    // a fault on our side (`CLAUDE.md` §0 rule 5).
+    failure: search.failure,
     // Was hard-coded false, which made every offline state in this modal
     // reachable from a test and from nowhere else. Search needs the network;
     // the address book does not, which is what keeps this screen useful in a
@@ -86,6 +91,7 @@ export default function AddStopScreen(): React.JSX.Element {
       query={search.query}
       onQueryChange={search.setQuery}
       onSelect={add}
+      onRetry={search.retry}
       onAddManually={() => {
         // A manual label needs a place to attach to and has no `place_id`;
         // that path lands with the import flow, which already has to solve

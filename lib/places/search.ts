@@ -50,8 +50,36 @@ export type SearchState =
   /** Search needs the network; reuse does not. Recents and favourites remain
    *  searchable locally, so the modal is still useful with no signal. */
   | { readonly kind: 'offline'; readonly options: readonly SourcedOption[] }
+  /**
+   * The search was attempted and failed.
+   *
+   * **Distinct from `no-match`, and the distinction is the whole point.** Until
+   * this existed a failed request produced an empty result list, which reached
+   * the screen as "no match for what you typed" — the app blaming the address
+   * for a fault on our side. A user cannot act on that: they retype a perfectly
+   * good address, get the same answer, and conclude the product does not work.
+   *
+   * Every cause worth separating is separated, because each one has a different
+   * next action (`CLAUDE.md` §0 rule 5): reconnect, wait, subscribe, or retry.
+   */
+  | {
+      readonly kind: 'failed';
+      readonly reason: SearchFailure;
+      /** Reuse still works when the network does not, so what we already hold
+       *  stays on screen underneath the message. */
+      readonly options: readonly SourcedOption[];
+    }
   /** Refused before the attempt, with the limit explained (docs/08 §8). */
   | { readonly kind: 'at-capacity'; readonly limit: number };
+
+/**
+ * Why a search failed, in the user's terms rather than the transport's.
+ *
+ * Mirrors `GeocodingFailure` from `lib/providers/types`, deliberately without
+ * importing it: `lib/places` decides presentation and must not depend on the API
+ * layer's taxonomy changing underneath it.
+ */
+export type SearchFailure = 'offline' | 'quota-exhausted' | 'no-entitlement' | 'unavailable';
 
 export interface SearchInputs {
   readonly query: string;
@@ -60,6 +88,9 @@ export interface SearchInputs {
   readonly results: readonly PlaceOption[];
   readonly isSearching: boolean;
   readonly isOffline: boolean;
+  /** The last attempt's failure, or null. Null is "no attempt has failed", not
+   *  "the attempt succeeded" — a fresh query clears it before asking again. */
+  readonly failure?: SearchFailure | null;
   readonly stopCount: number;
   readonly maxStops: number;
 }
@@ -125,6 +156,14 @@ export function searchStateOf(inputs: SearchInputs): SearchState {
   // The existing list stays visible beneath the skeletons: a list that empties
   // while it loads loses the user's place and flashes the layout.
   if (inputs.isSearching) return { kind: 'searching', options: local };
+
+  // **Before `no-match`, and that order is the fix.** A failed request returns
+  // no results, so testing emptiness first reports every outage as "no match for
+  // what you typed" — the app blaming the user's address for our fault.
+  const failure = inputs.failure ?? null;
+  if (failure !== null) {
+    return { kind: 'failed', reason: failure, options: local };
+  }
 
   if (inputs.results.length === 0 && local.length === 0) {
     return { kind: 'no-match', query: inputs.query.trim() };

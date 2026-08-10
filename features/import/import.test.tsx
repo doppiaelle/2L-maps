@@ -244,6 +244,31 @@ describe('the free split runs first', () => {
   });
 });
 
+describe('when the model cannot be reached', () => {
+  it('says the attempt failed instead of appearing to ignore the tap', () => {
+    // The hook used to return early on a failed parse and set nothing. The
+    // button had visibly done nothing — no result, no message — which is
+    // indistinguishable from a dead control (CLAUDE.md §0 rule 5).
+    renderView({ failure: 'could-not-parse' });
+
+    expect(screen.getByTestId('import-failure').props.children).toMatch(/AI/);
+  });
+
+  it('names the free split as the thing that still works', () => {
+    // A degraded state, not a dead end: the lines below were split without the
+    // model and are usable. Saying so is what stops the user starting over.
+    renderView({ failure: 'could-not-parse' });
+
+    expect(screen.getByTestId('import-failure').props.children).toMatch(/split without it/);
+    expect(screen.getAllByTestId('import-candidate').length).toBeGreaterThan(0);
+  });
+
+  it('keeps the resolve failure distinct, because the two have different causes', () => {
+    renderView({ failure: 'could-not-resolve' });
+    expect(screen.getByTestId('import-failure').props.children).toMatch(/look those addresses up/);
+  });
+});
+
 describe('turning candidates into stops', () => {
   it('geocodes before adding, because a stop with no place_id is not a stop', async () => {
     // The durable key is the `place_id` (ADR-0007). A stop added without one

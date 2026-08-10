@@ -131,6 +131,50 @@ describe('searching', () => {
   });
 });
 
+describe('a search that failed', () => {
+  it('is not reported as a no-match', () => {
+    // The defect this exists to prevent. A failed request returns no results,
+    // so an emptiness check reaches "no match for what you typed" first and the
+    // app blames the address for a fault on our side. The user's only move is
+    // to retype a correct address and watch it fail again.
+    const state = searchStateOf(inputs({ query: 'Via Roma 10', failure: 'unavailable' }));
+
+    expect(state.kind).toBe('failed');
+    if (state.kind === 'failed') expect(state.reason).toBe('unavailable');
+  });
+
+  it('keeps every cause separate, because each has a different next action', () => {
+    for (const reason of ['offline', 'quota-exhausted', 'no-entitlement', 'unavailable'] as const) {
+      const state = searchStateOf(inputs({ query: 'Via Roma 10', failure: reason }));
+      if (state.kind !== 'failed') throw new Error(`expected failed for ${reason}`);
+      expect(state.reason).toBe(reason);
+    }
+  });
+
+  it('still shows what is stored locally, which cost nothing and still works', () => {
+    const state = searchStateOf(
+      inputs({
+        query: 'Via Roma',
+        failure: 'unavailable',
+        recents: [option('r1', 'Via Roma')],
+      }),
+    );
+
+    if (state.kind !== 'failed') throw new Error('expected failed');
+    expect(state.options).toHaveLength(1);
+  });
+
+  it('yields to a request still in flight', () => {
+    // A stale failure under a running retry would show an error and a spinner
+    // at once, and the error is the one that is out of date.
+    const state = searchStateOf(
+      inputs({ query: 'Via Roma 10', failure: 'unavailable', isSearching: true }),
+    );
+
+    expect(state.kind).toBe('searching');
+  });
+});
+
 describe('offline', () => {
   it('still offers what is stored locally', () => {
     // Search needs the network; reuse does not, so the modal stays useful.
