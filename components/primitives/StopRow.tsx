@@ -39,6 +39,20 @@ export interface StopRowProps {
   /** `2.4 km · 8 min`, once a route has been optimized. */
   readonly meta: string | null;
   onPress: () => void;
+  /**
+   * Editing controls, when the route may still be changed.
+   *
+   * Buttons rather than a swipe. A swipe-only action is invisible and
+   * inaccessible (`CLAUDE.md` §7 rule 4), and this row is read one-handed in a
+   * van — the affordance has to be something a thumb can find without knowing it
+   * is there.
+   *
+   * Absent while a route is in progress: reordering under a driver who is
+   * following the list is not an edit, it is a hazard.
+   */
+  onRemove?: (() => void) | undefined;
+  onMoveUp?: (() => void) | undefined;
+  onMoveDown?: (() => void) | undefined;
   readonly testID?: string;
 }
 
@@ -61,6 +75,9 @@ export function StopRow({
   hasCoordinate,
   meta,
   onPress,
+  onRemove,
+  onMoveUp,
+  onMoveDown,
   testID,
 }: StopRowProps): React.JSX.Element {
   const presentation = PRESENTATION[state];
@@ -127,6 +144,70 @@ export function StopRow({
           <Text className="text-caption text-warning">Address needs refreshing</Text>
         )}
       </View>
+
+      {(onMoveUp !== undefined || onMoveDown !== undefined || onRemove !== undefined) && (
+        <View className="flex-row items-center" testID="stop-controls">
+          {/* Each control states the stop it acts on. "Move up" alone is
+              ambiguous the moment a screen reader user is moving through a list
+              of twenty-five of them. */}
+          <RowControl
+            glyph="↑"
+            label={`Move ${title} up`}
+            onPress={onMoveUp}
+            testID="stop-move-up"
+          />
+          <RowControl
+            glyph="↓"
+            label={`Move ${title} down`}
+            onPress={onMoveDown}
+            testID="stop-move-down"
+          />
+          <RowControl glyph="✕" label={`Remove ${title}`} onPress={onRemove} testID="stop-remove" />
+        </View>
+      )}
+    </Pressable>
+  );
+}
+
+/**
+ * One editing control.
+ *
+ * Rendered disabled rather than hidden when it does not apply — the first stop
+ * cannot move up — because a control that disappears makes the row beside it
+ * change width and the whole list shift as the user scrolls.
+ *
+ * The visual glyph is small; the touch target is not. 44×44 is the floor and it
+ * is the hit area, not the ink (`CLAUDE.md` §10 rule 2).
+ */
+function RowControl({
+  glyph,
+  label,
+  onPress,
+  testID,
+}: {
+  glyph: string;
+  label: string;
+  onPress: (() => void) | undefined;
+  testID: string;
+}): React.JSX.Element {
+  const isEnabled = onPress !== undefined;
+
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={!isEnabled}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: !isEnabled }}
+      style={{
+        minWidth: layout.touchMin,
+        minHeight: layout.touchMin,
+        opacity: isEnabled ? 1 : 0.3,
+      }}
+      className="items-center justify-center"
+      testID={testID}
+    >
+      <Text className="text-body text-text-secondary">{glyph}</Text>
     </Pressable>
   );
 }
