@@ -24,9 +24,8 @@ import {
   createSupabaseAuth,
   createSupabaseFavourites,
   createSupabaseRoutes,
-  functionsBaseUrl,
-  readSupabaseConfig,
 } from '@/lib/supabase/client';
+import { functionsBaseUrl, readSupabaseConfig } from '@/lib/supabase/config';
 
 /**
  * Root layout.
