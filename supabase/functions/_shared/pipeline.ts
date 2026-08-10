@@ -212,6 +212,21 @@ export async function runPipeline<TRequest, TResult>(
 
 function toFailure<TResult>(error: unknown): PipelineOutcome<TResult> {
   if (error instanceof ApiError) {
+    // **Logged too, and this branch is the one that was missing.** A deliberate
+    // refusal is still the answer to "why does nothing work" — an upstream that
+    // rejects us reaches here as `UPSTREAM_UNAVAILABLE` and used to leave no
+    // trace at all, so a wrong model id and a revoked key looked identical from
+    // the outside and neither appeared in the logs.
+    //
+    // `details` is ours: we construct every field (a retry delay, a limit, an
+    // upstream status). No upstream body and no credential passes through it.
+    console.error(
+      JSON.stringify({
+        event: 'request_refused',
+        code: error.code,
+        details: error.options.details ?? {},
+      }),
+    );
     return { ok: false, status: statusFor(error.code), body: error.toEnvelope() };
   }
 
