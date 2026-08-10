@@ -13,6 +13,10 @@
 
 ---
 
+> **Just trying it on a phone for the first time?** Use
+> [`38_QUICK_START_SETTINGS.md`](38_QUICK_START_SETTINGS.md) instead — nine steps, with
+> everything a first test does not need left out. Come back here before real users.
+
 ## 1. Purpose
 
 The code is written and tested against contracts. Nothing is connected. This document is the
