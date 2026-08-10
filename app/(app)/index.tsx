@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Linking, useColorScheme, useWindowDimensions } from 'react-native';
+import { Linking, View, useColorScheme, useWindowDimensions } from 'react-native';
 
 import { useHandoff } from '@/features/handoff/use-handoff';
 import { useMonetisation } from '@/features/monetisation/monetisation-provider';
@@ -16,6 +16,12 @@ import { useOpenRoute } from '@/features/routes/use-open-route';
 import { useRouteSync } from '@/features/routes/use-route-sync';
 import { useDraftRouteStore, useRouteProgressStore, useUiStore } from '@/features/stores';
 import { AdSlot } from '@/components/primitives/AdSlot';
+import { AppMap } from '@/components/map/AppMap';
+import { Dock, DOCK_HEIGHT } from '@/components/navigation/Dock';
+import { SectionPanel } from '@/components/navigation/SectionPanel';
+import { HistorySection } from '@/features/routes/HistorySection';
+import { SettingsSection } from '@/features/settings/SettingsSection';
+import { dockItems, dockObstructionFraction, showsClose, toggleSection } from '@/lib/ui/dock';
 import { UndoToast } from '@/components/feedback/UndoToast';
 import { readMapIds } from '@/lib/config/map-ids';
 import { isOffline } from '@/lib/network/connectivity';
@@ -52,8 +58,9 @@ export default function PlanScreen(): React.JSX.Element {
   const progress = useRouteProgressStore((store) => store.progress);
   const mark = useRouteProgressStore((store) => store.mark);
   const nextStop = useRouteProgressStore((store) => store.next);
-  const detent = useUiStore((store) => store.detent);
-  const setDetent = useUiStore((store) => store.setDetent);
+  const activeSection = useUiStore((store) => store.activeSection);
+  const openSection = useUiStore((store) => store.openSection);
+  const closeSection = useUiStore((store) => store.closeSection);
   const selectedStopId = useUiStore((store) => store.selectedStopId);
   const selectStop = useUiStore((store) => store.selectStop);
   const clearSelection = useUiStore((store) => store.clearSelection);
@@ -195,94 +202,128 @@ export default function PlanScreen(): React.JSX.Element {
     lastFailure: failure === null ? null : failure.kind === 'offline' ? 'offline' : 'upstream',
   });
 
+  const theme = scheme === 'dark' ? 'dark' : 'light';
+
   return (
-    <>
-      <PlanView
-        state={state}
-        intent={actionIntentOf(state, availability)}
-        stops={rows}
-        markers={markers}
+    <View style={{ flex: 1 }} testID="plan-screen">
+      {/* Behind everything, always mounted. Unmounting it would make closing a
+          section cost a tile fetch and a camera animation every time
+          (ADR-0018). */}
+      <AppMap
+        stops={markers}
         route={geometry}
-        distance={distance}
-        duration={duration}
-        detent={detent}
-        onDetentChange={setDetent}
         selectedStopId={selectedStopId}
-        onSelectStop={selectStop}
-        onRemoveStop={(stopId) => {
-          removeStopById(stopId);
-          setPendingRemoval(stopId);
-        }}
-        onMoveStop={moveStopTo}
-        onClearRoute={() => {
-          // A fresh id, because a new route is a new row rather than an edit of
-          // the last one — History would otherwise show one route that keeps
-          // changing shape.
-          resetDraft(newRouteId());
-          clearSelection();
-        }}
-        onClearSelection={clearSelection}
-        onPrimaryAction={() => {
-          // The control's own state already says which of the two this is; the
-          // screen only has to route the tap. `planStateOf` decided that, and
-          // re-deriving it here would be the same rule in two places.
-          // Mid-route the same control means Done, and the state machine already
-          // said so — re-deriving it here would be one rule in two places.
-          if (state.kind === 'in-progress') {
-            advance('completed');
-            return;
-          }
-
-          if (state.kind !== 'optimized') {
-            optimize();
-            return;
-          }
-
-          void handoff.start().then((outcome) => {
-            // A first handoff with no provider chosen presents the picker rather
-            // than guessing — sending a twelve-stop day to the wrong app is a bad
-            // introduction to the one feature the product is for.
-            if (outcome.kind === 'needs-provider') router.push('/provider');
-          });
-        }}
-        // Nothing at all until an ad provider exists. `<AdSlot>` reserves its
-        // height from the first render to avoid a reflow, so rendering it with no
-        // provider would reserve a gap that could never be filled.
-        adSlot={
-          ads === null ? null : (
-            <AdSlot
-              slot="stop-list"
-              allowances={quota.allowances}
-              isRouteInProgress={progress !== null}
-              ads={ads}
-              testID="plan-ad-slot"
-            />
-          )
-        }
-        onAddStop={() => {
-          router.push('/add-stop');
-        }}
-        onImport={() => {
-          router.push('/import');
-        }}
-        onOpenHistory={() => {
-          router.push('/history');
-        }}
-        onOpenSettings={() => {
-          router.push('/settings');
-        }}
-        onSkipStop={() => {
-          advance('skipped');
-        }}
-        theme={scheme === 'dark' ? 'dark' : 'light'}
+        theme={theme}
         mapIds={readMapIds()}
         // The map's own offline state, which the component has always had and
         // nothing ever put it into. Tiles cannot be cached or pre-fetched
         // (`CLAUDE.md` §13 rule 4), so with no signal there is nothing to draw
         // and saying so beats a grey rectangle.
-        mapStatus={isOffline(connectivity) ? 'offline' : 'ready'}
-        screenHeight={height}
-        testID="plan-screen"
+        status={isOffline(connectivity) ? 'offline' : 'ready'}
+        onStopPress={selectStop}
+        onMapPress={clearSelection}
+        // The dock covers the bottom edge; the camera pads for it so a marker
+        // never lands underneath.
+        bottomObstructionFraction={dockObstructionFraction(DOCK_HEIGHT, height)}
+      />
+
+      {activeSection === 'itinerary' && (
+        <SectionPanel theme={theme} testID="section-itinerary">
+          <PlanView
+            state={state}
+            intent={actionIntentOf(state, availability)}
+            stops={rows}
+            distance={distance}
+            duration={duration}
+            onSelectStop={selectStop}
+            onRemoveStop={(stopId) => {
+              removeStopById(stopId);
+              setPendingRemoval(stopId);
+            }}
+            onMoveStop={moveStopTo}
+            onClearRoute={() => {
+              // A fresh id, because a new route is a new row rather than an edit of
+              // the last one — History would otherwise show one route that keeps
+              // changing shape.
+              resetDraft(newRouteId());
+              clearSelection();
+            }}
+            onPrimaryAction={() => {
+              // The control's own state already says which of the two this is; the
+              // screen only has to route the tap. `planStateOf` decided that, and
+              // re-deriving it here would be the same rule in two places.
+              // Mid-route the same control means Done, and the state machine already
+              // said so — re-deriving it here would be one rule in two places.
+              if (state.kind === 'in-progress') {
+                advance('completed');
+                return;
+              }
+
+              if (state.kind !== 'optimized') {
+                optimize();
+                return;
+              }
+
+              void handoff.start().then((outcome) => {
+                // A first handoff with no provider chosen presents the picker rather
+                // than guessing — sending a twelve-stop day to the wrong app is a bad
+                // introduction to the one feature the product is for.
+                if (outcome.kind === 'needs-provider') router.push('/provider');
+              });
+            }}
+            // Nothing at all until an ad provider exists. `<AdSlot>` reserves its
+            // height from the first render to avoid a reflow, so rendering it with no
+            // provider would reserve a gap that could never be filled.
+            adSlot={
+              ads === null ? null : (
+                <AdSlot
+                  slot="stop-list"
+                  allowances={quota.allowances}
+                  isRouteInProgress={progress !== null}
+                  ads={ads}
+                  testID="plan-ad-slot"
+                />
+              )
+            }
+            onAddStop={() => {
+              router.push('/add-stop');
+            }}
+            onImport={() => {
+              router.push('/import');
+            }}
+            onSkipStop={() => {
+              advance('skipped');
+            }}
+            testID="plan-view"
+          />
+        </SectionPanel>
+      )}
+
+      {activeSection === 'history' && (
+        <SectionPanel theme={theme} testID="section-history">
+          <HistorySection onOpenRoute={closeSection} theme={theme} />
+        </SectionPanel>
+      )}
+
+      {activeSection === 'settings' && (
+        <SectionPanel theme={theme} testID="section-settings">
+          <SettingsSection theme={theme} />
+        </SectionPanel>
+      )}
+
+      <Dock
+        items={dockItems(activeSection, { isRouteInProgress: progress !== null })}
+        showsClose={showsClose(activeSection)}
+        onSelect={(section) => {
+          // `toggleSection` decides; the screen only routes. Tapping the open
+          // section closes it, which is the second way back to the map.
+          const next = toggleSection(activeSection, section);
+          if (next === null) closeSection();
+          else openSection(next);
+        }}
+        onClose={closeSection}
+        theme={theme}
+        testID="plan-dock"
       />
 
       {pendingRemoval !== null && (
@@ -303,6 +344,6 @@ export default function PlanScreen(): React.JSX.Element {
           testID="plan-undo-remove"
         />
       )}
-    </>
+    </View>
   );
 }

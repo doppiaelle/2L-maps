@@ -1,9 +1,17 @@
-# ADR-0010 — Mobile only; the stop list is a collapsible sheet, never a sidebar
+# ADR-0010 — Mobile only; the stop list is never a sidebar
 
-**Status:** Accepted
+**Status:** Accepted, partially superseded
 **Date:** 2026-08-06
 **Deciders:** Product owner
 **Implements decisions:** D9
+**Superseded in part by:** [ADR-0018](0018-bottom-dock-navigation.md)
+
+> **What still stands and what does not.** The decision this ADR exists for — mobile only, no
+> sidebar, the thumb-reach argument behind it — is unchanged and is the reason a drawer was
+> also rejected later. **The mechanism is superseded:** the stop list is no longer a
+> collapsible sheet with three detents but a full-screen section opened from a bottom dock.
+> The sheet lost on its own terms — it put the list behind a gesture — not on this ADR's.
+> Every mention of detents below is history.
 
 ---
 

@@ -198,7 +198,7 @@ Budgets, measured on a mid-range Android device and an iPhone at least three gen
 |---|---|
 | Cold start to interactive | < 2.5 s |
 | Stop list scroll | 60 fps, no dropped frames at 25 stops |
-| Sheet detent transition | < 300 ms, gesture-driven, interruptible |
+| Dock section transition | < 300 ms, interruptible |
 | Autocomplete keystroke → suggestions | < 400 ms perceived, debounce ≥ 300 ms |
 | Optimization request → result (T1) | < 3 s, with progress shown after 1 s |
 | Map marker render, 25 stops | < 16 ms per frame |
@@ -224,12 +224,18 @@ Full specification: [`docs/24_PERFORMANCE.md`](docs/24_PERFORMANCE.md).
 
 These are product constraints, not preferences. A design that violates them is rejected.
 
-1. **Three taps maximum** from app open to an optimized route. Any new screen in that path
-   must remove one elsewhere.
+1. **Four taps maximum** from app open to an optimized route: Route → Add a stop → choose →
+   Optimize. Any new screen in that path must remove one elsewhere. It was three while the
+   app opened onto the stop list; the count rose by one when the map became the opening
+   view, and the trade was made deliberately — a tap in a place the user can see is worth
+   more than a tap saved by a gesture they cannot
+   ([ADR-0018](docs/adr/0018-bottom-dock-navigation.md)).
 2. **One-handed operation.** Every primary control sits in the lower third. The map is for
    looking, not reaching.
-3. **The stop list is a bottom sheet**, never a sidebar, at any size
-   ([ADR-0010](docs/adr/0010-mobile-only-scope.md)).
+3. **Navigation is a dock at the bottom**, never a sidebar, never a drawer, and never a
+   gesture ([ADR-0018](docs/adr/0018-bottom-dock-navigation.md)). Each section opens over a
+   map that stays mounted beneath it. Every section stays reachable while a route is in
+   progress: hiding someone's way out is not the same as protecting them.
 4. **Gestures have visible alternatives.** A swipe-only action is inaccessible.
 5. **Every state is designed** — loading, empty, error, offline, degraded, quota-exhausted.
    A spinner is not a loading state; a skeleton that matches the eventual layout is.

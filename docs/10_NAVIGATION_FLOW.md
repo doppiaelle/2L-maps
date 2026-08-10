@@ -137,9 +137,9 @@ back to it, never adding depth.
 
 | Screen | Presentation | Reason |
 |---|---|---|
-| Plan | Root, no transition | Never navigated to |
-| History, Settings | Push | Deliberate destinations |
-| Add stop, Import, Provider | Modal, sheet-style | Input tasks over the current context |
+| Map | Root, no transition | Never navigated to |
+| Route, History, Settings | Dock section over the map | Deliberate destinations, no stack entry |
+| Add stop, Import, Provider | Modal | Input tasks over the current context |
 | Paywall | Modal, **not dismissible by swipe** | Requires a deliberate action; the route survives beneath |
 | Summary | Modal, full | Terminal moment of a journey |
 
@@ -177,14 +177,15 @@ afterwards rather than being discarded.
 |---|---|---|
 | Current route and stop order | Process death | Persisted store |
 | Route progress | Process death | Persisted, **written before every handoff** |
-| Sheet detent | Background, not process death | In-memory |
+| Open dock section | Background, not process death | In-memory |
 | Map camera | Background, not process death | In-memory |
-| Scroll position | Detent change and modal dismissal | Preserved by list |
+| Scroll position | Modal dismissal | Preserved by list |
 | Pending deep link | Sign-in flow | Held in the root layout |
 | Modal input in progress | Background | Draft retained on return |
 
-Sheet detent and camera are deliberately not persisted: after a cold start, fitting the camera
-to the route is more useful than restoring where the user last panned.
+The open section and the camera are deliberately not persisted: after a cold start the map is
+what orients someone who has just unlocked their phone, and fitting the camera to the route is
+more useful than restoring where they last panned.
 
 ## 8. Architectural decisions
 
@@ -285,8 +286,8 @@ launch because routes span days.
 
 | Alternative | Attraction | Why rejected |
 |---|---|---|
-| Tab navigator with three tabs | Familiar; discoverable | Consumes permanent thumb-zone space for navigation rather than action; implies three equal activities |
-| Stop list as a pushed screen | Simpler than sheet mechanics | Loses the map, breaking the link between order and geography |
+| ~~Tab navigator with three tabs~~ | Familiar; discoverable | **Reversed by [ADR-0018](adr/0018-bottom-dock-navigation.md).** Both objections were real and both were outweighed: the space a dock takes is space the collapsed sheet was taking anyway, and the three activities *are* equal in the only sense that matters — each is somewhere the user goes deliberately |
+| Stop list as a pushed screen | Simpler than sheet mechanics | Loses the map, breaking the link between order and geography. Still rejected: the dock's sections open **over** a map that stays mounted, so nothing is lost when one closes |
 | Entitlement as a route guard | Simpler; stronger conversion pressure | Locks users out of their own data and creates hostility |
 | Route deep links to a read-only detail screen | Conventional master-detail | Adds a step before the user reaches where they can work |
 | Rendering immediately, restoring after | Faster perceived start | Produces a visible flash that reads as a defect |

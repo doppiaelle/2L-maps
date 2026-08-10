@@ -71,7 +71,7 @@ already better than anything we would build and the user already trusts one of t
 ([ADR-0004](adr/0004-external-navigation-handoff.md)).
 
 What we own is the part nobody else does well for this user: taking a list and returning the
-right sequence, with a truthful ETA, in under three taps.
+right sequence, with a truthful ETA, in four taps.
 
 ### What it is not
 
@@ -245,7 +245,8 @@ All twelve ADRs are binding. This table is the map; the reasoning is in each fil
 | **`place_id`** | Google's stable place identifier. Storable indefinitely. The durable key for every location in the system. |
 | **Coordinate cache** | Latitude, longitude and formatted address derived from Google. Deletable after 30 days by platform terms; nullable everywhere in the schema. |
 | **Facade** | An internal interface isolating an external SDK — `<AppMap>`, `RoutingProvider`, `GeocodingProvider`, `NavigationProvider`. No screen imports a provider SDK directly. |
-| **Sheet** | The bottom sheet holding the stop list, with peek, half and full detents. The only stop-list surface; never a sidebar. |
+| **Dock** | The bar at the bottom of every screen holding the three sections — Route, History, Settings — and the close control that appears when one is open (ADR-0018). |
+| **Section** | One of the dock's three destinations, opened full-screen above a map that stays mounted underneath. Replaced the bottom sheet. |
 | **Accent** | Mint green. Marks the active route, the primary action, the selected marker and completed stops. Red is never an accent — it means error or warning only. |
 
 ---

@@ -21,7 +21,7 @@ It does not specify screens ([`08`](08_SCREEN_SPECIFICATIONS.md)) or routing bet
 
 ## 2. Goals
 
-1. Prove the three-tap constraint (NFR-06) holds on the critical path.
+1. Prove the four-tap constraint (NFR-06) holds on the critical path.
 2. Trace every journey through its failure branches, not only its happy path.
 3. Identify the moments where a user abandons, and what prevents each.
 4. Provide the specification the E2E suite is written against.
@@ -48,7 +48,7 @@ It does not specify screens ([`08`](08_SCREEN_SPECIFICATIONS.md)) or routing bet
                     └──────┬───────┘
                            ▼
     ┌──────────────────────────────────────────────┐
-    │              J1  Plan and optimize           │ ◀── the three-tap path
+    │              J1  Plan and optimize           │ ◀── the four-tap path
     │   add stops → Optimize → ordered route       │
     └──────┬───────────────────────────────┬───────┘
            │                               │
@@ -68,16 +68,24 @@ It does not specify screens ([`08`](08_SCREEN_SPECIFICATIONS.md)) or routing bet
     Cross-cutting: J6 offline · J7 quota/entitlement · J8 import
 ```
 
-### The three-tap path (NFR-06)
+### The four-tap path (NFR-06)
 
 ```
-  App open  ─┬─▶  [tap 1]  Add stop   (repeat per stop — additions are not
+  App open  ─┬─▶  [tap 1]  Route      (the app opens on the map; the
+             │              from the dock             route is one section across)
+             │
+             ├─▶  [tap 2]  Add stop   (repeat per stop — additions are not
              │              from address book or search      counted, they
              │                                               are the input)
-             ├─▶  [tap 2]  Optimize
+             ├─▶  [tap 3]  Optimize
              │
-             └─▶  [tap 3]  Start  ──▶  external navigation app
+             └─▶  [tap 4]  Start  ──▶  external navigation app
 ```
+
+It was three until [ADR-0018](adr/0018-bottom-dock-navigation.md), when the stop list stopped
+being a sheet dragged up from the bottom and became a dock section. The tap was added
+deliberately: a tap in a place the user can see is worth more than a tap saved by a gesture
+they cannot.
 
 Adding stops is the user's input, not navigation overhead. The constraint is that **no
 intermediate screen, confirmation or menu** sits between having stops and driving. Any
@@ -148,7 +156,7 @@ optimization before this screen.
    - address book — recents and favourites, zero network cost, shown first;
    - Places autocomplete — debounced, minimum three characters, session-tokened;
    - import — see J8.
-3. The stop list appears in the sheet at its half detent, in entry order, each row showing its
+3. The stop list appears in the Route section, in entry order, each row showing its
    ordinal.
 4. **Tap Optimize.** The client sends the stop set; the server selects a tier
    ([ADR-0003](adr/0003-tiered-optimization-cascade.md)) and returns the order.
@@ -340,7 +348,7 @@ the likely reason stated (wrong format, wrong country, empty input).
 
 ## 11. Checklist
 
-- [ ] J1 measured at exactly three taps on a physical device.
+- [ ] J1 measured at exactly four taps on a physical device.
 - [ ] Every journey has a Maestro E2E flow.
 - [ ] Every failure branch in §9 is tested, not only the happy path.
 - [ ] Every journey survives backgrounding and process death at each step.
@@ -362,6 +370,7 @@ the likely reason stated (wrong format, wrong country, empty input).
 | Date | Change | Reason | Author |
 |---|---|---|---|
 | 2026-08-06 | Journeys defined; three-tap path fixed as J1 | Project inception | Product owner |
+| 2026-08-10 | Three taps became four | The map is the opening view and the route is a dock section (ADR-0018) | Product owner |
 | 2026-08-06 | Paywall placed after onboarding, before first value | Product owner decision; experiment recorded in roadmap | Product owner |
 
 ## 14. Rationale

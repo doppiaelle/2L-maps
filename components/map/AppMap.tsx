@@ -75,11 +75,19 @@ export interface AppMapProps {
   onStopPress: (stopId: string) => void;
   onMapPress: () => void;
   /** Offered in the failed state. Without one the state is still explained; it
-   *  just has no next action beyond the sheet, which stays fully usable. */
+   *  just has no next action beyond the dock, which stays fully usable. */
   onRetry?: () => void;
-  /** Fraction of the map the sheet covers at its current detent. The camera fits
-   *  around it, and the attribution clears it. */
-  readonly sheetFraction?: number;
+  /**
+   * Fraction of the map's bottom edge covered by something else — today the dock
+   * ([ADR-0018](../../docs/adr/0018-bottom-dock-navigation.md)). The camera fits
+   * around it and the attribution clears it.
+   *
+   * Named for what it is rather than for what used to cause it: this was
+   * `sheetFraction` and defaulted to 0.4, a number that meant "a half-open
+   * sheet" and kept padding the camera for a sheet that no longer exists. Zero
+   * is the honest default — nothing covers the map unless a caller says so.
+   */
+  readonly bottomObstructionFraction?: number;
   /** Transitions become instant (`CLAUDE.md` §10 rule 6). Injected rather than
    *  read here, so the whole tree answers the question the same way. */
   readonly prefersReducedMotion?: boolean;
@@ -112,7 +120,7 @@ export const AppMap = forwardRef<AppMapHandle, AppMapProps>(function AppMap(
     onStopPress,
     onMapPress,
     onRetry,
-    sheetFraction = 0.4,
+    bottomObstructionFraction = 0,
     prefersReducedMotion = false,
     onUndrawableStops,
     onGeometryDefect,
@@ -216,10 +224,10 @@ export const AppMap = forwardRef<AppMapHandle, AppMapProps>(function AppMap(
   // never yanks the map out from under a user who is looking at something.
   useEffect(() => {
     if (!isReady || !isFollowingRef.current || fitCoordinates.length === 0) return;
-    const bounds = boundsFor(fitCoordinates, sheetFraction);
+    const bounds = boundsFor(fitCoordinates, bottomObstructionFraction);
     if (bounds === null) return;
-    fitToBounds(bounds, { bottom: layout.screenPadding + height * sheetFraction });
-  }, [fitCoordinates, isReady, sheetFraction, height, fitToBounds]);
+    fitToBounds(bounds, { bottom: layout.screenPadding + height * bottomObstructionFraction });
+  }, [fitCoordinates, isReady, bottomObstructionFraction, height, fitToBounds]);
 
   const handleRegionChange = useCallback((region: CameraRegion) => {
     setViewport(regionToViewport(region));
@@ -302,7 +310,7 @@ export const AppMap = forwardRef<AppMapHandle, AppMapProps>(function AppMap(
 
       <MapAttribution
         theme={theme}
-        bottomOffset={height * sheetFraction}
+        bottomOffset={height * bottomObstructionFraction}
         testID="app-map-attribution"
       />
     </View>

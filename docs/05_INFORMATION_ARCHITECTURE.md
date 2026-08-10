@@ -68,9 +68,10 @@ occasionally.
   Maximum depth: 3. Most interactions happen at depth 1.
 ```
 
-### Where the sheet fits
+### Where the sections fit
 
-The stop list is not a screen. It is a mode of the Plan surface.
+The stop list is not a pushed screen. It is one of three sections of the map surface, opened
+from the dock and closed back to the map ([ADR-0018](adr/0018-bottom-dock-navigation.md)).
 
 ```
   ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐
@@ -89,7 +90,7 @@ The stop list is not a screen. It is a mode of the Plan surface.
    map dominant         visible              actions
 
   The primary action stays pinned in the thumb zone at every
-  detent. Changing detent never moves it.
+  section. Opening or closing a section never moves it.
 ```
 
 ---
@@ -135,7 +136,7 @@ start.
 other destinations return here rather than layering on top.
 
 Plan is a single surface with modes, not a stack of screens. Adding a stop opens a modal over
-it; the sheet changes detent; the route optimizes in place. Nothing pushes.
+it; a dock section opens over the map; the route optimizes in place. Nothing pushes.
 
 ### History
 
@@ -164,7 +165,7 @@ the specification: the copies diverge.
 | Information | Home | Never appears in |
 |---|---|---|
 | Stop order | Sheet list; marker numbers on the map | A separate ordering screen |
-| Total distance and ETA | Sheet header, all detents | The map surface itself |
+| Total distance and ETA | Top of the Route section | The map surface itself |
 | Per-leg distance and duration | Stop row in the sheet | The map |
 | Stop label and note | Stop detail | The list row (label only, truncated) |
 | Degraded-result warning | Sheet header **and** map polyline style | — |
@@ -217,7 +218,7 @@ growth is a hierarchy the user navigates today for a feature that does not exist
 | 5 | Trial expired | All destinations remain reachable; only new optimization is blocked |
 | 6 | Route opened from History while another is in progress | The in-progress route is offered for resumption before being replaced |
 | 7 | Settings opened, subscription changed | Returning to Plan reflects the new entitlement without a reload |
-| 8 | 25 stops in the sheet | Full detent scrolls; the header and primary action stay pinned |
+| 8 | 25 stops in the Route section | The list scrolls; the header and primary action stay pinned |
 
 ## 11. Error handling
 
@@ -235,10 +236,10 @@ growth is a hierarchy the user navigates today for a feature that does not exist
 ## 12. Best practices
 
 1. **Do not add a destination.** Three is enough; a fourth needs an ADR.
-2. **Extend the sheet before adding a screen.** Its detents absorb most new information.
+2. **Extend a section before adding a destination.** A section is a whole screen and absorbs most new information.
 3. **Never duplicate information without a reason**, and record the reason when you do.
 4. **Errors attach to their subject.**
-5. **Keep the primary action pinned across every detent** so its position is learned once.
+5. **Keep the primary action pinned at the bottom of the section** so its position is learned once.
 6. **Deep links land on Plan**, because that is where work happens.
 
 ## 13. Checklist
@@ -249,14 +250,14 @@ growth is a hierarchy the user navigates today for a feature that does not exist
 - [ ] Each item in §7 has exactly one home, or a recorded reason for two.
 - [ ] Settings is unreachable during a route.
 - [ ] Deep links resolve to Plan.
-- [ ] The primary action stays fixed across detent changes.
+- [ ] The primary action stays fixed when sections open and close.
 - [ ] Errors appear attached to their subject.
 
 ## 14. Roadmap
 
 | Phase | Scope | Trigger |
 |---|---|---|
-| MVP | Three destinations; sheet with three detents | — |
+| MVP | Three destinations, reached from a bottom dock (ADR-0018) | — |
 | 1.x | Favourites inside the add-stop modal; import as a second modal | Feature delivery |
 | 1.2 | Live Activity as a system surface, not a destination | Release 1.2 |
 | 2.0 | Time-window editing inside stop detail — no new destination | Gate D3 |

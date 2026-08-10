@@ -47,11 +47,13 @@ A component is not finished until every state listed for it exists and is tested
    │    ├── <RoutePolyline>        solid mint, or dashed for T0
    │    └── <MapAttribution>       never covered, ever
    │
-   └── <RouteSheet>                three detents
-        ├── <RouteSummaryHeader>   metrics + status chips
-        ├── <StopList>             virtualised
-        │    └── <StopRow>         badge · label · meta · handle
-        └── <PrimaryAction>        pinned across detents
+   ├── <SectionPanel>              full-screen, above the map
+   │    ├── <RouteSummaryHeader>   metrics + status chips
+   │    ├── <StopList>             virtualised
+   │    │    └── <StopRow>         badge · label · meta · remove · reorder
+   │    └── <PrimaryAction>        pinned to the section bottom
+   │
+   └── <Dock>                      three sections + close
 
   Shared
    ├── <Skeleton>          matches its eventual layout
@@ -130,29 +132,46 @@ routing that did not happen ([`15_ROUTE_OPTIMIZATION.md`](15_ROUTE_OPTIMIZATION.
 
 ### `<MapAttribution>`
 
-Always visible, never covered by the sheet at any detent, never dismissible. A terms obligation
+Always visible, never covered by the dock, never dismissible. A terms obligation
 ([`14_GOOGLE_MAPS_INTEGRATION.md`](14_GOOGLE_MAPS_INTEGRATION.md)).
 
 ---
 
-## 7. Sheet components
+## 7. Navigation components
 
-### `<RouteSheet>`
+### `<Dock>`
 
-**Responsibility:** the stop list surface and the pinned primary action. Three detents: peek,
-half, full.
+**Responsibility:** the app's navigation, and the only one
+([ADR-0018](adr/0018-bottom-dock-navigation.md)). Three sections plus a close control that
+appears only when one is open.
 
 | Concern | Specification |
 |---|---|
-| **States** | Each detent × each route state (empty, planned, optimizing, optimized, in progress) |
-| **Animation** | `motion-standard` spring, gesture-driven, **interruptible mid-animation** |
-| **Accessibility** | Detent changes announced. The drag handle is a button with an accessible label; detent is also changeable without a gesture |
-| **Performance** | Gestures on the native driver / Reanimated worklets. **No JS-thread work during a drag** |
-| **Interaction** | Drag to change detent · tap the handle to cycle · tap the map to collapse |
-| **Errors** | Errors render in the header, never as an overlay covering the list |
-| **Loading** | Skeleton rows inside the list; the header shows its real structure |
+| **States** | Nothing open (three items) · a section open (four, including close) |
+| **Animation** | None of its own. The section it opens animates; the dock does not move |
+| **Accessibility** | `tablist` / `tab`, with `selected` announced. Every label says what happens, not what the control is |
+| **Performance** | No gesture, no shared values, nothing on the JS thread |
+| **Interaction** | Tap an item to open · tap the open item to close · tap the close control |
+| **Errors** | None reachable: it renders what `lib/ui/dock.ts` decided |
+| **Loading** | Never loads. It is present from the first frame |
 
-The primary action is **pinned to the sheet bottom at every detent** and never moves.
+Every section stays reachable **while a route is in progress**. The controls this replaced
+hid themselves mid-route, which removed the driver's way out rather than protecting them.
+
+### `<SectionPanel>`
+
+**Responsibility:** hold one section full-screen above the map.
+
+| Concern | Specification |
+|---|---|
+| **States** | One. It is a container |
+| **Animation** | < 300 ms, instant under reduced motion |
+| **Accessibility** | `accessibilityViewIsModal`, so the map behind is not traversable |
+| **Performance** | The map stays mounted underneath; closing costs no tile fetch |
+| **Interaction** | None of its own — closed from the dock |
+
+**It stops above the dock**, never edge to edge, or it would cover the control it is closed
+by. The primary action inside it is pinned to the section's bottom and never moves.
 
 ### `<StopRow>`
 
@@ -184,7 +203,7 @@ No dividers between rows — separation is by `list-row-gap`, per the reference.
 
 ### `<StopList>`
 
-Virtualised above 20 rows. Maintains scroll position across detent changes. Scrolls to the
+Virtualised above 20 rows. Maintains scroll position while a section stays open. Scrolls to the
 selected row when a marker is tapped. Reordering updates marker numbers **live during the drag**,
 not on release — the feedback is the point.
 
@@ -254,10 +273,10 @@ glyph as well as colour.
 |---|---|---|
 | [0005](adr/0005-map-engine-and-route-preview.md) | `react-native-maps` sits behind an `<AppMap>` facade | Every map component |
 | [0009](adr/0009-visual-direction.md) | Tokens only; single mint accent; red for alerts | Every component |
-| [0010](adr/0010-mobile-only-scope.md) | Sheet with detents | Sheet components |
+| [0018](adr/0018-bottom-dock-navigation.md) | Dock with sections | Navigation components |
 | [0012](adr/0012-long-term-osm-exit-path.md) | Provider-agnostic seams | Why map components take product types, not SDK types |
 
-**Decided here:** components expose the product's vocabulary — stops, legs, detents — never the
+**Decided here:** components expose the product's vocabulary — stops, legs, sections — never the
 SDK's. A prop named after a `react-native-maps` concept is a leak that makes
 [ADR-0012](adr/0012-long-term-osm-exit-path.md) unaffordable later.
 
@@ -265,11 +284,11 @@ SDK's. A prop named after a `react-native-maps` concept is a leak that makes
 
 | # | Condition | Expected behaviour |
 |---|---|---|
-| 1 | 25 rows at full detent | Virtualised; 60 fps maintained |
+| 1 | 25 rows in an open section | Virtualised; 60 fps maintained |
 | 2 | Dynamic Type at 200% | Row height grows; virtualisation recalculates; no truncation |
 | 3 | Reorder during optimization | Blocked with an explanation; the request is not silently discarded |
 | 4 | Marker tapped while the sheet is full | Sheet drops to half; the row scrolls into view |
-| 5 | Sheet dragged during a detent animation | Gesture takes over; animation is interruptible |
+| 5 | Dock tapped during a section animation | The new section takes over; the animation is interruptible |
 | 6 | Undo tapped after the row is gone from view | List scrolls to the restored row |
 | 7 | Very long user label | Two lines then ellipsis; full text in stop detail |
 | 8 | Two rows re-hydrating simultaneously | Both show skeletons; the rest of the list stays interactive |

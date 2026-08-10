@@ -23,8 +23,6 @@ export default function AppLayout(): React.JSX.Element {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="index" />
-      <Stack.Screen name="history" />
-      <Stack.Screen name="settings" />
       {/* Modals appear over Plan and dismiss back to it, never adding depth.
           The paywall refuses a swipe dismissal: it needs a deliberate answer,
           and the route survives underneath either way (docs/10 §6). */}
