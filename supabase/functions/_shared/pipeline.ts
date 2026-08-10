@@ -218,6 +218,23 @@ function toFailure<TResult>(error: unknown): PipelineOutcome<TResult> {
   // An unexpected throw becomes a generic INTERNAL. The original message never
   // reaches the client: error objects are the most common way a query, a stack
   // trace or a credential ends up somewhere it should not be.
+  //
+  // **It is logged before it is discarded, and this is the catch that matters.**
+  // The adapters are built inside `callUpstream`, so a missing upstream key
+  // throws *here* rather than in `serveWith` — which meant the single most
+  // likely production failure, a secret that was never set, produced `INTERNAL`
+  // to the client and not one line anywhere an operator could read.
+  //
+  // Message and type only, no stack: our own throws name the missing key and
+  // never its value (§9 rule 8).
+  console.error(
+    JSON.stringify({
+      event: 'pipeline_failed',
+      type: error instanceof Error ? error.name : typeof error,
+      reason: error instanceof Error ? error.message : 'non-error thrown',
+    }),
+  );
+
   return {
     ok: false,
     status: statusFor('INTERNAL'),

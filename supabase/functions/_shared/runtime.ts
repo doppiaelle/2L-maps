@@ -68,23 +68,43 @@ export function placesAdapter(): ReturnType<typeof createPlacesAdapter> {
  * omission; it has to be asked for.
  */
 export function parseAdapter(): ParseAdapter {
-  const provider = (typeof Deno === 'undefined' ? undefined : Deno.env.get('PARSE_PROVIDER')) ?? '';
+  const provider = readEnv('PARSE_PROVIDER');
+  const anthropicKey = readEnv('ANTHROPIC_API_KEY');
+  const openRouterKey = readEnv('OPENROUTER_API_KEY');
 
-  if (provider === 'openrouter') {
-    const model = typeof Deno === 'undefined' ? undefined : Deno.env.get('PARSE_MODEL');
+  // `PARSE_PROVIDER` is an override, not a requirement. It used to be the only
+  // way to reach OpenRouter, so a project holding an OpenRouter key and no
+  // Anthropic key fell through to the Anthropic branch and threw on a secret it
+  // was never going to have — and the endpoint failed for a configuration that
+  // was, in substance, complete. A setting whose omission breaks a working setup
+  // is a trap, not a default.
+  const useOpenRouter =
+    provider === 'openrouter' || (provider === '' && anthropicKey === '' && openRouterKey !== '');
+
+  if (useOpenRouter) {
+    const model = readEnv('PARSE_MODEL');
     return createOpenRouterParseAdapter({
       apiKey: requireEnv('OPENROUTER_API_KEY'),
       fetchImpl: fetch,
       maxCandidates: MAX_STOPS,
-      ...(model === undefined || model === '' ? {} : { model }),
+      ...(model === '' ? {} : { model }),
     });
   }
 
+  // Anthropic still wins whenever its key is present, including when both are.
+  // ADR-0017's reasoning is unchanged: many free endpoints retain prompts for
+  // training and a pasted delivery list is third-party personal data, so the
+  // cheaper path is chosen deliberately or not at all.
   return createParseAdapter({
     apiKey: requireEnv('ANTHROPIC_API_KEY'),
     fetchImpl: fetch,
     maxCandidates: MAX_STOPS,
   });
+}
+
+/** An optional variable: absent and empty are the same thing to a deployment. */
+function readEnv(key: string): string {
+  return (typeof Deno === 'undefined' ? undefined : Deno.env.get(key)) ?? '';
 }
 
 /**

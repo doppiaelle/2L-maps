@@ -55,10 +55,27 @@ export function serveWith(
     try {
       const base = await contextFactory();
       return await handler(request, { ...base, limits: limits() });
-    } catch {
-      // The thrown value is never read: it can carry a connection string or a
-      // key, and neither may reach a response body or a log line
-      // (CLAUDE.md §9 rule 8).
+    } catch (error) {
+      // **Logged here, never returned.** The two have different rules and
+      // conflating them is what made this backend undebuggable: the response
+      // must say nothing (an error can carry a connection string), but the log
+      // is the only place an operator can ever learn why a function died.
+      //
+      // Swallowing it entirely meant a missing secret produced `INTERNAL` to
+      // the client and *silence* in the Supabase logs — so the one question
+      // worth asking, "why is every request failing", had no answer anywhere.
+      //
+      // Only the message and the type are logged. Our own throws name the thing
+      // that is missing ("Missing required secret: GOOGLE_SERVER_API_KEY") and
+      // never its value, which is what keeps this inside §9 rule 8. The stack is
+      // omitted deliberately: it can quote source containing a literal.
+      console.error(
+        JSON.stringify({
+          event: 'request_failed',
+          type: error instanceof Error ? error.name : typeof error,
+          reason: error instanceof Error ? error.message : 'non-error thrown',
+        }),
+      );
       return errorResponse('INTERNAL', 'Something went wrong on our side');
     }
   });
