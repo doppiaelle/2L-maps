@@ -1,7 +1,7 @@
-import { ApiError } from '../errors';
-import type { RoutesFailure, RoutesRequest } from '../upstream/routes';
-import type { OptimizeRequest } from '../schemas';
-import type { UpstreamOutcome } from '../pipeline';
+import { ApiError } from '../errors.ts';
+import type { RoutesFailure, RoutesRequest } from '../upstream/routes.ts';
+import type { OptimizeRequest } from '../schemas.ts';
+import type { UpstreamOutcome } from '../pipeline.ts';
 
 /**
  * `/optimize`'s upstream step, kept out of the entrypoint so it is type-checked

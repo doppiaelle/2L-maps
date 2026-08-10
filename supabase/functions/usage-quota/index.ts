@@ -1,7 +1,7 @@
-import { createQuotaHandler } from '../_shared/handler';
-import { serveWith } from '../_shared/serve';
-import { defaultLimits } from '../_shared/runtime';
-import { readUsageQuota } from '../_shared/endpoints/usage-quota';
+import { createQuotaHandler } from '../_shared/handler.ts';
+import { serveWith } from '../_shared/serve.ts';
+import { defaultLimits } from '../_shared/runtime.ts';
+import { readUsageQuota } from '../_shared/endpoints/usage-quota.ts';
 
 /**
  * `/usage-quota` — the authoritative source of plan and allowances

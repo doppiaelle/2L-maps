@@ -1,6 +1,6 @@
-import { handleRevenueCatWebhook } from '../_shared/endpoints/revenuecat-webhook';
-import { serveWith } from '../_shared/serve';
-import { defaultLimits } from '../_shared/runtime';
+import { handleRevenueCatWebhook } from '../_shared/endpoints/revenuecat-webhook.ts';
+import { serveWith } from '../_shared/serve.ts';
+import { defaultLimits } from '../_shared/runtime.ts';
 
 /**
  * `POST /revenuecat-webhook` — the **only** writer of `user_entitlements`

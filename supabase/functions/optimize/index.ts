@@ -1,8 +1,8 @@
-import { createHandler } from '../_shared/handler';
-import { optimizeUpstream } from '../_shared/endpoints/optimize';
-import { optimizeRequestSchema } from '../_shared/schemas';
-import { defaultLimits, routesAdapter } from '../_shared/runtime';
-import { serveWith } from '../_shared/serve';
+import { createHandler } from '../_shared/handler.ts';
+import { optimizeUpstream } from '../_shared/endpoints/optimize.ts';
+import { optimizeRequestSchema } from '../_shared/schemas.ts';
+import { defaultLimits, routesAdapter } from '../_shared/runtime.ts';
+import { serveWith } from '../_shared/serve.ts';
 
 /**
  * `/optimize` — tier T1.

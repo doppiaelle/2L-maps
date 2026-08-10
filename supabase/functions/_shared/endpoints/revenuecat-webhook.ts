@@ -1,8 +1,8 @@
-import { errorResponse, jsonResponse } from '../http';
-import { hmacSha256, revenueCatSecret } from '../crypto';
-import { parseRequest, revenueCatWebhookSchema } from '../schemas';
+import { errorResponse, jsonResponse } from '../http.ts';
+import { hmacSha256, revenueCatSecret } from '../crypto.ts';
+import { parseRequest, revenueCatWebhookSchema } from '../schemas.ts';
 
-import type { HandlerContext } from '../handler';
+import type { HandlerContext } from '../handler.ts';
 
 /**
  * The RevenueCat webhook — the **only** writer of `user_entitlements`.

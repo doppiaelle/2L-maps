@@ -3,10 +3,10 @@ import {
   type DatabaseClient,
   type QuotaLimits,
   type TokenVerifier,
-} from './dependencies';
-import { errorResponse, jsonResponse, pipelineResponse, readJson } from './http';
-import { runPipeline, type AuthenticatedUser, type UpstreamOutcome } from './pipeline';
-import { parseRequest } from './schemas';
+} from './dependencies.ts';
+import { errorResponse, jsonResponse, pipelineResponse, readJson } from './http.ts';
+import { runPipeline, type AuthenticatedUser, type UpstreamOutcome } from './pipeline.ts';
+import { parseRequest } from './schemas.ts';
 
 import type { z } from 'zod';
 

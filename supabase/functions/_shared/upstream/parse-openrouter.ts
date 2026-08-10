@@ -6,7 +6,7 @@ import {
   type ParseAdapter,
   type ParseInput,
   type ParseOutcome,
-} from './parse';
+} from './parse.ts';
 
 /**
  * The same parse, through OpenRouter.

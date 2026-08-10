@@ -71,6 +71,43 @@ jobs:
           npx expo prebuild --platform android --no-install --clean
           grep -q 'com.google.android.geo.API_KEY' android/app/src/main/AndroidManifest.xml
 
+  functions:
+    name: the Edge Functions resolve under Deno
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      # **The Edge Functions run on a runtime nothing else in this pipeline
+      # uses.** `tsconfig.json` excludes `supabase/functions/*/index.ts` because
+      # they reference Deno globals, and the Jest suites reach `_shared/*`
+      # through Node's resolver, which infers extensions Deno does not. So the
+      # backend was checked twice by resolvers looser than the one that runs it,
+      # and its first deploy failed on 82 relative imports missing `.ts` — every
+      # one of them in a file the suite had already passed.
+      #
+      # Graph resolution, not `deno check`, because **that is what deploying
+      # does**: `supabase functions deploy` bundles, it does not type-check, and
+      # `failed to create the graph` is the exact error that came back. A
+      # type-check here would additionally judge the `npm:` packages' own types
+      # — real errors that production never evaluates — and a gate that goes red
+      # for something that cannot break is a gate people learn to override.
+      #
+      # `supabase/test/module-graph.test.ts` asserts the same property offline
+      # in milliseconds, under Deno's rules rather than Node's. This is the
+      # version that uses Deno itself, including the `npm:` specifiers in the
+      # import map, which no offline check can confirm are downloadable.
+      - name: Build the module graph for every entry point
+        run: |
+          for entry in supabase/functions/*/index.ts; do
+            echo "▸ $entry"
+            deno info --config supabase/functions/deno.json --quiet "$entry" > /dev/null
+          done
+          echo "Every entry point resolves."
+
   bundle:
     name: the JavaScript bundles (risk C6)
     runs-on: ubuntu-latest

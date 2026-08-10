@@ -1,4 +1,4 @@
-import type { TokenVerifier } from './dependencies';
+import type { TokenVerifier } from './dependencies.ts';
 
 /**
  * Who is calling, decided by the auth server rather than by us.

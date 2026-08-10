@@ -1,8 +1,8 @@
-import { createHandler } from '../_shared/handler';
-import { placeDetailsUpstream } from '../_shared/endpoints/place-details';
-import { placeDetailsRequestSchema } from '../_shared/schemas';
-import { defaultLimits, placesAdapter } from '../_shared/runtime';
-import { serveWith } from '../_shared/serve';
+import { createHandler } from '../_shared/handler.ts';
+import { placeDetailsUpstream } from '../_shared/endpoints/place-details.ts';
+import { placeDetailsRequestSchema } from '../_shared/schemas.ts';
+import { defaultLimits, placesAdapter } from '../_shared/runtime.ts';
+import { serveWith } from '../_shared/serve.ts';
 
 /**
  * `/place-details` — turn durable `place_id`s back into usable coordinates

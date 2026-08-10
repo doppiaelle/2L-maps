@@ -8,9 +8,9 @@ import {
   type EntitlementRow,
   type EntitlementStatus,
   type PlanTier,
-} from '../plans';
+} from '../plans.ts';
 
-import type { HandlerContext } from '../handler';
+import type { HandlerContext } from '../handler.ts';
 
 /**
  * `/usage-quota` — what this user may do, and how much of it is left.

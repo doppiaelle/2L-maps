@@ -1,5 +1,5 @@
-import { errorEnvelope, statusFor, type ErrorCode, type ErrorOptions } from './errors';
-import type { PipelineOutcome } from './pipeline';
+import { errorEnvelope, statusFor, type ErrorCode, type ErrorOptions } from './errors.ts';
+import type { PipelineOutcome } from './pipeline.ts';
 
 /**
  * HTTP plumbing shared by every function entrypoint.

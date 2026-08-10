@@ -1,7 +1,7 @@
-import { createRequestContext } from './context';
-import { errorResponse } from './http';
+import { createRequestContext } from './context.ts';
+import { errorResponse } from './http.ts';
 
-import type { HandlerContext } from './handler';
+import type { HandlerContext } from './handler.ts';
 
 /**
  * The Deno boundary, in one place.

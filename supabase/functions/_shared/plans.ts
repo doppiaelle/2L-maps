@@ -1,4 +1,4 @@
-import { DAY_PASS_DURATION_HOURS } from '../../../types/constants';
+import { DAY_PASS_DURATION_HOURS } from '../../../types/constants.ts';
 
 /**
  * Plans, allowances and the quota window — one source, used by both readers.

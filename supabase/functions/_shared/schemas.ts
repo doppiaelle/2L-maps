@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { MAX_STOPS, MIN_STOPS } from '../../../types/constants';
+import { MAX_STOPS, MIN_STOPS } from '../../../types/constants.ts';
 
 /**
  * Input validation at the boundary.
