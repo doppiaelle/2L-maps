@@ -15,8 +15,9 @@ for the glossary, then the document owning the area you are changing
 
 These are ordered by how expensive the violation is. Each is elaborated below.
 
-1. **No Google credential in the client except the Maps SDK rendering key.** Every other
-   Google call goes through a Supabase Edge Function. → [ADR-0006](docs/adr/0006-mandatory-backend-proxy.md)
+1. **No Google credential in the client. None.** Every Google call goes through a Supabase
+   Edge Function. → [ADR-0006](docs/adr/0006-mandatory-backend-proxy.md),
+   [ADR-0021](docs/adr/0021-drawn-route-preview.md)
 2. **No screen, hook or store imports a provider SDK directly.** All external SDKs sit behind
    a facade. → [ADR-0005](docs/adr/0005-map-engine-and-route-preview.md), [ADR-0012](docs/adr/0012-long-term-osm-exit-path.md)
 3. **Coordinates are nullable everywhere and expire after 30 days. `place_id` is the durable
@@ -58,7 +59,7 @@ Five external capabilities are wrapped. **No exceptions, including "just for a s
 
 | Facade | Wraps | Why |
 |---|---|---|
-| `<AppMap>` | `react-native-maps` | Known Expo SDK upgrade fragility; must be mockable in tests |
+| `<RouteCanvas>` | nothing — it draws | The preview is ours ([ADR-0021](docs/adr/0021-drawn-route-preview.md)). It wraps no SDK; what it isolates is the projection and the SVG, so `lib/map/` stays pure and testable |
 | `RoutingProvider` | Routes API via Edge Function | Migration seam to Valhalla |
 | `GeocodingProvider` | Places API via Edge Function | Migration seam; cost control point |
 | `NavigationProvider` | External app handoff | Per-provider capability differences |
@@ -83,8 +84,8 @@ logic is in the wrong place.
   `switch` in five files.
 - **Liskov** — every `NavigationProvider` implementation must be substitutable. A provider
   that cannot do chunked handoff reports that through its capability matrix; it does not throw.
-- **Interface segregation** — `<AppMap>` exposes what the product needs, not what
-  `react-native-maps` offers.
+- **Interface segregation** — `<RouteCanvas>` takes stops and a route, not a camera, a
+  viewport or a tile source. It had all three when a map engine was underneath it.
 - **Dependency inversion** — `lib/` defines the interface; the adapter implements it. `lib/`
   never imports an SDK.
 
@@ -226,18 +227,19 @@ Full specification: [`docs/24_PERFORMANCE.md`](docs/24_PERFORMANCE.md).
 
 These are product constraints, not preferences. A design that violates them is rejected.
 
-1. **Four taps maximum** from app open to an optimized route: Route → Add a stop → choose →
-   Optimize. Any new screen in that path must remove one elsewhere. It was three while the
-   app opened onto the stop list; the count rose by one when the map became the opening
-   view, and the trade was made deliberately — a tap in a place the user can see is worth
-   more than a tap saved by a gesture they cannot
-   ([ADR-0018](docs/adr/0018-bottom-dock-navigation.md)).
+1. **Three taps maximum** from app open to an optimized route: Add a stop → choose →
+   Optimize. Any new screen in that path must remove one elsewhere. It was four for one
+   day, while the app opened onto a map — and an empty map orients nobody, so the tap
+   spent reaching the route came back ([ADR-0022](docs/adr/0022-one-route-section.md)).
 2. **One-handed operation.** Every primary control sits in the lower third. The map is for
    looking, not reaching.
 3. **Navigation is a dock at the bottom**, never a sidebar, never a drawer, and never a
-   gesture ([ADR-0018](docs/adr/0018-bottom-dock-navigation.md)). Each section opens over a
-   map that stays mounted beneath it. Every section stays reachable while a route is in
-   progress: hiding someone's way out is not the same as protecting them.
+   gesture ([ADR-0018](docs/adr/0018-bottom-dock-navigation.md)). Three sections, always
+   three, and the row never changes width — an item that moves is an item nobody learns
+   ([ADR-0020](docs/adr/0020-four-section-dock.md)). The route preview is not one of them:
+   it is what an optimization produces, shown inside Route
+   ([ADR-0022](docs/adr/0022-one-route-section.md)). Every section stays reachable while a
+   route is in progress: hiding someone's way out is not the same as protecting them.
 4. **Gestures have visible alternatives.** A swipe-only action is inaccessible.
 5. **Every state is designed** — loading, empty, error, offline, degraded, quota-exhausted.
    A spinner is not a loading state; a skeleton that matches the eventual layout is.
@@ -266,8 +268,11 @@ These are product constraints, not preferences. A design that violates them is r
 
 ## 9. Security rules
 
-1. **One Google credential in the client**: the Maps SDK rendering key, restricted by bundle
-   ID and SHA-1, scoped to the Maps SDK only.
+1. **No Google credential in the client at all.** The Maps SDK rendering key was the one
+   exception, and it existed to let the SDK draw tiles. The route preview is drawn from our
+   own geometry and there is no SDK left to authorise
+   ([ADR-0021](docs/adr/0021-drawn-route-preview.md)), so the key and its restrictions are
+   gone. Every Google call is a Supabase Edge Function with a server-side key.
 2. **Service-account credentials live in Supabase secrets.** Never in the repository, never in
    `app.config`, never in an EAS build secret read at runtime.
 3. **RLS is on for every table, with no exceptions.** A table without a policy is unreachable
@@ -379,17 +384,25 @@ Non-blocking preferences are marked `nit:` and never hold a merge.
 
 Concrete failure modes this project is exposed to, and the rule that prevents each.
 
-1. **Never upgrade the Expo SDK and `react-native-maps` separately.** They are pinned as a
-   pair. An upgrade requires a verified build on **Android** before merge
-   ([ADR-0005](docs/adr/0005-map-engine-and-route-preview.md)). The iOS half of that check
-   cannot run ([ADR-0014](docs/adr/0014-android-first-verification.md)), which is a standing
-   reason risk C6 remains open rather than closed.
+1. **Never merge a native-module change without the Android prebuild gate passing.** Risk
+   C6 was the Expo SDK and `react-native-maps` drifting apart; that pair is gone, and what
+   remains is `expo-location` and `react-native-svg`. The gate is the same and the iOS half
+   of it still cannot run ([ADR-0014](docs/adr/0014-android-first-verification.md)), which
+   is why C6 stays open rather than closed.
 2. **Never assume a coordinate is present.** Handle `null` at every read
    ([ADR-0007](docs/adr/0007-place-id-durable-coordinates-perishable.md)).
 3. **Never cache a coordinate beyond 30 days**, anywhere — including analytics payloads and
    crash breadcrumbs. This is a terms violation, not a bug.
-4. **Never cache map tiles or bulk pre-fetch.** Prohibited by the platform terms.
-5. **Never display Google-derived content on a non-Google map.** Prohibited per API.
+4. **Never cache map tiles or bulk pre-fetch.** Prohibited by the platform terms, and now
+   trivially true: nothing fetches a tile.
+5. **Google-derived content is displayed on a canvas we draw, and this is a known
+   exposure.** The Maps Platform terms forbid it, per API. The decision to do it anyway was
+   taken by the product owner against an explicit recommendation, and the risk it carries —
+   revocation of the Maps Platform key, which stops the app for every user at once — is
+   recorded in [ADR-0021](docs/adr/0021-drawn-route-preview.md) and as risk C3. **Do not
+   widen it.** Attribution stays wherever Google-derived content appears, no tile is ever
+   fetched or cached, and the thirty-day coordinate rule is unaffected. Reinstating a map
+   engine, or removing the attribution, both require reopening the ADR.
 6. **Never add a metered call without a quota check.** Every new upstream call goes through
    the seven-step Edge Function pipeline.
 7. **Never ship a paywall change without re-reading Guideline 3.1.2.** Trial disclosure is the

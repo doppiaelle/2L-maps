@@ -112,7 +112,7 @@ dependent code changes. This has happened before and will happen again (risk S1)
 | `place_id` may be stored indefinitely | It is the durable key for every location | [`12_DATABASE.md`](12_DATABASE.md) |
 | **Coordinates cached ≤ 30 consecutive days** | Nullable columns, `coords_refreshed_at`, daily purge job with alerting on failure | [ADR-0007](adr/0007-place-id-durable-coordinates-perishable.md) |
 | No map tile caching or bulk pre-fetch | Offline means own data only | [ADR-0008](adr/0008-offline-scope.md) |
-| **No Google content on a non-Google map** | `react-native-maps` with Google on both platforms; `expo-maps` excluded on iOS because it renders Apple Maps | [ADR-0005](adr/0005-map-engine-and-route-preview.md) |
+| **No Google content on a non-Google map** | **Knowingly not met** — the route preview is drawn by us and shows Google-derived coordinates and geometry. The decision, the recommendation against it and the exposure are in [ADR-0021](adr/0021-drawn-route-preview.md); carried as risk C3 | [ADR-0021](adr/0021-drawn-route-preview.md) |
 | Attribution displayed | Always visible, never covered at any sheet detent; burned into exported snapshots | [`14_GOOGLE_MAPS_INTEGRATION.md`](14_GOOGLE_MAPS_INTEGRATION.md) |
 | No Google trademarks implying affiliation | **Open — the name "2L Maps" requires a decision before submission (risk C9)** | [`35_RISK_REGISTER.md`](35_RISK_REGISTER.md) |
 | Turn-by-turn requires the Navigation SDK | No in-app guidance; handoff only | [ADR-0004](adr/0004-external-navigation-handoff.md) |
@@ -324,7 +324,7 @@ Before first submission and every release:
 - [ ] Purge job running, monitored, alerting verified.
 - [ ] No coordinate older than 30 days — verified by audit query.
 - [ ] Attribution visible at every sheet detent and in exported snapshots.
-- [ ] Single map engine; no Google content on any non-Google surface.
+- [ ] Attribution visible wherever Google-derived content appears, including on the drawn preview (ADR-0021). No tiles fetched or cached.
 - [ ] Name and branding decision resolved (risk C9).
 - [ ] Export and deletion functional and self-service.
 - [ ] Supabase in an EU region.

@@ -230,7 +230,7 @@ trade-off.
 |---|---|---|---|
 | CR-01 | Coordinates from Google may be cached at most 30 consecutive days | Google Maps Platform terms | [ADR-0007](adr/0007-place-id-durable-coordinates-perishable.md) |
 | CR-02 | Map tiles may not be cached or bulk pre-fetched | Google Maps Platform terms | [ADR-0008](adr/0008-offline-scope.md) |
-| CR-03 | Google Maps Content may not be displayed on a non-Google map | Google Maps Platform terms, per API | [ADR-0005](adr/0005-map-engine-and-route-preview.md) |
+| CR-03 | **Knowingly not met.** Google Maps Content is displayed on a canvas we draw. The decision, the recommendation against it and the exposure are recorded in [ADR-0021](adr/0021-drawn-route-preview.md) | Google Maps Platform terms, per API | [ADR-0021](adr/0021-drawn-route-preview.md), [ADR-0005](adr/0005-map-engine-and-route-preview.md) |
 | CR-04 | Turn-by-turn guidance requires the Navigation SDK, which cannot coexist with the Maps SDK | Google licensing and SDK conflict | [ADR-0004](adr/0004-external-navigation-handoff.md) |
 | CR-05 | `optimizeWaypointOrder` supports at most 25 intermediate waypoints, and is incompatible with `TRAFFIC_AWARE_OPTIMAL` | Routes API | [ADR-0003](adr/0003-tiered-optimization-cascade.md) |
 | CR-06 | Apple Maps and Waze accept a single destination per deep link | Platform URL schemes | [ADR-0004](adr/0004-external-navigation-handoff.md) |

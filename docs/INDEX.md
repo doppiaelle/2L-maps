@@ -132,6 +132,9 @@ owning your area (see §Areas below) → [`29`](29_DEFINITION_OF_DONE.md).
 | [0018](adr/0018-bottom-dock-navigation.md) | A bottom dock replaces the sheet and the floating controls |
 | [0019](adr/0019-explicit-address-search.md) | Address search is submitted by a press, never typed ahead; the debounce is deleted |
 | [0020](adr/0020-four-section-dock.md) | The dock has four fixed sections and the map is one of them; amends ADR-0018 |
+| [0021](adr/0021-drawn-route-preview.md) | The route preview is drawn by us, not rendered by Google; the client keeps no Google credential. **Carries a known terms exposure — read it before touching the map** |
+| [0022](adr/0022-one-route-section.md) | One Route section with the map as its second face; amends ADR-0018 and ADR-0020 |
+| [0023](adr/0023-legs-name-their-stops.md) | A leg names the stops it runs between, both ends nullable; `MAJOR` |
 
 ---
 

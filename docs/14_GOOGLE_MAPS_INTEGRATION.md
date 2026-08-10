@@ -1,9 +1,27 @@
 # 14 — Google Maps Integration
 
-> **Status:** Approved
+> **Status:** Largely superseded by [ADR-0021](adr/0021-drawn-route-preview.md)
 > **Owner:** Architecture
-> **Last reviewed:** 2026-08-06
-> **Related:** [ADR-0005](adr/0005-map-engine-and-route-preview.md) · [ADR-0009](adr/0009-visual-direction.md) · [`09_COMPONENT_LIBRARY.md`](09_COMPONENT_LIBRARY.md)
+> **Last reviewed:** 2026-08-10
+> **Related:** [ADR-0021](adr/0021-drawn-route-preview.md) · [ADR-0005](adr/0005-map-engine-and-route-preview.md) · [ADR-0009](adr/0009-visual-direction.md) · [`09_COMPONENT_LIBRARY.md`](09_COMPONENT_LIBRARY.md)
+
+> ### What is still true, and what is not
+>
+> **There is no Google map in this product any more.** The route preview is drawn
+> by us from our own geometry ([ADR-0021](adr/0021-drawn-route-preview.md)), and
+> `react-native-maps`, the Cloud Map IDs, the JSON base style, the viewport
+> clustering and the Maps SDK key are all deleted.
+>
+> - **§6 Map styling, §7 Markers, §9 Camera, gestures and layers** describe a map
+>   engine that is gone. Read them as history.
+> - **§8 Polyline** still describes where the geometry comes from, which has not
+>   changed — only what draws it.
+> - **§10 Terms obligations** is the section that matters most and it is corrected
+>   in place. One of the six is now knowingly not met.
+>
+> This document is kept rather than deleted because the reasoning in §5 and §10 is
+> what ADR-0021 argues against, and an ADR whose opposing case has been erased is
+> an ADR nobody can re-examine.
 
 ---
 
@@ -207,18 +225,28 @@ a non-gesture equivalent ([`../CLAUDE.md`](../CLAUDE.md) §7).
 
 ## 10. Terms obligations
 
-**Non-negotiable**, and all traced to [`32_LEGAL_COMPLIANCE.md`](32_LEGAL_COMPLIANCE.md).
+All traced to [`32_LEGAL_COMPLIANCE.md`](32_LEGAL_COMPLIANCE.md). Five of the six
+still hold. **The fourth does not, and that is a decision rather than a
+regression** — see [ADR-0021](adr/0021-drawn-route-preview.md).
 
-1. **Google attribution is always visible** on any surface showing Google map content, and is
-   never obscured by the bottom sheet at any detent.
+1. **Google attribution is always visible** on any surface showing Google-derived
+   content. Still true, and now on the drawn canvas: the renderer changing does
+   not change where the data came from.
 2. **No tile caching, no bulk pre-fetch** ([ADR-0008](adr/0008-offline-scope.md)).
+   Trivially true — nothing fetches a tile.
 3. **Coordinates cached at most 30 days**
-   ([ADR-0007](adr/0007-place-id-durable-coordinates-perishable.md)).
-4. **Google content never appears on a non-Google map** — this is why `expo-maps` is excluded on
-   iOS, where it renders Apple Maps.
+   ([ADR-0007](adr/0007-place-id-durable-coordinates-perishable.md)). Unchanged,
+   and now enforced in one more place: the preview draws only what
+   `isCoordinateFresh` still allows.
+4. ~~**Google content never appears on a non-Google map.**~~ **Knowingly not met.**
+   The preview shows Places coordinates and Routes geometry on a canvas we draw.
+   The product owner decided this against an explicit recommendation; the
+   exposure — revocation of the Maps Platform key, which stops the app for every
+   user at once — is recorded in ADR-0021 and as risk **C3**. Do not widen it.
 5. **Exported snapshots carry attribution burned into the image** (risk C14).
-6. The Maps SDK key is restricted to bundle ID and signing certificate, and scoped to Maps SDK
-   APIs only.
+   Unchanged in principle; there is no snapshot feature at present.
+6. ~~The Maps SDK key is restricted to bundle ID and signing certificate.~~ **There
+   is no Maps SDK key.** The client holds no Google credential of any kind.
 
 ---
 

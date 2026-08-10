@@ -235,6 +235,10 @@ account termination or a blocked release.*
 | **Description** | The "No Use With Non-Google Maps" clause applies per API. Rendering a Google polyline or geocode on MapLibre, Apple Maps or any third-party map is a violation. |
 | **Likelihood / Impact** | Low / High |
 | **Status** | Mitigated — `react-native-maps` with Google provider on both platforms ([ADR-0005](adr/0005-map-engine-and-route-preview.md)) |
+| **Status** | **Realised, knowingly.** The route preview is drawn by us and shows Google-derived coordinates and geometry ([ADR-0021](adr/0021-drawn-route-preview.md)). The decision was the product owner's, taken against an explicit recommendation. |
+| **Exposure** | Revocation of the Maps Platform key, which stops the app for every user at the same moment. Verifiable by a store reviewer. |
+| **What is still honoured** | Attribution on the canvas, no tile fetched or cached, the thirty-day coordinate rule enforced. |
+| **Reversal** | `git revert` of the removal commit, plus reissuing the Maps API key and its bundle-ID and SHA-1 restrictions in the Cloud console. |
 | **Trigger** | Any pull request introducing a second map engine; `expo-maps` adoption on iOS |
 | **Response** | Blocked at review. Changing the map engine requires an ADR. |
 | **Owner** | Architecture |
@@ -326,9 +330,9 @@ account termination or a blocked release.*
 |---|---|
 | **Description** | The paper map style requires Cloud-based Map Styling with a Map ID configured in the Google Cloud console. A console change alters the shipped app with no code review, and an unresolvable Map ID changes the app's appearance silently. |
 | **Likelihood / Impact** | Low / Low |
-| **Status** | Mitigated — Map IDs and intended appearance documented; fallback to default style mandatory |
+| **Status** | **Closed.** There is no console style left to drift: the preview is drawn from the design tokens in this repository and its appearance is under test ([ADR-0021](adr/0021-drawn-route-preview.md)). |
 | **Trigger** | Unexpected map appearance; a style change nobody recorded |
-| **Response** | Treat style changes as reviewable events; keep the documented reference current. |
+| **Response** | None needed. A style change is now a code change and is reviewed like any other. |
 | **Owner** | Architecture |
 
 ---

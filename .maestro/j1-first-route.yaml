@@ -1,31 +1,39 @@
 # J1 — a first route, from nothing to a handoff.
 #
-# The journey the four-tap guarantee is measured against
+# The journey the three-tap guarantee is measured against
 # (docs/03_USER_JOURNEYS.md, CLAUDE.md §7 rule 1). The tap count is asserted by
-# the flow's own shape: every `tapOn` between launch and `Start` is one of them.
+# the flow's own shape: every `tapOn` between launch and `Confirm` is one of them.
 #
-# It was three until ADR-0018. The app now opens on the map and the route lives
-# in a dock section, so opening that section is the first tap — deliberately
-# spent, and visible here rather than hidden in a gesture.
+# It was four for one day, while the app opened on a map — and an empty map
+# orients nobody, so the tap spent reaching the route came back (ADR-0022).
+# The app opens on the Route section now.
+#
+# **Two things in this flow had already broken and nothing noticed**, because it
+# does not run in CI: typing no longer searches (ADR-0019, the search is
+# submitted by a press), and the button that was `Start` is now `Confirm`
+# (ADR-0022). A flow that is never executed is a flow that documents the past.
 appId: com.doppiaelle.twolmaps
 ---
 - launchApp:
     clearState: true
 
-# Tap 1 — open the route section. The map is the opening view.
+# The Route section is the opening view; no tap is spent reaching it.
 - assertVisible:
     id: 'plan-screen'
-- tapOn:
-    id: 'dock-itinerary'
 - assertVisible:
     id: 'section-itinerary'
 
-# Tap 2 — add a stop.
+# Tap 1 — add a stop.
 - tapOn:
     id: 'plan-add-stop'
 - assertVisible:
     id: 'add-stop-input'
 - inputText: 'Via Roma'
+# Typing costs nothing and finds nothing: the search is submitted by a press, so
+# a free user's ten monthly lookups are not spent on pauses in their typing
+# (ADR-0019).
+- tapOn:
+    id: 'add-stop-search'
 - assertVisible:
     id: 'add-stop-option'
 - tapOn:
@@ -36,6 +44,8 @@ appId: com.doppiaelle.twolmaps
     id: 'plan-add-stop'
 - inputText: 'Piazza Vecchia'
 - tapOn:
+    id: 'add-stop-search'
+- tapOn:
     id: 'add-stop-option'
 
 # Tap 2 — optimize. The control says what it will do before it does it.
@@ -43,8 +53,14 @@ appId: com.doppiaelle.twolmaps
 - tapOn:
     id: 'plan-action'
 
-# Tap 3 — start. The label having changed is the proof the result landed.
-- assertVisible: 'Start'
+# The result replaces the list with the drawn route, in the same section and
+# without a further tap (ADR-0022). That it appeared at all is the proof the
+# result landed — this is the screen that "Could not optimize" used to occupy.
+- assertVisible:
+    id: 'plan-route-canvas'
+
+# Tap 3 — confirm, which hands the day to a navigation app.
+- assertVisible: 'Confirm'
 - tapOn:
     id: 'plan-action'
 # The boundary. What happens after this is Google Maps, and Maestro cannot see
