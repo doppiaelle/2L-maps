@@ -1,8 +1,24 @@
 name: android-preview
 
-# Builds the Android development build — the artifact that is installed once on a
-# physical phone, after which every change arrives over the local network by QR
-# code with no rebuild (ADR-0014).
+# Builds the Android app for a physical phone (ADR-0014).
+#
+# **Two variants, and the default is the one that works on its own.**
+#
+# - `standalone` (default) — the JavaScript is compiled into the APK. Install it
+#   and it runs. Every change needs a new build, which is this workflow again.
+# - `dev-server` — a development build, which contains no JavaScript and loads it
+#   from a Metro server over the local network. Install it once and every change
+#   arrives by QR code with no rebuild — but it shows a dashboard asking for a
+#   server URL until one is running, and it needs a machine with Node on the same
+#   network.
+#
+# ADR-0014 described only the second, because it assumed a development machine.
+# Without one that variant cannot start at all, which is why it is no longer the
+# default.
+#
+# **Both are signed with the same key.** Expo's template signs the `release`
+# build type with `debug.keystore` too, so the SHA-1 below is correct for either
+# and the Maps key does not need a second fingerprint.
 #
 # Linux runners only, so minutes bill at 1× rather than the 10× macOS rate. This
 # is why the whole approach costs nothing.
@@ -22,6 +38,13 @@ name: android-preview
 
 on:
   workflow_dispatch:
+    inputs:
+      variant:
+        description: Which build
+        required: true
+        type: choice
+        options: [standalone, dev-server]
+        default: standalone
   push:
     branches: [main]
 
@@ -35,6 +58,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      # `inputs.variant` is empty on a push, which falls through to standalone —
+      # the variant that runs without anything else being switched on.
+      - name: Choose the variant
+        id: variant
+        run: |
+          if [ "${{ inputs.variant }}" = "dev-server" ]; then
+            echo "task=assembleDebug"  >> "$GITHUB_OUTPUT"
+            echo "dir=debug"           >> "$GITHUB_OUTPUT"
+            echo "name=dev-server"     >> "$GITHUB_OUTPUT"
+          else
+            echo "task=assembleRelease" >> "$GITHUB_OUTPUT"
+            echo "dir=release"          >> "$GITHUB_OUTPUT"
+            echo "name=standalone"      >> "$GITHUB_OUTPUT"
+          fi
+          cat "$GITHUB_OUTPUT"
 
       - uses: actions/setup-node@v4
         with:
@@ -85,8 +124,6 @@ jobs:
           EXPO_PUBLIC_MAP_ID_DARK: ${{ secrets.MAP_ID_DARK }}
         run: npx expo prebuild --platform android --no-install --clean
 
-      # `assembleDebug` rather than release: a development build is meant to load
-      # JavaScript from the dev server, which a release build will not do.
       - name: Build
         working-directory: android
         env:
@@ -107,7 +144,7 @@ jobs:
         # The cost is that the APK will not run on an x86 emulator or a 32-bit
         # device. Add the others back here if either is ever needed; nothing else
         # depends on the choice.
-        run: ./gradlew assembleDebug --no-daemon -PreactNativeArchitectures=arm64-v8a
+        run: ./gradlew ${{ steps.variant.outputs.task }} --no-daemon -PreactNativeArchitectures=arm64-v8a
 
       # The SHA-1 is knowable before this workflow ever runs — see the note above
       # — but it is printed anyway, because "the value is documented" and "the
@@ -124,8 +161,8 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: 2l-maps-development-build
-          path: android/app/build/outputs/apk/debug/*.apk
+          name: 2l-maps-${{ steps.variant.outputs.name }}
+          path: android/app/build/outputs/apk/${{ steps.variant.outputs.dir }}/*.apk
           # Long enough to reinstall after a phone reset without rebuilding.
           retention-days: 30
           if-no-files-found: error
