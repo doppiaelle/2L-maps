@@ -40,8 +40,9 @@ const SUPABASE_SHIM = `
   exception when duplicate_object then null; end $$;
 
   create table auth.users (
-    id    uuid primary key default gen_random_uuid(),
-    email text
+    id         uuid primary key default gen_random_uuid(),
+    email      text,
+    created_at timestamptz not null default now()
   );
 
   -- The real implementation reads the verified JWT claims that PostgREST sets on

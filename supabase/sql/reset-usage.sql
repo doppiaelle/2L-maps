@@ -25,60 +25,72 @@
 --
 --   Supabase dashboard → SQL Editor → paste → Run.
 --
--- Set the email below to the account you sign in with on the device. The
--- deletion is scoped to that one user: a bare `delete from usage_events` would
--- reset every tester at once, including whoever is mid-way through checking
--- that the *exhausted* state renders correctly.
+-- **Each block below is one statement, and that is deliberate.** The editor
+-- runs statements over a pooled connection, so anything that leaves state
+-- behind — a temporary table, a session variable — may not survive to the next
+-- one. Everything each block needs, it establishes itself.
 
-begin;
+-- ─── 1. Which account? ───────────────────────────────────────────────────────
+--
+-- Run this first if you are not certain which address you signed in with. An
+-- account created through Google carries whatever address Google returned, which
+-- is not necessarily the one you would have typed.
 
--- ─── Who ─────────────────────────────────────────────────────────────────────
--- Change this, and nothing else in the file.
-create temporary table _target on commit drop as
-select id
-from auth.users
-where email = 'lorenzocarovillano@gmail.com';
-
--- Fails loudly rather than deleting nothing and reporting success. A typo in the
--- address above is the likeliest thing to go wrong here, and a silent no-op sends
--- the tester back to the device to find the allowance still exhausted.
-do $$
-begin
-  if not exists (select 1 from _target) then
-    raise exception 'No account matches that email. Check the address in the temporary table above.';
-  end if;
-end;
-$$;
-
--- ─── What ────────────────────────────────────────────────────────────────────
--- Everything in the current window. Older rows are left alone: they are outside
--- the window the quota reader counts, so deleting them changes no allowance and
--- only destroys history.
-delete from usage_events
-where user_id in (select id from _target)
-  and occurred_at >= date_trunc('month', now() at time zone 'utc');
-
--- What is left, so the result is visible rather than assumed.
 select
-  endpoint,
-  count(*) as remaining_events_this_month
-from usage_events
-where user_id in (select id from _target)
-  and occurred_at >= date_trunc('month', now() at time zone 'utc')
-group by endpoint
-order by endpoint;
+  u.email,
+  u.created_at,
+  count(e.id) filter (
+    where e.occurred_at >= date_trunc('month', now() at time zone 'utc')
+  ) as calls_this_month
+from auth.users u
+left join usage_events e on e.user_id = u.id
+group by u.id, u.email, u.created_at
+order by u.created_at;
 
-commit;
+-- ─── 2. The reset ────────────────────────────────────────────────────────────
+--
+-- Change the address on the marked line, and nothing else.
+--
+-- One statement, so the lookup and the deletion cannot land on different
+-- connections. It reports `accounts_matched` alongside the count: **zero there
+-- means the address did not match and nothing was deleted**, which is the one
+-- failure worth catching — a silent no-op sends you back to the device to find
+-- the allowance still exhausted and no idea why.
+--
+-- Scoped to one user on purpose. A bare `delete from usage_events` would reset
+-- every tester at once, including whoever is part-way through checking that the
+-- *exhausted* state renders correctly.
+--
+-- Only the current window is touched. Older rows sit outside the period the
+-- quota reader counts, so removing them would free no allowance and destroy
+-- history for nothing.
 
--- ─── A day pass instead, when the allowances themselves are what you are testing ──
+with target as (
+  select id
+  from auth.users
+  where email = 'doppiaelletech@gmail.com' -- ← change this
+),
+cleared as (
+  delete from usage_events
+  where user_id in (select id from target)
+    and occurred_at >= date_trunc('month', now() at time zone 'utc')
+  returning endpoint
+)
+select
+  (select count(*) from target) as accounts_matched,
+  (select count(*) from cleared) as rows_cleared;
+
+-- ─── 3. A day pass instead, when the allowances themselves are what you test ──
 --
--- Deleting usage tests the *free* allowances again. To test what a paying user
--- sees, grant a day pass rather than clearing the counter — the plan resolver
--- reads `day_pass_expires_at` against the clock and needs no webhook
--- (`resolvePlan` in `supabase/functions/_shared/plans.ts`):
---
---   insert into user_entitlements (user_id, status, plan, day_pass_expires_at)
---   select id, 'none', 'day-pass', now() + interval '24 hours'
---   from auth.users where email = 'lorenzocarovillano@gmail.com'
---   on conflict (user_id) do update
---     set plan = 'day-pass', day_pass_expires_at = excluded.day_pass_expires_at;
+-- Deleting usage tests the *free* allowances again. To see what a paying user
+-- sees, grant a day pass rather than clearing the counter — `resolvePlan` in
+-- `supabase/functions/_shared/plans.ts` reads `day_pass_expires_at` against the
+-- clock and needs no webhook.
+
+-- insert into user_entitlements (user_id, status, plan, day_pass_expires_at)
+-- select id, 'none', 'day-pass', now() + interval '24 hours'
+-- from auth.users
+-- where email = 'doppiaelletech@gmail.com' -- ← and here
+-- on conflict (user_id) do update
+--   set plan = 'day-pass',
+--       day_pass_expires_at = excluded.day_pass_expires_at;
