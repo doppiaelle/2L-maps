@@ -180,15 +180,28 @@ iOS submission — that is deferred ([ADR-0014](adr/0014-android-first-verificat
 
 16. **Supabase secrets** (`supabase secrets set`, or Settings → Edge Functions → Secrets):
 
-    | Name | Value |
-    |---|---|
-    | `GOOGLE_SERVICE_ACCOUNT_JSON` | the whole JSON file, as one line |
-    | `GOOGLE_ROUTES_API_KEY` | a *separate*, unrestricted-by-referrer server key, quota-capped in stage A |
-    | `GOOGLE_PLACES_API_KEY` | as above |
-    | `REVENUECAT_WEBHOOK_SECRET` | set in stage H |
-    | `ANTHROPIC_API_KEY` | only if AI-assisted entry is enabled ([ADR-0016](adr/0016-ai-assisted-stop-entry.md)) |
+    | Name | Value | Needed for |
+    |---|---|---|
+    | `GOOGLE_SERVER_API_KEY` | a *separate* server key — no referrer restriction, quota-capped in stage A | Routes, Places and Geocoding. **One key, not three:** `runtime.ts` reads this single name for all of them |
+    | `REVENUECAT_WEBHOOK_SECRET` | set in stage H | Entitlement webhooks only |
+    | `ANTHROPIC_API_KEY` | your Anthropic key | The import parser, unless you switch it below ([ADR-0016](adr/0016-ai-assisted-stop-entry.md)) |
+    | `PARSE_PROVIDER` | `openrouter` — omit entirely for the default | Optional. Selects the parser ([ADR-0017](adr/0017-parse-provider-switch.md)) |
+    | `OPENROUTER_API_KEY` | your OpenRouter key | Only when `PARSE_PROVIDER=openrouter` |
+    | `PARSE_MODEL` | a model id | Optional override within whichever provider is selected |
 
-    Then delete the downloaded JSON key from your machine.
+    **`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` and `SUPABASE_DB_URL` are
+    injected automatically** into every Edge Function by the platform. Do not set them by hand;
+    the functions read them for the database connection and the token verifier.
+
+    **Before you set `PARSE_PROVIDER=openrouter`, read [ADR-0017](adr/0017-parse-provider-switch.md).**
+    Many free inference endpoints retain prompts for training, and a pasted delivery list is the
+    addresses of your customers rather than your own. It is fine for test data. It is a decision
+    to make deliberately before real ones go through it — which is why the default is Anthropic
+    and the switch has to be set by hand.
+
+    There is **no service account**. An earlier draft of this runbook asked for
+    `GOOGLE_SERVICE_ACCOUNT_JSON`; nothing reads it. The Google APIs this product calls take an
+    API key, and adding a service account would be a second credential to protect for no gain.
 
 17. **GitHub secrets** (Settings → Secrets and variables → Actions):
 
@@ -297,8 +310,8 @@ Do this last. It is the least reversible step legally, and the product works wit
 | Maps SDK keys (2) | `.env.local`, EAS environment | Anywhere unrestricted |
 | Supabase anon key | `.env.local` | — it is publishable |
 | Supabase service role key | Supabase only | The app, CI, this repository |
-| Google service account JSON | Supabase secrets | Anywhere else, including your Downloads |
-| Server API keys for Routes/Places | Supabase secrets | The client bundle |
+| The server API key for Routes/Places | Supabase secrets | The client bundle |
+| Model API keys (Anthropic, OpenRouter) | Supabase secrets | The client bundle |
 | RevenueCat webhook secret | Supabase secrets + RevenueCat | — |
 | `EXPO_TOKEN`, Supabase CI tokens | GitHub secrets | — |
 
@@ -360,7 +373,7 @@ attached rather than a feeling of completion.
 - [ ] Two budgets, and an alert email received.
 - [ ] Four APIs enabled, each with a non-default per-day quota.
 - [ ] Both client keys restricted by package/bundle **and** by API.
-- [ ] Service account JSON in Supabase secrets and deleted locally.
+- [ ] `GOOGLE_SERVER_API_KEY` in Supabase secrets, quota-capped, and not in any client build.
 - [ ] Supabase project in an EU region.
 - [ ] `.env.local` gitignored, and `git status` clean.
 - [ ] Migrations applied; generated types match the repository.

@@ -224,6 +224,29 @@ Everything in §7 for every feature, plus:
 
 ---
 
+## 8a. What cannot be verified in this environment, and why — recorded 2026-08-10
+
+Some criteria above are unticked not because the work was skipped but because **the environment
+this code is written in cannot exercise them.** Recording that here is the point: an unticked box
+with no explanation is indistinguishable from a forgotten one, and by release nobody remembers
+which was which.
+
+| Criterion | Why it cannot be checked here | What checks it |
+|---|---|---|
+| **Performance budgets** (`CLAUDE.md` §6) | Every budget is stated for a mid-range Android device on battery — cold start under 2.5 s, 60 fps at 25 stops, markers under 16 ms a frame. A container has no GPU, no thermal envelope and no touch input, so any number measured here would be a number about this machine | A physical Android phone. The lower the specification the better: the budgets are written for the device the target user actually owns, not for the one a developer does |
+| **TalkBack** (`CLAUDE.md` §10 rule 7) | Android's screen reader. It reads the interface aloud and is driven by swipes rather than taps, and it exercises exactly the labels, roles and state announcements the code sets. None of that can run headless | Turning it on: Settings → Accessibility → TalkBack. What matters is whether the route can be built and driven without looking — every control named by what it *does*, every state change announced |
+| **Maestro flows** ([`22_TESTING.md`](22_TESTING.md)) | End-to-end tests that drive the built app on a real device or emulator, tapping through the three journeys in [`03_USER_JOURNEYS.md`](03_USER_JOURNEYS.md). They need an installed APK and a running device, neither of which exists here | An Android device with the development build installed, or CI with an emulator |
+| **Contrast in sunlight, gloved touch, thermal throttling** | Physical conditions. This product's operating environment is a van windscreen in August | The phone, outdoors |
+| **iOS, at every level** | No Mac, and no paid build service ([ADR-0014](adr/0014-android-first-verification.md)) | Deliberately deferred until Android is finished and proven. The box stays unticked and risk C6 stays open |
+
+**What *is* verified here:** typecheck, lint, format, the whole unit, component, integration and
+contract suite, the schema against a real Postgres via PGlite, and `expo prebuild --platform
+android` — which is the C6 gate and the only proof that the Expo/`react-native-maps` pair still
+resolves ([ADR-0005](adr/0005-map-engine-and-route-preview.md)).
+
+**The honest summary:** everything that can be decided by reading data is decided; everything
+that can only be decided by holding the phone is not.
+
 ## 9. Architectural decisions
 
 | ID | Decision | Applies to |

@@ -127,6 +127,7 @@ owning your area (see §Areas below) → [`29`](29_DEFINITION_OF_DONE.md).
 | [0014](adr/0014-android-first-verification.md) | Android-first verification through a CI-built development build; iOS unverified |
 | [0015](adr/0015-ad-supported-free-tier.md) | Ad-supported free tier capped on address search, day pass, Pro; amends ADR-0002 |
 | [0016](adr/0016-ai-assisted-stop-entry.md) | Paste, photo and dictation parsed to stops by a model, behind the Edge Function |
+| [0017](adr/0017-parse-provider-switch.md) | The parse provider is a switch, not a choice made once — Anthropic by default, OpenRouter opt-in |
 
 ---
 
