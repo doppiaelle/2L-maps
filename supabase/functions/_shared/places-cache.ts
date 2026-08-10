@@ -1,6 +1,6 @@
-import { COORDINATE_MAX_AGE_DAYS } from '../../../types/constants';
+import { COORDINATE_MAX_AGE_DAYS } from '../../../types/constants.ts';
 
-import type { DatabaseClient } from './dependencies';
+import type { DatabaseClient } from './dependencies.ts';
 
 /**
  * `places_cache` — the durability boundary, and the product's largest cost lever.

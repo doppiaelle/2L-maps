@@ -1,9 +1,9 @@
 import postgres from 'postgres';
 
-import { createTokenVerifier } from './tokens';
+import { createTokenVerifier } from './tokens.ts';
 
-import type { DatabaseClient } from './dependencies';
-import type { HandlerContext } from './handler';
+import type { DatabaseClient } from './dependencies.ts';
+import type { HandlerContext } from './handler.ts';
 
 /**
  * The request context: a database connection and a token verifier.

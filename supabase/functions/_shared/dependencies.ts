@@ -1,4 +1,4 @@
-import { ApiError } from './errors';
+import { ApiError } from './errors.ts';
 import {
   allowanceFor,
   quotaResetsAt,
@@ -6,7 +6,7 @@ import {
   resolvePlan,
   type EntitlementRow,
   type PlanTier,
-} from './plans';
+} from './plans.ts';
 import type {
   AuthenticatedUser,
   EntitlementState,
@@ -15,7 +15,7 @@ import type {
   RateLimitState,
   UpstreamOutcome,
   UsageRecord,
-} from './pipeline';
+} from './pipeline.ts';
 
 /**
  * The Supabase-backed pipeline dependencies, shared by every metered function.

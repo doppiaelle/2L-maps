@@ -8,6 +8,14 @@
     "exactOptionalPropertyTypes": true,
     "forceConsistentCasingInFileNames": true,
     "verbatimModuleSyntax": true,
+    // Deno requires an explicit extension on every relative import, and the
+    // Edge Functions are Deno. Without this the same files cannot be both
+    // type-checked here and deployed there — which is how they reached their
+    // first deploy attempt with 82 imports Deno could not resolve.
+    //
+    // Permissive rather than mandatory: nothing in the app uses it, and
+    // `noEmit` is already set, which is the condition TypeScript attaches.
+    "allowImportingTsExtensions": true,
     "paths": {
       "@/app/*": ["./app/*"],
       "@/features/*": ["./features/*"],

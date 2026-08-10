@@ -1,4 +1,4 @@
-import { ApiError, statusFor, type DegradationHint, type ErrorEnvelope } from './errors';
+import { ApiError, statusFor, type DegradationHint, type ErrorEnvelope } from './errors.ts';
 
 /**
  * The seven-step pipeline every metered function runs.

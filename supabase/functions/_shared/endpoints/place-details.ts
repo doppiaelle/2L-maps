@@ -1,8 +1,8 @@
-import { ApiError } from '../errors';
-import { readFreshPlaces, writePlaces, type CachedPlace } from '../places-cache';
+import { ApiError } from '../errors.ts';
+import { readFreshPlaces, writePlaces, type CachedPlace } from '../places-cache.ts';
 
-import type { DatabaseClient } from '../dependencies';
-import type { UpstreamOutcome } from '../pipeline';
+import type { DatabaseClient } from '../dependencies.ts';
+import type { UpstreamOutcome } from '../pipeline.ts';
 
 /**
  * `/place-details` — turn durable `place_id`s back into usable coordinates

@@ -1,8 +1,8 @@
-import { ApiError } from '../_shared/errors';
-import { createHandler } from '../_shared/handler';
-import { parseAddressesRequestSchema } from '../_shared/schemas';
-import { defaultLimits, parseAdapter } from '../_shared/runtime';
-import { serveWith } from '../_shared/serve';
+import { ApiError } from '../_shared/errors.ts';
+import { createHandler } from '../_shared/handler.ts';
+import { parseAddressesRequestSchema } from '../_shared/schemas.ts';
+import { defaultLimits, parseAdapter } from '../_shared/runtime.ts';
+import { serveWith } from '../_shared/serve.ts';
 
 /**
  * `/parse-addresses` — unstructured input to candidate addresses

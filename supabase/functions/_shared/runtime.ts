@@ -1,10 +1,10 @@
-import { createParseAdapter, type ParseAdapter } from './upstream/parse';
-import { createOpenRouterParseAdapter } from './upstream/parse-openrouter';
-import { createPlacesAdapter } from './upstream/places';
-import { createRoutesAdapter } from './upstream/routes';
-import { MAX_STOPS } from '../../../types/constants';
+import { createParseAdapter, type ParseAdapter } from './upstream/parse.ts';
+import { createOpenRouterParseAdapter } from './upstream/parse-openrouter.ts';
+import { createPlacesAdapter } from './upstream/places.ts';
+import { createRoutesAdapter } from './upstream/routes.ts';
+import { MAX_STOPS } from '../../../types/constants.ts';
 
-import type { HandlerContext } from './handler';
+import type { HandlerContext } from './handler.ts';
 
 /**
  * The composition root: where secrets are read and adapters are built.
