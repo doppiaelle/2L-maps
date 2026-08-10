@@ -40,7 +40,8 @@ export interface AutocompleteRequest {
   readonly input: string;
   readonly sessionToken: string;
   readonly locale?: string | null;
-  readonly bias?: { readonly latitude: number; readonly longitude: number } | null;
+  /** `lat`/`lng`, matching docs/33_API_CONTRACTS.md and the client. */
+  readonly bias?: { readonly lat: number; readonly lng: number } | null;
 }
 
 export interface AutocompleteResult {
@@ -60,7 +61,7 @@ export async function autocompleteUpstream(
     ...(request.locale === undefined || request.locale === null ? {} : { locale: request.locale }),
     ...(request.bias === undefined || request.bias === null
       ? {}
-      : { bias: { lat: request.bias.latitude, lng: request.bias.longitude } }),
+      : { bias: { lat: request.bias.lat, lng: request.bias.lng } }),
   });
 
   if (!outcome.ok) {

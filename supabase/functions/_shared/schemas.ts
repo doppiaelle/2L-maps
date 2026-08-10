@@ -75,13 +75,28 @@ export type OptimizeRequest = z.infer<typeof optimizeRequestSchema>;
 export const autocompleteRequestSchema = z.object({
   input: z.string().min(1).max(200),
   sessionToken: z.string().min(1).max(128),
-  locale: z.string().min(2).max(35).optional(),
+  // **`.nullable()` as well as `.optional()`, and the omission was fatal.** In
+  // Zod, `.optional()` accepts an absent key and rejects an explicit `null`. The
+  // client sends `locale: null` and `bias: null` when it has neither — which is
+  // every search — so this schema rejected every request the app has ever made,
+  // with 400 INVALID_REQUEST, before Google was ever contacted.
+  //
+  // Nothing caught it because both halves were tested separately: the schema
+  // against hand-written fixtures that used `undefined`, the client against a
+  // mocked server that accepted anything. `supabase/test/client-contract.test.ts`
+  // now runs one against the other.
+  locale: z.string().min(2).max(35).nullable().optional(),
+  // `lat`/`lng`, per docs/33_API_CONTRACTS.md §`/places-autocomplete`, which is
+  // also what the client sends. This schema asked for `latitude`/`longitude` and
+  // a mandatory `radiusMeters` the contract never mentions — so even a request
+  // that supplied a bias would have been refused. The document is the source
+  // (`CLAUDE.md` §13 rule 9); this was the copy that drifted.
   bias: z
     .object({
-      latitude: z.number().min(-90).max(90),
-      longitude: z.number().min(-180).max(180),
-      radiusMeters: z.number().int().positive().max(50_000),
+      lat: z.number().min(-90).max(90),
+      lng: z.number().min(-180).max(180),
     })
+    .nullable()
     .optional(),
 });
 

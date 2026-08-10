@@ -127,11 +127,29 @@ describe('/places-autocomplete input', () => {
     expect(!outcome.ok && outcome.code).toBe('MISSING_SESSION_TOKEN');
   });
 
-  it('accepts an optional location bias', () => {
+  it('accepts an optional location bias, in the shape the contract states', () => {
+    // `lat`/`lng` (docs/33_API_CONTRACTS.md §`/places-autocomplete`). This case
+    // used to assert `latitude`/`longitude` plus a `radiusMeters` the contract
+    // never mentions, and it passed — because it was checking the schema against
+    // its own author's belief rather than against the client. It is the reason
+    // a broken endpoint looked covered.
     const outcome = parseRequest(autocompleteRequestSchema, {
       input: 'Via Roma',
       sessionToken: 's',
-      bias: { latitude: 45.46, longitude: 9.19, radiusMeters: 20_000 },
+      bias: { lat: 45.46, lng: 9.19 },
+    });
+    expect(outcome.ok).toBe(true);
+  });
+
+  it('accepts an explicit null where the client has no bias and no locale', () => {
+    // `.optional()` alone accepts an absent key and rejects `null`. The client
+    // sends `null`, so this is the exact request every search made — and every
+    // one was answered 400 before Google was contacted.
+    const outcome = parseRequest(autocompleteRequestSchema, {
+      input: 'Via Roma',
+      sessionToken: 's',
+      bias: null,
+      locale: null,
     });
     expect(outcome.ok).toBe(true);
   });
