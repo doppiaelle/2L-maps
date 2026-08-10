@@ -11,6 +11,7 @@ import type { AddressNotice } from '@/lib/places/notice';
 import { layout, radius, space } from '@/lib/design/tokens';
 import { metricsAreEstimated } from '@/lib/route/plan-state';
 import type { ActionIntent, PlanState } from '@/lib/route/plan-state';
+import type { RouteView } from '@/lib/route/route-view';
 
 /**
  * Plan, composed.
@@ -43,6 +44,21 @@ export interface PlanMetric {
 export interface PlanViewProps {
   readonly state: PlanState;
   readonly intent: ActionIntent;
+  /**
+   * Which of the section's two faces is showing
+   * ([ADR-0022](../../docs/adr/0022-one-route-section.md)).
+   *
+   * Decided by `routeViewAfter`, never here. The map is not a place the user
+   * navigates to — it is what an optimization produces, and it takes the list's
+   * space for as long as the result it was drawn from is the current one.
+   */
+  readonly view?: RouteView;
+  /** The drawn route. Passed in rather than rendered here, so this component
+   *  stays presentational and knows nothing about projections or SVG. */
+  readonly mapSlot?: React.ReactNode;
+  /** The X. Leaves the result behind and returns to the list — with the stops
+   *  intact, which is what "back to the list" has to mean. */
+  onDismissMap?: () => void;
   readonly stops: readonly StopListItem[];
   readonly distance: PlanMetric | null;
   readonly duration: PlanMetric | null;
@@ -108,6 +124,9 @@ export function PlanView({
   onSkipStop,
   addressNotice = null,
   onRetryAddresses,
+  view = 'list',
+  mapSlot,
+  onDismissMap,
   testID,
 }: PlanViewProps): React.JSX.Element {
   const actionState = useMemo(() => toActionState(intent, state), [intent, state]);
@@ -161,17 +180,50 @@ export function PlanView({
         </View>
       )}
 
-      {/* The list takes the space the header and action do not. It scrolls;
-          they do not. */}
+      {/* One space, two things in it. The list takes what the header and action
+          do not; the map takes exactly the same space when there is a result to
+          show, so nothing around it moves as the section changes face. */}
       <View style={{ flex: 1 }}>
-        <StopList
-          state={listStateFor(state, stops)}
-          onSelectStop={onSelectStop}
-          // Read-only while driving: reordering under someone following the list
-          // is a hazard rather than an edit.
-          {...(state.kind === 'in-progress' ? {} : { onRemoveStop, onMoveStop })}
-          testID="plan-stop-list"
-        />
+        {view === 'map' ? (
+          <View style={{ flex: 1, paddingHorizontal: layout.screenPadding }}>
+            {mapSlot}
+
+            {onDismissMap !== undefined && (
+              // Top right, which is the corner ADR-0018 spent a whole decision
+              // moving controls *out* of — and it is right here, because this is
+              // not navigation. It dismisses what is on the canvas, it sits on
+              // the canvas, and the thumb-zone rule is served by Confirm being
+              // where every primary action has always been.
+              <Pressable
+                onPress={onDismissMap}
+                accessibilityRole="button"
+                accessibilityLabel="Discard this route and go back to the list"
+                style={{
+                  position: 'absolute',
+                  top: space.space3,
+                  right: layout.screenPadding + space.space3,
+                  width: layout.touchMin,
+                  height: layout.touchMin,
+                  borderRadius: radius.radiusFull,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                testID="plan-dismiss-map"
+              >
+                <Text className="text-title-md text-text-primary">✕</Text>
+              </Pressable>
+            )}
+          </View>
+        ) : (
+          <StopList
+            state={listStateFor(state, stops)}
+            onSelectStop={onSelectStop}
+            // Read-only while driving: reordering under someone following the
+            // list is a hazard rather than an edit.
+            {...(state.kind === 'in-progress' ? {} : { onRemoveStop, onMoveStop })}
+            testID="plan-stop-list"
+          />
+        )}
       </View>
 
       <View style={{ paddingHorizontal: layout.screenPadding, paddingBottom: space.space3 }}>
@@ -283,7 +335,11 @@ function toActionState(intent: ActionIntent, state: PlanState): PrimaryActionSta
     case 'optimizing':
       return { kind: 'working', label: 'Optimizing' };
     case 'start':
-      return { kind: 'ready', label: 'Start' };
+      // "Confirm" rather than "Start": it sits under a drawn route the user is
+      // being asked to accept, and what it does is hand the day to a navigation
+      // app. "Start" described a thing this product has never done — it does not
+      // navigate (ADR-0004).
+      return { kind: 'ready', label: 'Confirm' };
     case 'advance':
       return { kind: 'ready', label: 'Done' };
     case 'retry':
@@ -300,7 +356,7 @@ function toActionState(intent: ActionIntent, state: PlanState): PrimaryActionSta
 /** What a blocked control still says. Keeping the verb means the user learns
  *  what the button is *for* even while they cannot use it. */
 function labelFor(state: PlanState): string {
-  return state.kind === 'optimized' ? 'Start' : 'Optimize';
+  return state.kind === 'optimized' ? 'Confirm' : 'Optimize';
 }
 
 function titleFor(state: PlanState): string {

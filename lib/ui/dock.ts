@@ -3,42 +3,37 @@
  *
  * Navigation used to be a swipe and two icons floating over the map
  * ([ADR-0018](../../docs/adr/0018-bottom-dock-navigation.md)). A dock replaced
- * them. What changed since
- * ([ADR-0020](../../docs/adr/0020-four-section-dock.md)) is that the dock no
- * longer changes shape.
+ * them, and for a while the map was one of its sections
+ * ([ADR-0020](../../docs/adr/0020-four-section-dock.md)).
  *
- * **Four sections, always four, and the map is one of them.** The first version
- * had three items plus a close control that appeared only while a section was
- * open, on the reasoning that a permanently visible X on the bare map would be a
- * control that does nothing. The reasoning was right about the X and wrong about
- * the conclusion: it made the dock three items wide sometimes and four others,
- * so every open and every close shifted every item under the user's thumb. A
- * user moving between Route and History watched the row re-lay-out twice on the
- * way.
+ * **Three sections now, and the map is not one of them**
+ * ([ADR-0022](../../docs/adr/0022-one-route-section.md)). Making the map a
+ * destination fixed a real problem — a dock that changed width — and created a
+ * worse one on the device: the app opened on an empty rectangle of somebody
+ * else's country, and the route the user came to build was one tap away behind
+ * it. The map is not a place the user goes. It is what an optimization produces,
+ * and it now appears inside the Route section at the moment there is a route to
+ * draw.
  *
- * Making the map a section fixes it at the cause. The X is gone — not replaced,
- * removed — because "show me the map" is a destination like the other three and
- * reads as one. The row never changes width, the items never move, and closing a
- * section is the same gesture as opening one.
+ * The row still never changes width, which is what ADR-0020 was really about.
+ * Three fixed items, no close control, nothing added or removed while the app is
+ * running.
  *
- * **Map is leftmost and is where the app opens.** It is the state a user returns
- * to most, and the left edge is where a thumb travelling across the row starts.
+ * **Route is leftmost and is where the app opens.** It is the product.
  */
 
-export type DockSection = 'map' | 'itinerary' | 'history' | 'settings';
+export type DockSection = 'itinerary' | 'history' | 'settings';
 
 /**
  * Which section is showing.
  *
- * **Not nullable.** It used to be `DockSection | null`, where null meant the
- * bare map — a state expressed as the absence of one, which every call site then
- * had to translate. `'map'` is the same state with a name, and the translation
- * is gone from all of them.
+ * Not nullable, and that part of ADR-0020 stands: a state expressed as the
+ * absence of one is a state every reader has to translate.
  */
 export type ActiveSection = DockSection;
 
 /** Where the app opens, and where closing anything returns to. */
-export const DEFAULT_SECTION: ActiveSection = 'map';
+export const DEFAULT_SECTION: ActiveSection = 'itinerary';
 
 export interface DockItem {
   readonly section: DockSection;
@@ -58,12 +53,6 @@ export interface DockConditions {
 /** The order is fixed: the section a user reaches for most sits nearest the thumb
  *  it is reached with, and a dock whose items move is a dock nobody learns. */
 const SECTIONS: readonly Omit<DockItem, 'isSelected'>[] = [
-  {
-    section: 'map',
-    label: 'Map',
-    glyph: '◈',
-    accessibilityLabel: 'Show the map',
-  },
   {
     section: 'itinerary',
     label: 'Route',
@@ -100,15 +89,18 @@ export function dockItems(active: ActiveSection, _conditions: DockConditions): D
 /**
  * What tapping a dock item does.
  *
- * Tapping the open section returns to the map, so the dock is also the way back
- * — which is the job the close control used to do, done by a control that is
- * always in the same place. Tapping Map while the map is showing is a no-op
- * rather than a toggle into something else: a user pressing the section they are
- * already in is confirming where they are, not asking to leave.
+ * **Nothing toggles.** Tapping the section you are already in confirms where you
+ * are; it does not eject you somewhere else. That was true of Map under
+ * ADR-0020 and is now true of all three, because there is no longer a
+ * "somewhere else" that is not itself a section — leaving Route used to mean
+ * showing the map, and the map is inside Route now.
+ *
+ * What replaced the toggle is the X on the drawn map, which returns to the list
+ * *within* the section (`lib/route/route-view.ts`). That is the control the user
+ * actually wanted when they tapped Route a second time.
  */
-export function toggleSection(active: ActiveSection, tapped: DockSection): ActiveSection {
-  if (tapped === DEFAULT_SECTION) return DEFAULT_SECTION;
-  return active === tapped ? DEFAULT_SECTION : tapped;
+export function toggleSection(_active: ActiveSection, tapped: DockSection): ActiveSection {
+  return tapped;
 }
 
 /**

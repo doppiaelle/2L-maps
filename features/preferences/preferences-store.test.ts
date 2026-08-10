@@ -85,10 +85,10 @@ describe('interface state is deliberately not persisted', () => {
     // Restoring an open section, a selection and a camera would drop the user
     // into a view they have no memory of choosing — over a city they have left.
     const store = createUiStore();
-    // The map, not a section: it is what orients someone who has just unlocked
-    // their phone (ADR-0018). It is a named section rather than an absence
-    // since ADR-0020.
-    expect(store.getState().activeSection).toBe('map');
+    // Route, because Route is the product. It opened on the map, which meant an
+    // empty rectangle of somebody else's country with the work one tap behind
+    // it (ADR-0022).
+    expect(store.getState().activeSection).toBe('itinerary');
     expect(store.getState().selectedStopId).toBeNull();
     expect(store.getState().camera).toBeNull();
     expect(store.getState().isOptimizing).toBe(false);
@@ -120,11 +120,11 @@ describe('interface state is deliberately not persisted', () => {
     expect(store.getState().activeSection).toBe('history');
   });
 
-  it('closes back to the map', () => {
+  it('closes back to the route', () => {
     const store = createUiStore();
     store.getState().openSection('settings');
     store.getState().closeSection();
 
-    expect(store.getState().activeSection).toBe('map');
+    expect(store.getState().activeSection).toBe('itinerary');
   });
 });

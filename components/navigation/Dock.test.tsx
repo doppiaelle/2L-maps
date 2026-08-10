@@ -36,30 +36,30 @@ const renderDock = (
   );
 
 describe('what the dock shows', () => {
-  it('offers every section on the bare map', () => {
-    renderDock('map');
+  it('offers every section', () => {
+    renderDock('itinerary');
 
-    expect(screen.getByTestId('dock-map')).toBeTruthy();
     expect(screen.getByTestId('dock-itinerary')).toBeTruthy();
     expect(screen.getByTestId('dock-history')).toBeTruthy();
     expect(screen.getByTestId('dock-settings')).toBeTruthy();
   });
 
-  it('shows the same four items whatever is open', () => {
+  it('has no Map item, because the map is not a destination', () => {
+    // It is what an optimization produces, shown inside Route (ADR-0022).
+    renderDock('itinerary');
+    expect(screen.queryByTestId('dock-map')).toBeNull();
+  });
+
+  it('shows the same three items whatever is open', () => {
     // The property the close control broke: the row's width is a constant, so an
     // item is where the user last saw it (ADR-0020).
-    const sections: DockSection[] = ['map', 'itinerary', 'history', 'settings'];
+    const sections: DockSection[] = ['itinerary', 'history', 'settings'];
 
     for (const active of sections) {
       const { unmount } = renderDock(active);
-      expect(screen.getAllByRole('tab')).toHaveLength(4);
+      expect(screen.getAllByRole('tab')).toHaveLength(3);
       unmount();
     }
-  });
-
-  it('marks the map as the selected section when nothing is open', () => {
-    renderDock('map');
-    expect(screen.getByTestId('dock-map').props.accessibilityState.selected).toBe(true);
   });
 
   it('keeps History and Settings reachable while a route is in progress', () => {
@@ -79,7 +79,7 @@ describe('what the dock shows', () => {
   });
 
   it('says what each item does rather than what it is', () => {
-    renderDock('map');
+    renderDock('itinerary');
     expect(screen.getByLabelText('Open your saved routes')).toBeTruthy();
   });
 });
@@ -90,26 +90,17 @@ describe('leaving a section', () => {
     expect(screen.queryByTestId('dock-close')).toBeNull();
   });
 
-  it('offers the map as a destination instead', () => {
-    renderDock('settings');
-    expect(screen.getByLabelText('Show the map')).toBeTruthy();
-  });
-
-  it('sends the open section back to the map when it is tapped again', () => {
-    expect(toggleSection('settings', 'settings')).toBe('map');
-  });
-
-  it('leaves the map where it is when the map is tapped', () => {
-    // Pressing the section you are already in confirms where you are; it is not
-    // a request to go somewhere else.
-    expect(toggleSection('map', 'map')).toBe('map');
+  it('does not eject you from the section you are in', () => {
+    // The way back out of a drawn route is the X on the map itself, which
+    // returns to the list within the section (`lib/route/route-view.ts`).
+    expect(toggleSection('settings', 'settings')).toBe('settings');
   });
 });
 
 describe('choosing a section', () => {
   it('reports which one was tapped', () => {
     const onSelect = jest.fn();
-    renderDock('map', parked, { onSelect });
+    renderDock('itinerary', parked, { onSelect });
 
     fireEvent.press(screen.getByTestId('dock-history'));
     expect(onSelect).toHaveBeenCalledWith('history');

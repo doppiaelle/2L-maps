@@ -103,9 +103,12 @@ describe('optimizing', () => {
 });
 
 describe('optimized', () => {
-  it('becomes Start', () => {
+  it('becomes Confirm', () => {
     renderPlan({ hasResult: true });
-    expect(screen.getByText('Start')).toBeTruthy();
+    // "Confirm" rather than "Start": it sits under a drawn route the user is
+    // being asked to accept, and what it does is hand the day to a navigation
+    // app. This product has never navigated (ADR-0004).
+    expect(screen.getByText('Confirm')).toBeTruthy();
   });
 
   it('shows no estimate chip once the numbers are real', () => {

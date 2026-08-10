@@ -1,10 +1,9 @@
 import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Linking, View, useColorScheme, useWindowDimensions } from 'react-native';
+import { Linking, View, useColorScheme } from 'react-native';
 
 import { useHandoff } from '@/features/handoff/use-handoff';
 import { useMonetisation } from '@/features/monetisation/monetisation-provider';
-import { useConnectivity } from '@/features/network/connectivity-provider';
 import { useDrainOnReconnect } from '@/features/network/use-drain-on-reconnect';
 import { usePendingDeepLinkContext } from '@/features/navigation/deep-link-provider';
 import { useLaunchDestination } from '@/features/navigation/use-launch-destination';
@@ -16,22 +15,23 @@ import { useOpenRoute } from '@/features/routes/use-open-route';
 import { useRouteSync } from '@/features/routes/use-route-sync';
 import { useDraftRouteStore, useRouteProgressStore, useUiStore } from '@/features/stores';
 import { AdSlot } from '@/components/primitives/AdSlot';
-import { AppMap } from '@/components/map/AppMap';
+import { RouteCanvas } from '@/components/map/RouteCanvas';
 import { Dock, DOCK_OUTER_HEIGHT } from '@/components/navigation/Dock';
-import { useLocation } from '@/features/location/location-provider';
 import { useIsBackgrounded } from '@/features/ui/use-is-backgrounded';
 import { SectionPanel } from '@/components/navigation/SectionPanel';
 import { HistorySection } from '@/features/routes/HistorySection';
 import { SettingsSection } from '@/features/settings/SettingsSection';
-import { dockItems, dockObstructionFraction, toggleSection } from '@/lib/ui/dock';
+import { dockItems, toggleSection } from '@/lib/ui/dock';
+import { NoticeToast } from '@/components/feedback/NoticeToast';
 import { UndoToast } from '@/components/feedback/UndoToast';
-import { readMapIds } from '@/lib/config/map-ids';
 import { space } from '@/lib/design/tokens';
-import { isOffline } from '@/lib/network/connectivity';
 import { addressNoticeOf } from '@/lib/places/notice';
 import { formatDistance, formatDuration } from '@/lib/format/units';
 import { buildPlanRows, placeIdsToResolve, straightLineMeters } from '@/lib/route/plan-rows';
-import { buildRouteGeometry } from '@/lib/map/route-geometry';
+import { buildRouteGeometry, planRoute } from '@/lib/map/route-geometry';
+import { routeViewAfter, showsMap } from '@/lib/route/route-view';
+import type { RouteView } from '@/lib/route/route-view';
+import { handoffNoticeOf } from '@/lib/handoff/outcome-notice';
 import { newRouteId } from '@/lib/route/route-id';
 import { actionIntentOf, planStateOf } from '@/lib/route/plan-state';
 import { summarise } from '@/lib/route/progress';
@@ -51,11 +51,9 @@ import { wasAlreadyOptimal } from '@/lib/route/draft';
  * optimized route reachable at all (`CLAUDE.md` §7 rule 1).
  */
 export default function PlanScreen(): React.JSX.Element {
-  const { height } = useWindowDimensions();
   const scheme = useColorScheme();
 
   const pending = usePendingDeepLinkContext();
-  const connectivity = useConnectivity();
   const { ads } = useMonetisation();
   const draft = useDraftRouteStore((store) => store.draft);
   const result = useDraftRouteStore((store) => store.result);
@@ -75,12 +73,20 @@ export default function PlanScreen(): React.JSX.Element {
   const undoRemove = useDraftRouteStore((store) => store.undoRemove);
   const moveStopTo = useDraftRouteStore((store) => store.moveStopTo);
   const resetDraft = useDraftRouteStore((store) => store.reset);
+  const clearResult = useDraftRouteStore((store) => store.clearResult);
   const applyResolvedCoordinates = useDraftRouteStore((store) => store.applyResolvedCoordinates);
 
   // What the undo toast is offering. Null means nothing was just removed —
   // the removal has already happened in the store, and `undoRemove` is what
   // puts it back (docs/06 P8: execute and offer undo, never confirm first).
   const [pendingRemoval, setPendingRemoval] = useState<string | null>(null);
+
+  // Which face the Route section is showing. `routeViewAfter` decides; this only
+  // holds the answer (ADR-0022).
+  const [routeView, setRouteView] = useState<RouteView>('list');
+  // What the last handoff attempt produced, for the five outcomes that used to
+  // produce nothing at all.
+  const [handoffNotice, setHandoffNotice] = useState<ReturnType<typeof handoffNoticeOf>>(null);
 
   const destination = useLaunchDestination({
     isStoreHydrated: true,
@@ -99,10 +105,6 @@ export default function PlanScreen(): React.JSX.Element {
 
   const { open: openRoute } = useOpenRoute();
 
-  // Nothing is requested here: the provider follows a permission that was
-  // already granted and asks for one only when a control is pressed
-  // (docs/18_PERMISSIONS.md §4).
-  const location = useLocation();
   const isBackgrounded = useIsBackgrounded();
 
   useEffect(() => {
@@ -140,7 +142,7 @@ export default function PlanScreen(): React.JSX.Element {
     // render and `resolvedKey` is the part that actually changed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resolvedKey, applyResolvedCoordinates]);
-  const { rows, markers } = buildPlanRows({
+  const { rows, markers, undrawableStopIds } = buildPlanRows({
     stops: draft.stops,
     resolved: places.byPlaceId,
     progress,
@@ -230,53 +232,65 @@ export default function PlanScreen(): React.JSX.Element {
     lastFailure: failure === null ? null : failure.kind === 'offline' ? 'offline' : 'upstream',
   });
 
+  // A result arriving is the one thing that opens the map, and it does so
+  // without a second tap: the user pressed Optimize and this is the answer.
+  const hasResult = result !== null;
+  useEffect(() => {
+    if (hasResult)
+      setRouteView((current) =>
+        routeViewAfter({ kind: 'result-arrived' }, { current, hasResult: true }),
+      );
+  }, [hasResult]);
+
+  // Every edit leaves the map, because the result no longer describes the stops
+  // that are there. A map of the previous route is worse than no map: it looks
+  // current.
+  const editSignature = draft.stops.map((stop) => stop.id).join(',');
+  useEffect(() => {
+    setRouteView((current) => routeViewAfter({ kind: 'edited' }, { current, hasResult: false }));
+    setHandoffNotice(null);
+  }, [editSignature]);
+
   const theme = scheme === 'dark' ? 'dark' : 'light';
 
   return (
     <View style={{ flex: 1 }} testID="plan-screen">
-      {/* Behind everything, always mounted. Unmounting it would make closing a
-          section cost a tile fetch and a camera animation every time
-          (ADR-0018). */}
-      <AppMap
-        stops={markers}
-        route={geometry}
-        selectedStopId={selectedStopId}
-        theme={theme}
-        mapIds={readMapIds()}
-        // The map's own offline state, which the component has always had and
-        // nothing ever put it into. Tiles cannot be cached or pre-fetched
-        // (`CLAUDE.md` §13 rule 4), so with no signal there is nothing to draw
-        // and saying so beats a grey rectangle.
-        status={isOffline(connectivity) ? 'offline' : 'ready'}
-        onStopPress={selectStop}
-        onMapPress={clearSelection}
-        // Drawn only once the fix is one we would route from — `locationStateOf`
-        // holds a first, wildly inaccurate GPS reading back rather than putting
-        // the driver a kilometre from where they are.
-        userLocation={
-          location.state.kind === 'ready'
-            ? {
-                coordinate: location.state.location.coordinate,
-                headingDegrees: location.state.location.headingDegrees,
-              }
-            : null
-        }
-        // The press is what asks for the permission the first time. Awaited
-        // nowhere: the answer arrives through `location.state`, and the camera
-        // follows it.
-        onRecenter={() => {
-          void location.enable();
-        }}
-        // The dock covers the bottom edge; the camera pads for it so a marker
-        // never lands underneath.
-        bottomObstructionFraction={dockObstructionFraction(DOCK_OUTER_HEIGHT, height)}
-      />
-
       {activeSection === 'itinerary' && (
         <SectionPanel theme={theme} testID="section-itinerary">
           <PlanView
             state={state}
             intent={actionIntentOf(state, availability)}
+            // The map is a face of this section, not a screen behind it
+            // (ADR-0022). `showsMap` is the floor: a view of 'map' with no
+            // result would draw an empty canvas, and the drawn map has no tiles
+            // to fall back on.
+            view={showsMap(routeView, result !== null) ? 'map' : 'list'}
+            mapSlot={
+              result === null ? null : (
+                <RouteCanvas
+                  stops={markers}
+                  route={planRoute(
+                    geometry,
+                    markers.map((marker) => ({
+                      stopId: marker.stopId,
+                      coordinate: marker.coordinate,
+                    })),
+                  )}
+                  selectedStopId={selectedStopId}
+                  undrawableStopIds={undrawableStopIds}
+                  theme={theme}
+                  testID="plan-route-canvas"
+                />
+              )
+            }
+            onDismissMap={() => {
+              // The result goes; the stops stay. "Back to the list" with an
+              // empty list would not be back to anything.
+              clearResult();
+              setRouteView(
+                routeViewAfter({ kind: 'dismissed' }, { current: routeView, hasResult: true }),
+              );
+            }}
             stops={rows}
             distance={distance}
             duration={duration}
@@ -313,7 +327,24 @@ export default function PlanScreen(): React.JSX.Element {
                 // A first handoff with no provider chosen presents the picker rather
                 // than guessing — sending a twelve-stop day to the wrong app is a bad
                 // introduction to the one feature the product is for.
-                if (outcome.kind === 'needs-provider') router.push('/provider');
+                if (outcome.kind === 'needs-provider') {
+                  router.push('/provider');
+                  return;
+                }
+
+                // **The other five used to produce nothing.** A blocked Waze
+                // handoff, a route past the URL ceiling and an app that is not
+                // installed all looked the same from the phone: the button was
+                // pressed and the screen did not change (`CLAUDE.md` §0 rule 5).
+                setHandoffNotice(
+                  handoffNoticeOf({
+                    kind: outcome.kind,
+                    ...(outcome.kind === 'handed-off' ? { chunkCount: outcome.chunkCount } : {}),
+                    ...(outcome.kind === 'needs-coordinates'
+                      ? { stopCount: outcome.stopIds.length }
+                      : {}),
+                  }),
+                );
               });
             }}
             // Nothing at all until an ad provider exists. `<AdSlot>` reserves its
@@ -376,6 +407,24 @@ export default function PlanScreen(): React.JSX.Element {
         theme={theme}
         testID="plan-dock"
       />
+
+      {handoffNotice !== null && (
+        // No timer on this one. A route split into three parts, or a navigation
+        // app that is not installed, are both things the driver has to act on
+        // before setting off — and a message that removes itself after six
+        // seconds is one they can miss by looking at the road.
+        <NoticeToast
+          title={handoffNotice.title}
+          detail={handoffNotice.detail}
+          kind={handoffNotice.kind}
+          bottomOffset={DOCK_OUTER_HEIGHT + space.space2}
+          theme={theme}
+          onDismiss={() => {
+            setHandoffNotice(null);
+          }}
+          testID="plan-handoff-notice"
+        />
+      )}
 
       {pendingRemoval !== null && (
         // The removal already happened; this is the window in which it can be

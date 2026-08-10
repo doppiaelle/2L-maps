@@ -91,6 +91,16 @@ export interface DraftRouteState {
   setOrigin: (placeId: string | null, isCurrentLocation: boolean) => void;
   applyResult: (result: OptimizationResult) => void;
   /**
+   * Throw away the result, keep the stops.
+   *
+   * What the X on the drawn route does. "Back to the list" with an empty list
+   * would not be back to anything: the user is leaving an answer, not
+   * abandoning an afternoon of typing (ADR-0022). The order stays as the
+   * optimizer left it — it is still the best order anyone knows, and reverting
+   * to the typed one would discard work the user paid for.
+   */
+  clearResult: () => void;
+  /**
    * Keep the coordinates a lookup just returned.
    *
    * The one write that stops a stop's address and marker depending on a live
@@ -266,6 +276,13 @@ export function createDraftRouteStore(storage?: DraftStorage) {
           // object when nothing needed writing, so an unchanged draft costs no
           // render and no persistence write.
           if (draft !== get().draft) set({ draft });
+        },
+
+        clearResult: () => {
+          set({
+            draft: { ...get().draft, isOptimized: false, isDegraded: false },
+            result: null,
+          });
         },
 
         applyResult: (result) => {
