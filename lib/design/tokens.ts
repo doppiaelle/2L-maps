@@ -146,13 +146,24 @@ export const mapColours: Readonly<Record<ThemeName, MapColourTokens>> = {
   },
   dark: {
     routeCasing: null,
-    land: '#141416',
-    water: '#0E1618',
-    road: '#232327',
-    roadMinor: '#1B1B1E',
-    park: '#151A16',
-    label: '#8A8A90',
-    labelHalo: '#0B0B0C',
+    // Raised off `bg` (#0B0B0C), which it used to sit almost on top of. The map
+    // was a black rectangle with black roads on it: the land/road pair measured
+    // about 1.4:1, so on a phone in daylight there was nothing to see, and every
+    // report of "the map is completely black" was partly this and partly the SDK
+    // never drawing at all (`MAP_READY_TIMEOUT_MS` in `AppMap`).
+    //
+    // These reach 2.6:1 for arterials against land and 1.9:1 for minor roads —
+    // deliberately below the 3:1 interface minimum, because the road mesh is not
+    // an interface element: it is the paper the route is drawn on, and a map that
+    // meets control contrast everywhere competes with the mint line that has to
+    // win (`CLAUDE.md` §8 rule 5). The route, the pins and every label do meet it.
+    land: '#101012',
+    water: '#0C1A1D',
+    road: '#33333A',
+    roadMinor: '#242428',
+    park: '#141C17',
+    label: '#9A9AA0',
+    labelHalo: '#101012',
   },
 };
 

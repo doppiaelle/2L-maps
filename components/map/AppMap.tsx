@@ -28,6 +28,7 @@ import {
 } from '@/lib/map/style';
 import type { MapIdConfig } from '@/lib/map/style';
 import { baseMapStyle } from '@/lib/map/base-style';
+import { SURROUNDINGS_SPAN_DEGREES } from '@/lib/location/current-location';
 import type { AppMapHandle, MapBounds, MapCamera, RouteGeometry } from '@/lib/providers/types';
 
 /**
@@ -97,17 +98,58 @@ export interface AppMapProps {
   /** A road route whose geometry would not decode is a defect, not a user
    *  error: markers are drawn and this fires so it can be recorded. */
   onGeometryDefect?: () => void;
+  /**
+   * Where the device is, when it is known and allowed.
+   *
+   * Drawn as our own marker rather than through `showsUserLocation`, which draws
+   * Google's blue dot — a colour this product does not use and a shape it did
+   * not design ([ADR-0009](../../docs/adr/0009-visual-direction.md)). It is also
+   * what the camera opens on before there is a route to fit.
+   */
+  readonly userLocation?: {
+    readonly coordinate: { readonly latitude: number; readonly longitude: number };
+    /** Null when the device will not say — a stationary phone has no course, and
+     *  the marker draws as a disc rather than pointing somewhere arbitrary. */
+    readonly headingDegrees: number | null;
+  } | null;
+  /**
+   * Recentres on the device, prompting for permission on first use.
+   *
+   * Absent means the control is not offered — a build or a test with no location
+   * capability at all. Present with a null `userLocation` still shows it: the
+   * press is how the permission gets requested in the first place
+   * ([`docs/18_PERMISSIONS.md`](../../docs/18_PERMISSIONS.md) §4).
+   */
+  onRecenter?: () => void;
   readonly testID?: string;
 }
 
-/** Where the camera sits before any stop exists. Northern Italy, wide enough to
- *  be recognisable and specific enough not to look like a broken map. */
+/** Where the camera sits before any stop exists and before the device has said
+ *  where it is. Northern Italy, wide enough to be recognisable and specific
+ *  enough not to look like a broken map. */
 const INITIAL_REGION: CameraRegion = {
   latitude: 45.6983,
   longitude: 9.6773,
   latitudeDelta: 0.4,
   longitudeDelta: 0.4,
 };
+
+/**
+ * How long the SDK gets to draw its first frame before the map is called failed.
+ *
+ * **This is the fix for a black screen, and it is a reporting fix rather than a
+ * rendering one.** The loading overlay is `bg` — near-black in dark theme — and
+ * it is removed by `onMapReady`. When the Maps SDK cannot authorise itself
+ * (a missing `EXPO_PUBLIC_MAPS_API_KEY_ANDROID`, a key not enabled for the Maps
+ * SDK for Android, or a SHA-1 that does not match the signing certificate) that
+ * callback never fires, so the overlay stayed up forever and the product showed
+ * a solid black rectangle with no explanation — the exact silent failure
+ * `CLAUDE.md` §0 rule 5 exists to forbid.
+ *
+ * Eight seconds is long enough for a cold SDK start on a slow device and short
+ * enough that nobody concludes the app is broken before it says so.
+ */
+const MAP_READY_TIMEOUT_MS = 8_000;
 
 export const AppMap = forwardRef<AppMapHandle, AppMapProps>(function AppMap(
   {
@@ -124,6 +166,8 @@ export const AppMap = forwardRef<AppMapHandle, AppMapProps>(function AppMap(
     prefersReducedMotion = false,
     onUndrawableStops,
     onGeometryDefect,
+    userLocation = null,
+    onRecenter,
     testID,
   },
   ref,
@@ -131,6 +175,7 @@ export const AppMap = forwardRef<AppMapHandle, AppMapProps>(function AppMap(
   const palette = colours[theme];
   const mapRef = useRef<MapView | null>(null);
   const [isReady, setIsReady] = useState(false);
+  const [hasTimedOut, setHasTimedOut] = useState(false);
   const [height, setHeight] = useState(0);
   const [viewport, setViewport] = useState<Viewport>(() => regionToViewport(INITIAL_REGION));
 
@@ -229,15 +274,88 @@ export const AppMap = forwardRef<AppMapHandle, AppMapProps>(function AppMap(
     fitToBounds(bounds, { bottom: layout.screenPadding + height * bottomObstructionFraction });
   }, [fitCoordinates, isReady, bottomObstructionFraction, height, fitToBounds]);
 
+  // The neighbourhood, before there is an itinerary to fit. Only while
+  // following and only with nothing else to show: a route on screen is what the
+  // user asked to look at, and yanking the camera to the van would take it away.
+  const userLatitude = userLocation?.coordinate.latitude ?? null;
+  const userLongitude = userLocation?.coordinate.longitude ?? null;
+  const hasCentredOnUser = useRef(false);
+  useEffect(() => {
+    if (!isReady || fitCoordinates.length > 0) return;
+    if (userLatitude === null || userLongitude === null) return;
+    // Once. Re-centring on every fix would fight a user who has panned away to
+    // look at something, and following is what the recenter control is for.
+    if (hasCentredOnUser.current || !isFollowingRef.current) return;
+    hasCentredOnUser.current = true;
+
+    mapRef.current?.animateToRegion(
+      {
+        latitude: userLatitude,
+        longitude: userLongitude,
+        latitudeDelta: SURROUNDINGS_SPAN_DEGREES,
+        longitudeDelta: SURROUNDINGS_SPAN_DEGREES,
+      },
+      prefersReducedMotion ? 0 : durationFor('standard', false),
+    );
+  }, [isReady, fitCoordinates.length, userLatitude, userLongitude, prefersReducedMotion]);
+
+  // A map that never drew has to say so. Without this the loading overlay stays
+  // up forever and the product is a black rectangle (`MAP_READY_TIMEOUT_MS`).
+  useEffect(() => {
+    if (isReady || status !== 'ready') return;
+    const timer = setTimeout(() => {
+      setHasTimedOut(true);
+    }, MAP_READY_TIMEOUT_MS);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [isReady, status]);
+
   const handleRegionChange = useCallback((region: CameraRegion) => {
     setViewport(regionToViewport(region));
   }, []);
 
+  const recentre = useCallback(() => {
+    isFollowingRef.current = true;
+    hasCentredOnUser.current = false;
+    onRecenter?.();
+
+    if (userLatitude === null || userLongitude === null) return;
+    mapRef.current?.animateToRegion(
+      {
+        latitude: userLatitude,
+        longitude: userLongitude,
+        latitudeDelta: SURROUNDINGS_SPAN_DEGREES,
+        longitudeDelta: SURROUNDINGS_SPAN_DEGREES,
+      },
+      prefersReducedMotion ? 0 : durationFor('standard', false),
+    );
+  }, [onRecenter, userLatitude, userLongitude, prefersReducedMotion]);
+
   const summary = `Route map, ${stops.length} ${stops.length === 1 ? 'stop' : 'stops'}`;
   const resolvedMapId = mapIdFor(theme, mapIds);
 
-  if (status !== 'ready') {
-    return <MapUnavailable theme={theme} status={status} onRetry={onRetry} testID={testID} />;
+  if (status !== 'ready' || hasTimedOut) {
+    return (
+      <MapUnavailable
+        theme={theme}
+        status={status === 'ready' ? 'failed' : status}
+        // A timeout is a failure this component invented, so it also supplies
+        // the way out of it: clearing the flag remounts the SDK, which is a real
+        // retry. Every other failure keeps the caller's — offering to retry
+        // something we cannot change would be a button that answers with
+        // silence.
+        onRetry={
+          hasTimedOut
+            ? () => {
+                setHasTimedOut(false);
+                onRetry?.();
+              }
+            : onRetry
+        }
+        testID={testID}
+      />
+    );
   }
 
   return (
@@ -279,6 +397,13 @@ export const AppMap = forwardRef<AppMapHandle, AppMapProps>(function AppMap(
         showsMyLocationButton={false}
       >
         <RouteLine drawn={drawnRoute} theme={theme} />
+        {userLocation !== null && (
+          <UserMarker
+            coordinate={userLocation.coordinate}
+            headingDegrees={userLocation.headingDegrees}
+            theme={theme}
+          />
+        )}
         {plan.pins.map((pin) => (
           <MapPin
             key={pin.kind === 'cluster' ? pin.id : pin.stopId}
@@ -308,6 +433,15 @@ export const AppMap = forwardRef<AppMapHandle, AppMapProps>(function AppMap(
         />
       )}
 
+      {onRecenter !== undefined && (
+        <RecentreControl
+          onPress={recentre}
+          hasLocation={userLocation !== null}
+          bottomOffset={height * bottomObstructionFraction}
+          theme={theme}
+        />
+      )}
+
       <MapAttribution
         theme={theme}
         bottomOffset={height * bottomObstructionFraction}
@@ -316,6 +450,170 @@ export const AppMap = forwardRef<AppMapHandle, AppMapProps>(function AppMap(
     </View>
   );
 });
+
+// ─── Where the driver is ─────────────────────────────────────────────────────
+
+/**
+ * The device's own position: a mint triangle pointing where it is going, or a
+ * mint disc when it is going nowhere.
+ *
+ * **Ours, not Google's.** `showsUserLocation` would draw the platform's blue
+ * dot, and blue is not a colour in this product — the accent is mint and it
+ * means "you and your route" everywhere else
+ * ([ADR-0009](../../docs/adr/0009-visual-direction.md)). Drawing it ourselves is
+ * also what lets it sit in the same visual language as the stop pins instead of
+ * beside it.
+ *
+ * The triangle is borders rather than an SVG or an image: no asset to load, no
+ * new dependency, and it rotates with the marker's own `rotation` prop so the
+ * heading costs no re-render of the view.
+ *
+ * Not an accessibility element. The map is one element with a summary label and
+ * markers are not traversable ([`docs/23_ACCESSIBILITY.md`](../../docs/23_ACCESSIBILITY.md));
+ * "you are here" is not information a screen-reader user can act on from a
+ * canvas they cannot explore.
+ */
+const UserMarker = memo(function UserMarker({
+  coordinate,
+  headingDegrees,
+  theme,
+}: {
+  coordinate: { readonly latitude: number; readonly longitude: number };
+  headingDegrees: number | null;
+  theme: ThemeName;
+}): React.JSX.Element {
+  const palette = colours[theme];
+
+  return (
+    <Marker
+      testID="map-user-location"
+      coordinate={coordinate}
+      // Centred on the fix rather than pinned by its base: this marks a point,
+      // not a place with a pin stuck in it.
+      anchor={{ x: 0.5, y: 0.5 }}
+      // Rotates with the map's bearing rather than staying upright, because the
+      // direction it points is a direction in the world.
+      flat
+      rotation={headingDegrees ?? 0}
+      tracksViewChanges={false}
+      zIndex={3}
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+    >
+      <View
+        style={{
+          width: layout.touchMin,
+          height: layout.touchMin,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {/* The halo is the surface colour, so the marker stays visible over both
+            the pale land and the dark one without a second palette. */}
+        <View
+          style={{
+            width: USER_MARKER_SIZE,
+            height: USER_MARKER_SIZE,
+            borderRadius: radius.radiusFull,
+            backgroundColor: palette.surface,
+            borderWidth: 1,
+            borderColor: palette.border,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          {headingDegrees === null ? (
+            <View
+              testID="user-location-disc"
+              style={{
+                width: USER_MARKER_SIZE / 2,
+                height: USER_MARKER_SIZE / 2,
+                borderRadius: radius.radiusFull,
+                backgroundColor: palette.accent,
+              }}
+            />
+          ) : (
+            <View
+              testID="user-location-triangle"
+              style={{
+                width: 0,
+                height: 0,
+                borderLeftWidth: USER_MARKER_SIZE / 4,
+                borderRightWidth: USER_MARKER_SIZE / 4,
+                borderBottomWidth: USER_MARKER_SIZE / 2,
+                borderLeftColor: 'transparent',
+                borderRightColor: 'transparent',
+                borderBottomColor: palette.accent,
+              }}
+            />
+          )}
+        </View>
+      </View>
+    </Marker>
+  );
+});
+
+/** The mint marker's outer disc, in points. Smaller than a stop pin: it is
+ *  context, and a route's stops are the content. */
+const USER_MARKER_SIZE = 22;
+
+/**
+ * Recentre on the driver.
+ *
+ * **Visible before the permission exists**, because pressing it is how the
+ * permission gets requested — the timeline in
+ * [`docs/18_PERMISSIONS.md`](../../docs/18_PERMISSIONS.md) §4 asks in context
+ * and never at launch, and a control that appears only once you have already
+ * granted something can never be the thing that asks.
+ *
+ * Sits above the dock rather than beside the attribution, in the lower third
+ * where a thumb reaches (`CLAUDE.md` §7 rule 2).
+ */
+function RecentreControl({
+  onPress,
+  hasLocation,
+  bottomOffset,
+  theme,
+}: {
+  onPress: () => void;
+  hasLocation: boolean;
+  bottomOffset: number;
+  theme: ThemeName;
+}): React.JSX.Element {
+  const palette = colours[theme];
+
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={
+        hasLocation ? 'Centre the map on my location' : 'Show my location on the map'
+      }
+      style={{
+        position: 'absolute',
+        right: layout.screenPadding,
+        bottom: bottomOffset + space.space4,
+        width: layout.touchMin,
+        height: layout.touchMin,
+        borderRadius: radius.radiusFull,
+        borderWidth: 1,
+        borderColor: palette.border,
+        backgroundColor: palette.surface,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+      testID="app-map-recentre"
+    >
+      <Text
+        style={{ color: hasLocation ? palette.accent : palette.textSecondary, fontSize: 18 }}
+        accessibilityElementsHidden
+        importantForAccessibility="no"
+      >
+        ◎
+      </Text>
+    </Pressable>
+  );
+}
 
 // ─── The route line ──────────────────────────────────────────────────────────
 
@@ -554,7 +852,15 @@ function MapUnavailable({
   const copy =
     status === 'offline'
       ? { title: 'Map unavailable offline', body: 'Your stops and route are still here.' }
-      : { title: 'The map could not load', body: 'Your stops and route are still here.' };
+      : {
+          title: 'The map could not load',
+          // Deliberately ours. The overwhelmingly likely cause is our own Maps
+          // SDK key — missing from the build, not enabled for the Maps SDK for
+          // Android, or signed with a different certificate — and telling the
+          // user to check their connection would send them to fix something that
+          // is not broken (`CLAUDE.md` §0 rule 5).
+          body: 'Something on our side did not answer. Your stops, your route and the handoff all still work.',
+        };
 
   return (
     <View

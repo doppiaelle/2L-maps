@@ -120,5 +120,19 @@ export function baseMapStyle(theme: ThemeName): MapStyleElement[] {
       elementType: 'labels.text.fill',
       stylers: [{ color: map.label }],
     },
+
+    // ── What is left after everything above ──
+    // Google's default map carries a colour cast even once every feature is
+    // recoloured: shields, ferry lines, airport aprons and a dozen features with
+    // no `featureType` of their own keep their own hues, and the result is a map
+    // that is *nearly* ours. Desaturating what remains is what closes the gap
+    // between "restyled Google map" and the abstract black-white-and-mint
+    // surface the product was designed around
+    // ([ADR-0009](../../docs/adr/0009-visual-direction.md)).
+    //
+    // Last in the array on purpose: `customMapStyle` applies rules in order, so
+    // this refines the colours set above rather than being overwritten by them.
+    { elementType: 'geometry', stylers: [{ saturation: -100 }] },
+    { featureType: 'road', elementType: 'geometry', stylers: [{ saturation: -100 }] },
   ];
 }
