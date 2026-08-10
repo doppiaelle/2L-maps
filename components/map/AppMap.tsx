@@ -27,6 +27,7 @@ import {
   routeStroke,
 } from '@/lib/map/style';
 import type { MapIdConfig } from '@/lib/map/style';
+import { baseMapStyle } from '@/lib/map/base-style';
 import type { AppMapHandle, MapBounds, MapCamera, RouteGeometry } from '@/lib/providers/types';
 
 /**
@@ -245,11 +246,14 @@ export const AppMap = forwardRef<AppMapHandle, AppMapProps>(function AppMap(
         provider={PROVIDER_GOOGLE}
         style={{ flex: 1 }}
         initialRegion={viewportToRegion(viewport)}
-        // Omitted rather than passed as undefined, which `exactOptionalPropertyTypes`
-        // is right to reject: the SDK's default style is what an absent Map ID
-        // must produce, and a revoked one has to degrade to a working map rather
-        // than a blank one (risk C15).
-        {...(resolvedMapId === null ? {} : { googleMapId: resolvedMapId })}
+        // A configured Map ID wins, because Cloud styling overrides JSON and
+        // passing both would silently ignore one of them. Without one — which is
+        // the normal case and no longer a misconfiguration — the repository's own
+        // style applies, so the product looks like the product with nothing set
+        // up in the Google console (risk C15, `lib/map/base-style.ts`).
+        {...(resolvedMapId === null
+          ? { customMapStyle: baseMapStyle(theme) }
+          : { googleMapId: resolvedMapId })}
         onMapReady={() => {
           setIsReady(true);
         }}

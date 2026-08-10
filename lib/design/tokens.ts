@@ -105,11 +105,55 @@ export interface MapColourTokens {
    *  (docs/07_DESIGN_SYSTEM.md §Map-specific). Null in dark, where the base map
    *  already separates the line and a casing would only thicken it. */
   readonly routeCasing: string | null;
+
+  /**
+   * The base map's own surfaces, for the JSON style in `lib/map/base-style.ts`.
+   *
+   * These exist because the map has to be **quiet** — desaturated and receding,
+   * with content above it rather than competing with it (`CLAUDE.md` §8 rule 5)
+   * — and Google's default style is neither. Its saturated motorways and its
+   * field of restaurant pins are designed for a map that *is* the product; here
+   * the route is the product and the map is the paper it is drawn on.
+   *
+   * Deliberately close to `bg` in lightness. The map should read as the same
+   * surface as the interface, one shade removed, so the sheet appears to sit on
+   * it rather than in front of a different picture.
+   */
+  readonly land: string;
+  readonly water: string;
+  /** Arterials. Visible enough to orient by, quiet enough to ignore. */
+  readonly road: string;
+  /** Everything smaller. A shade nearer the land, so the hierarchy survives at
+   *  route zoom where most of the mesh is minor roads. */
+  readonly roadMinor: string;
+  readonly park: string;
+  readonly label: string;
+  /** Behind label text, so a place name stays readable over any of the above
+   *  without the map needing a lighter base to accommodate it. */
+  readonly labelHalo: string;
 }
 
 export const mapColours: Readonly<Record<ThemeName, MapColourTokens>> = {
-  light: { routeCasing: 'rgba(11, 59, 46, 0.4)' },
-  dark: { routeCasing: null },
+  light: {
+    routeCasing: 'rgba(11, 59, 46, 0.4)',
+    land: '#F2F2EF',
+    water: '#DDE6E6',
+    road: '#FFFFFF',
+    roadMinor: '#F8F8F6',
+    park: '#E8EDE6',
+    label: '#6B6B70',
+    labelHalo: '#F7F7F5',
+  },
+  dark: {
+    routeCasing: null,
+    land: '#141416',
+    water: '#0E1618',
+    road: '#232327',
+    roadMinor: '#1B1B1E',
+    park: '#151A16',
+    label: '#8A8A90',
+    labelHalo: '#0B0B0C',
+  },
 };
 
 /**
