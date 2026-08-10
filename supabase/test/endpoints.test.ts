@@ -46,6 +46,91 @@ const optimizeRequest = (overrides: { isRoundTrip?: boolean } = {}) => ({
   departureTime: null,
 });
 
+/**
+ * Where the route starts.
+ *
+ * Every case here used to be one line that threw `INVALID_REQUEST`, and one of
+ * them was the ordinary path: an empty draft is created with
+ * `originIsCurrentLocation: true` and no place, so a user who added stops and
+ * pressed Optimize without ever choosing a starting point got "something went
+ * wrong on our side" for a completely reasonable request.
+ */
+describe('the origin', () => {
+  const withOrigin = (origin: Record<string, unknown>) => ({
+    ...optimizeRequest(),
+    origin: { placeId: null, isCurrentLocation: true, ...origin },
+  });
+
+  it('sends a saved place as a place waypoint', async () => {
+    const routes = routesPort([1, 0]);
+    await optimizeUpstream(optimizeRequest(), routes);
+
+    expect(routes.sent[0]).toMatchObject({ origin: { kind: 'place', placeId: 'origin-place' } });
+  });
+
+  it('sends the device’s position as a coordinate waypoint', async () => {
+    // A position on a road has no `place_id` and never will. Reverse-geocoding
+    // it would spend a billed lookup to produce a worse answer than the
+    // coordinate already in hand.
+    const routes = routesPort([1, 0]);
+    await optimizeUpstream(withOrigin({ latitude: 45.6983, longitude: 9.6773 }), routes);
+
+    expect(routes.sent[0]).toMatchObject({
+      origin: { kind: 'coordinate', latitude: 45.6983, longitude: 9.6773 },
+    });
+  });
+
+  it('falls back to the first stop when there is neither', async () => {
+    // What the user meant by not choosing: order the places I gave you,
+    // beginning with the one I gave you first. Also the documented behaviour
+    // when location is denied (docs/18_PERMISSIONS.md §4) — nothing is blocked.
+    const routes = routesPort([0]);
+    const outcome = await optimizeUpstream(withOrigin({}), routes);
+
+    expect(routes.sent[0]).toMatchObject({ origin: { kind: 'place', placeId: 'p1' } });
+    expect(outcome.result.orderedStopIds).toEqual(['s1', 's2', 's3']);
+  });
+
+  it('does not offer that first stop for reordering as well', async () => {
+    // A stop sent as the origin and as an intermediate comes back twice.
+    const routes = routesPort([0]);
+    await optimizeUpstream(withOrigin({}), routes);
+
+    expect(routes.sent[0]).toMatchObject({ intermediates: [{ kind: 'place', placeId: 'p2' }] });
+  });
+
+  it('keeps that first stop in the reply, since the driver is visiting it', async () => {
+    const routes = routesPort([0, 1]);
+    const outcome = await optimizeUpstream({ ...withOrigin({}), isRoundTrip: true }, routes);
+
+    expect(outcome.result.orderedStopIds).toEqual(['s1', 's2', 's3']);
+  });
+
+  it('ends a round trip where it started, coordinate origin included', async () => {
+    const routes = routesPort([0, 1, 2]);
+    await optimizeUpstream(
+      { ...withOrigin({ latitude: 45.7, longitude: 9.7 }), isRoundTrip: true },
+      routes,
+    );
+
+    expect(routes.sent[0]).toMatchObject({
+      destination: { kind: 'coordinate', latitude: 45.7, longitude: 9.7 },
+    });
+  });
+
+  it('refuses half a position rather than routing from the equator', async () => {
+    // A latitude with no longitude is a client defect. Treating it as "half a
+    // position" would silently start the route in the Gulf of Guinea.
+    const routes = routesPort([0, 1]);
+    const outcome = await optimizeUpstream(withOrigin({ latitude: 45.7 }), routes);
+
+    // Falls back to the first stop, which is the honest answer: we do not know
+    // where the device is.
+    expect(routes.sent[0]).toMatchObject({ origin: { kind: 'place', placeId: 'p1' } });
+    expect(outcome.result.orderedStopIds[0]).toBe('s1');
+  });
+});
+
 describe('mapping Google’s order back onto our stops', () => {
   it('returns client stop ids, not place ids', async () => {
     // The reply names the user's stops. Ordering by place id would collapse two

@@ -30,9 +30,22 @@ export const FIELD_MASK_DETAIL =
 
 const ROUTES_ENDPOINT = 'https://routes.googleapis.com/directions/v2:computeRoutes';
 
-export interface RoutesWaypoint {
-  readonly placeId: string;
-}
+/**
+ * A point on a route, as either of the two things Google accepts.
+ *
+ * A discriminated union rather than one type with an optional `placeId`
+ * (`CLAUDE.md` §3): a waypoint is one or the other, never both and never
+ * neither, and an optional field would make "no place and no coordinate" a
+ * representable state that every reader has to check for.
+ *
+ * The coordinate form exists for one caller — a route starting from where the
+ * driver is standing. That origin has no `place_id` and never will: it is a
+ * position, not a place, and reverse-geocoding it to invent one would spend a
+ * billed lookup to produce a worse answer than the coordinate we already hold.
+ */
+export type RoutesWaypoint =
+  | { readonly kind: 'place'; readonly placeId: string }
+  | { readonly kind: 'coordinate'; readonly latitude: number; readonly longitude: number };
 
 export interface RoutesRequest {
   readonly origin: RoutesWaypoint;
@@ -193,9 +206,18 @@ type DetailOutcome =
 
 function toWaypoints(request: RoutesRequest) {
   return {
-    origin: { placeId: request.origin.placeId },
-    destination: { placeId: request.destination.placeId },
-    intermediates: request.intermediates.map((w) => ({ placeId: w.placeId })),
+    origin: toWaypoint(request.origin),
+    destination: toWaypoint(request.destination),
+    intermediates: request.intermediates.map(toWaypoint),
+  };
+}
+
+/** Google's two waypoint shapes, from ours. Its `location.latLng` nesting is the
+ *  one place the upstream's vocabulary is allowed to appear. */
+function toWaypoint(waypoint: RoutesWaypoint) {
+  if (waypoint.kind === 'place') return { placeId: waypoint.placeId };
+  return {
+    location: { latLng: { latitude: waypoint.latitude, longitude: waypoint.longitude } },
   };
 }
 

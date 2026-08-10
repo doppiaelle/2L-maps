@@ -203,6 +203,7 @@ describe('the shared cache key', () => {
   const base = {
     stopPlaceIds: ['place-a', 'place-b', 'place-c'],
     originPlaceId: 'place-origin',
+    originCoordinate: null,
     isRoundTrip: false,
     departureTime: null,
   };
@@ -233,6 +234,40 @@ describe('the shared cache key', () => {
     expect(optimizationCacheKey(base)).not.toBe(
       optimizationCacheKey({ ...base, stopPlaceIds: ['place-a', 'place-b'] }),
     );
+  });
+
+  it('separates two routes that start from different places on the device', () => {
+    // The bug this replaced: a null origin canonicalised to the literal string
+    // `current-location`, so every "start from where I am" route with the same
+    // stops shared one key — and a driver in Bergamo could be served the answer
+    // computed for a driver in Palermo.
+    const here = {
+      ...base,
+      originPlaceId: null,
+      originCoordinate: { latitude: 45.69, longitude: 9.67 },
+    };
+    const there = {
+      ...base,
+      originPlaceId: null,
+      originCoordinate: { latitude: 38.11, longitude: 13.36 },
+    };
+    expect(optimizationCacheKey(here)).not.toBe(optimizationCacheKey(there));
+  });
+
+  it('shares a key between two starts in the same yard', () => {
+    // Rounded to about 110 m, so two vans loading at the same depot share the
+    // upstream call rather than each buying their own.
+    const one = {
+      ...base,
+      originPlaceId: null,
+      originCoordinate: { latitude: 45.6983, longitude: 9.6773 },
+    };
+    const other = {
+      ...base,
+      originPlaceId: null,
+      originCoordinate: { latitude: 45.69834, longitude: 9.67729 },
+    };
+    expect(optimizationCacheKey(one)).toBe(optimizationCacheKey(other));
   });
 
   it('contains nothing personal — the reason cross-user sharing is acceptable', () => {
@@ -270,6 +305,6 @@ describe('the shared cache key', () => {
   });
 
   it('carries a version prefix so the format can change without stale hits', () => {
-    expect(canonicalCacheInput(base)).toMatch(/^v1\|/);
+    expect(canonicalCacheInput(base)).toMatch(/^v2\|/);
   });
 });

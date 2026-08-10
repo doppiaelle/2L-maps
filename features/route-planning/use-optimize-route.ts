@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
 
 import { useServices } from '@/features/api/services-provider';
+import { useLocation } from '@/features/location/location-provider';
 import { USAGE_QUOTA_QUERY_KEY } from '@/features/quota/use-usage-quota';
 import { useDraftRouteStore, useUiStore } from '@/features/stores';
 import type { RoutingFailure, RoutingOutcome } from '@/lib/providers/types';
@@ -53,6 +54,16 @@ export function useOptimizeRoute(): OptimizeState {
   const draft = useDraftRouteStore((store) => store.draft);
   const applyResult = useDraftRouteStore((store) => store.applyResult);
   const setOptimizing = useUiStore((store) => store.setOptimizing);
+  const location = useLocation();
+
+  // Only for a draft that actually starts from the device, and only from a fix
+  // `locationStateOf` has already judged fresh and accurate enough to route
+  // from. A stale one would optimize the journey from a street the van left
+  // four minutes ago and report the result as exact.
+  const origin =
+    draft.originIsCurrentLocation && location.state.kind === 'ready'
+      ? location.state.location.coordinate
+      : null;
 
   const mutation = useMutation<RoutingOutcome, Error, void>({
     mutationFn: async () => {
@@ -63,7 +74,11 @@ export function useOptimizeRoute(): OptimizeState {
       return services.routing.optimize({
         routeId: draft.routeId,
         originPlaceId: draft.originPlaceId,
-        originCoordinate: null,
+        // Sent when the route starts from the device, and only then. This was
+        // hard-coded null, so a draft whose origin was the current location
+        // reached the server with neither a place nor a position and was
+        // refused as a client defect — which it was.
+        originCoordinate: origin,
         // The client id travels with the place id: two deliveries in the same
         // building are two stops, and sending place ids alone would collapse
         // them into one.

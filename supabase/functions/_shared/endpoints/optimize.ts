@@ -1,5 +1,5 @@
 import { ApiError } from '../errors.ts';
-import type { RoutesFailure, RoutesRequest } from '../upstream/routes.ts';
+import type { RoutesFailure, RoutesRequest, RoutesWaypoint } from '../upstream/routes.ts';
 import type { OptimizeRequest } from '../schemas.ts';
 import type { UpstreamOutcome } from '../pipeline.ts';
 
@@ -59,28 +59,52 @@ export async function optimizeUpstream(
   request: OptimizeRequest,
   routes: RoutesPort,
 ): Promise<UpstreamOutcome<OptimizeResult>> {
-  const originPlaceId = request.origin.placeId;
-  if (originPlaceId === null) {
-    // A current-location origin is resolved to a place client-side before it
-    // gets here. Arriving without either is a client defect, not a user error.
+  const stops = request.stops;
+  const last = stops[stops.length - 1];
+  const first = stops[0];
+  if (last === undefined || first === undefined) {
     throw new ApiError('INVALID_REQUEST', 'Something went wrong on our side');
   }
 
-  const stops = request.stops;
-  const last = stops[stops.length - 1];
-  if (last === undefined) {
-    throw new ApiError('INVALID_REQUEST', 'Something went wrong on our side');
-  }
+  /**
+   * Where the route starts: a saved place, the device, or the first stop.
+   *
+   * All three of these were previously one line that threw. The rule it stated
+   * — "a current-location origin is resolved to a place client-side before it
+   * gets here" — was a rule nothing implemented and nothing could: a position on
+   * a road has no `place_id`, and reverse-geocoding one would spend a billed
+   * lookup to turn a precise coordinate into a nearby approximation. Google's
+   * Routes API takes a coordinate waypoint directly, so it is sent as one.
+   *
+   * **The third case is why optimization could fail for a route that looked
+   * perfectly ordinary.** An empty draft is created with
+   * `originIsCurrentLocation: true` and no place, so a user who added stops and
+   * pressed Optimize without ever choosing a starting point sent an origin that
+   * was neither — and got "something went wrong on our side" for a request that
+   * was entirely reasonable. Starting from the first stop is what the user meant
+   * by not choosing: order the places I gave you, beginning with the one I gave
+   * you first. It is also the documented fallback when location is denied
+   * (docs/18_PERMISSIONS.md §4) — nothing is blocked.
+   */
+  const origin = originWaypoint(request.origin, first);
+  // Consumed as the origin rather than as a waypoint, so it must not also be
+  // offered for reordering — a stop sent twice comes back twice.
+  const isOriginTheFirstStop = request.origin.placeId === null && !hasCoordinate(request.origin);
 
   // The stops that may be reordered, paired with their client ids so the reply
   // can name them.
-  const movable = request.isRoundTrip ? stops : stops.slice(0, -1);
-  const destinationPlaceId = request.isRoundTrip ? originPlaceId : last.placeId;
+  const routable = isOriginTheFirstStop ? stops.slice(1) : stops;
+  const movable = request.isRoundTrip ? routable : routable.slice(0, -1);
+  // A round trip ends where it started, which is now a waypoint rather than an
+  // id — including when where it started is a coordinate.
+  const destination: RoutesWaypoint = request.isRoundTrip
+    ? origin
+    : { kind: 'place', placeId: last.placeId };
 
   const base: RoutesRequest = {
-    origin: { placeId: originPlaceId },
-    destination: { placeId: destinationPlaceId },
-    intermediates: movable.map((stop) => ({ placeId: stop.placeId })),
+    origin,
+    destination,
+    intermediates: movable.map((stop) => ({ kind: 'place' as const, placeId: stop.placeId })),
     departureTime: request.departureTime ?? null,
   };
 
@@ -103,15 +127,20 @@ export async function optimizeUpstream(
 
   const detail = await routes.detailFor({
     ...base,
-    intermediates: orderedStops.map((stop) => ({ placeId: stop.placeId })),
+    intermediates: orderedStops.map((stop) => ({ kind: 'place' as const, placeId: stop.placeId })),
   });
   if (!detail.ok) throw toApiError(detail.failure);
 
   // A one-way route finishes at the stop the user put last, and it keeps that
-  // position in the reply.
-  const orderedStopIds = request.isRoundTrip
-    ? orderedStops.map((stop) => stop.stopId)
-    : [...orderedStops.map((stop) => stop.stopId), last.stopId];
+  // position in the reply. A route that started from its own first stop keeps
+  // that one at the front: it is a stop the user is visiting, not merely a
+  // co-ordinate the journey began at, and dropping it from the reply would
+  // silently shorten the route by one.
+  const orderedStopIds = [
+    ...(isOriginTheFirstStop ? [first.stopId] : []),
+    ...orderedStops.map((stop) => stop.stopId),
+    ...(request.isRoundTrip ? [] : [last.stopId]),
+  ];
 
   return {
     result: {
@@ -133,6 +162,39 @@ export async function optimizeUpstream(
 
 function isPresent<T>(value: T | undefined): value is T {
   return value !== undefined;
+}
+
+/**
+ * The origin the client asked for, as a waypoint.
+ *
+ * A `place_id` wins where there is one: it is the durable key and it survives a
+ * route being reopened next week ([ADR-0007](../../../docs/adr/0007-place-id-durable-coordinates-perishable.md)).
+ * A device coordinate comes next, used exactly as sent. The first stop is the
+ * last resort, and it is a resort rather than an error — see the caller.
+ */
+function originWaypoint(
+  origin: OptimizeRequest['origin'],
+  firstStop: { readonly placeId: string },
+): RoutesWaypoint {
+  if (origin.placeId !== null) return { kind: 'place', placeId: origin.placeId };
+
+  if (hasCoordinate(origin)) {
+    return { kind: 'coordinate', latitude: origin.latitude, longitude: origin.longitude };
+  }
+
+  return { kind: 'place', placeId: firstStop.placeId };
+}
+
+/**
+ * Whether the origin carries a usable position.
+ *
+ * Both halves or neither. A request with a latitude and no longitude is a client
+ * defect, and treating it as "half a position" would route from the equator.
+ */
+function hasCoordinate(
+  origin: OptimizeRequest['origin'],
+): origin is OptimizeRequest['origin'] & { latitude: number; longitude: number } {
+  return typeof origin.latitude === 'number' && typeof origin.longitude === 'number';
 }
 
 /**

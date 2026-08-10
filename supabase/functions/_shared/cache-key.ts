@@ -25,9 +25,35 @@ export interface CacheKeyInput {
   readonly stopPlaceIds: readonly string[];
   /** Fixed, and therefore part of the key separately from the stops. */
   readonly originPlaceId: string | null;
+  /**
+   * Where the device was, when the route starts from it rather than from a place.
+   *
+   * **Without this the cache was wrong, not merely coarse.** A null
+   * `originPlaceId` used to canonicalise to the literal `current-location`, so
+   * every route in the world starting from "where I am" with the same stop set
+   * shared one key — a driver in Bergamo could be served the route a driver in
+   * Palermo had computed an hour earlier, and it would look like a working
+   * answer. Only nobody had ever set a current-location origin, so the bug had
+   * no way to fire until now.
+   */
+  readonly originCoordinate: { readonly latitude: number; readonly longitude: number } | null;
   readonly isRoundTrip: boolean;
   readonly departureTime: Date | null;
 }
+
+/**
+ * Decimal places kept from a current-location origin, for the key only.
+ *
+ * Three is about 110 m — close enough that two vans in the same yard share a
+ * cached route, and far enough that two on opposite sides of a town do not. The
+ * *request* still carries the full precision; this is only how near two starts
+ * have to be to count as the same one.
+ *
+ * The rounded pair is not personal data at 110 m and is hashed immediately
+ * alongside public place identifiers, so the property that makes cross-user
+ * sharing acceptable is unchanged (`CLAUDE.md` §9 rule 7).
+ */
+export const ORIGIN_COORDINATE_PRECISION = 3;
 
 /** The bucket a departure time falls in, as an ISO instant. */
 export function departureBucket(departureTime: Date | null): string {
@@ -45,9 +71,21 @@ export function departureBucket(departureTime: Date | null): string {
 export function canonicalCacheInput(input: CacheKeyInput): string {
   // Sorted, so the same stop set in any input order produces the same key.
   const stops = [...input.stopPlaceIds].sort().join(',');
-  const origin = input.originPlaceId ?? 'current-location';
+  const origin = originToken(input);
   const shape = input.isRoundTrip ? 'round-trip' : 'one-way';
-  return `v1|${origin}|${stops}|${shape}|${departureBucket(input.departureTime)}`;
+  // `v2` because the origin token changed shape. An old `v1` entry keyed on the
+  // bare string `current-location` is exactly the poisoned row described above,
+  // and it must not be reachable from the new key.
+  return `v2|${origin}|${stops}|${shape}|${departureBucket(input.departureTime)}`;
+}
+
+function originToken(input: CacheKeyInput): string {
+  if (input.originPlaceId !== null) return input.originPlaceId;
+  if (input.originCoordinate === null) return 'current-location';
+
+  const latitude = input.originCoordinate.latitude.toFixed(ORIGIN_COORDINATE_PRECISION);
+  const longitude = input.originCoordinate.longitude.toFixed(ORIGIN_COORDINATE_PRECISION);
+  return `at:${latitude},${longitude}`;
 }
 
 /**

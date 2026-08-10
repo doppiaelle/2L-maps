@@ -46,9 +46,12 @@ const adapterReturning = (responses: readonly { status: number; body: unknown }[
 };
 
 const request = (intermediates: number): RoutesRequest => ({
-  origin: { placeId: 'origin' },
-  destination: { placeId: 'destination' },
-  intermediates: Array.from({ length: intermediates }, (_, i) => ({ placeId: `stop-${i}` })),
+  origin: { kind: 'place', placeId: 'origin' },
+  destination: { kind: 'place', placeId: 'destination' },
+  intermediates: Array.from({ length: intermediates }, (_, i) => ({
+    kind: 'place' as const,
+    placeId: `stop-${i}`,
+  })),
   departureTime: null,
 });
 
