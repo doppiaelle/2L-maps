@@ -282,7 +282,15 @@ twolmaps://auth-callback
    > `types/database.generated.ts` → re-run the workflow. **Your database is already
    > migrated either way**, so you can also just carry on to the build and tidy this up
    > later.
-2. **`android-preview`** → *Run workflow* → leave **Which build** on **`standalone`** →
+2. **`deploy-functions`** → *Run workflow* → environment **`staging`** → *Run workflow*.
+   About a minute.
+
+   > **Without this, address search returns nothing and the parser does nothing**, with
+   > no error anywhere. The migrations create the tables; this deploys the code that
+   > talks to Google. Sign-in and the map work without it, which is what makes its
+   > absence so hard to spot.
+
+3. **`android-preview`** → *Run workflow* → leave **Which build** on **`standalone`** →
    *Run workflow*.
 
    **First run: 15–25 minutes. After that: 5–10.** Gradle downloads its own
