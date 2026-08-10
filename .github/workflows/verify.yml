@@ -100,33 +100,56 @@ jobs:
       # in milliseconds, under Deno's rules rather than Node's. This is the
       # version that uses Deno itself, including the `npm:` specifiers in the
       # import map, which no offline check can confirm are downloadable.
-      # Before trusting the gate, prove it fails. Every defect this pipeline has
-      # shipped was covered by something green, so a check whose failure path has
-      # never run is not evidence of anything.
-      - name: Prove an unresolvable import fails
-        run: |
-          printf "import './nothing-here.ts';\n" > /tmp/canary.ts
-          if deno info --config supabase/functions/deno.json --quiet /tmp/canary.ts > /dev/null 2>&1; then
-            echo "::error::deno info accepted an import that does not exist."
-            echo "This job would pass whatever the state of the module graph."
-            exit 1
-          fi
-          echo "A broken graph is rejected, so a passing run below means something."
-
       - name: Build the module graph for every entry point
         run: |
+          # `deno info` exits 0 even when a module is missing: it records the
+          # failure *inside* the graph and reports success at the shell. The
+          # first version of this job trusted the exit code and was therefore
+          # green by construction — it took a canary to notice, which is the
+          # whole argument for keeping one.
+          graph_errors() {
+            local out
+            if ! out=$(deno info --json --config supabase/functions/deno.json "$1" 2>&1); then
+              printf '%s\n' "$out"
+              return
+            fi
+            printf '%s' "$out" | jq -r '.. | objects | select(has("error")) | .error'
+          }
+
+          # Prove the check fails before trusting that it passes. If Deno ever
+          # renames the field this reads, the canary goes silent and the job
+          # fails saying so — rather than passing over an unresolvable graph,
+          # which is the direction that costs a deploy.
+          printf "import './nothing-here.ts';\n" > /tmp/canary.ts
+          canary=$(graph_errors /tmp/canary.ts)
+          if [ -z "$canary" ]; then
+            echo "::error::An import of a file that does not exist was reported clean."
+            echo "This job cannot see a broken graph, so it would pass whatever"
+            echo "state supabase/functions is in. Fix the detection, not this line."
+            exit 1
+          fi
+          echo "Canary rejected as expected — the check can see a broken graph."
+
           checked=0
+          broken=0
           for entry in supabase/functions/*/index.ts; do
-            echo "▸ $entry"
-            deno info --config supabase/functions/deno.json --quiet "$entry" > /dev/null
+            errors=$(graph_errors "$entry")
+            if [ -n "$errors" ]; then
+              echo "::error file=$entry::$errors"
+              broken=1
+            else
+              echo "▸ $entry"
+            fi
             checked=$((checked + 1))
           done
+
           # A glob that matches nothing runs the loop zero times and reports
-          # success, which is the same vacuous pass in a different costume.
+          # success — the same vacuous pass in a different costume.
           if [ "$checked" -eq 0 ]; then
             echo "::error::No entry points matched supabase/functions/*/index.ts."
             exit 1
           fi
+          [ "$broken" -eq 0 ] || exit 1
           echo "$checked entry points resolve."
 
   bundle:
