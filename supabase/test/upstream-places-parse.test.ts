@@ -45,6 +45,18 @@ describe('autocomplete is where the money goes', () => {
     expect(sent[0]?.body).toMatchObject({ sessionToken: 'session-xyz' });
   });
 
+  it('asks for street addresses rather than places in general', async () => {
+    // Unrestricted, Places ranks localities and businesses alongside addresses,
+    // and for the short input a driver types — "via roma" — the town wins. Every
+    // suggestion came back a city, which is useless to a product that delivers
+    // to a door.
+    const { fetchImpl, sent } = recorder(() => ({ status: 200, body: { suggestions: [] } }));
+    const places = createPlacesAdapter({ apiKey: 'k', fetchImpl });
+
+    await places.suggest('via roma', 'token');
+    expect(sent[0]?.body).toMatchObject({ includedPrimaryTypes: ['address'] });
+  });
+
   it('buys the suggestion text and the id, and nothing else', async () => {
     const { fetchImpl, sent } = recorder(() => ({ status: 200, body: { suggestions: [] } }));
     const places = createPlacesAdapter({ apiKey: 'k', fetchImpl });

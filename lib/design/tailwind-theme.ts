@@ -9,9 +9,11 @@ import type { TypeToken } from './tokens';
  * contrast test that guards the tokens also guards what components can reach for
  * — a colour that fails the test cannot be spelled in a class name either.
  *
- * **Light values only.** NativeWind resolves dark through its own `dark:`
- * variant, which reads the CSS variables emitted by `cssVariables()` below; the
- * palette here is the light one, and the variables carry both.
+ * **Colours are variable references, not values.** `cssVariables()` carries both
+ * palettes and `ThemeVariables` binds the active one at the root, so a class
+ * name means "the current theme's surface-raised" rather than "light's". The
+ * previous arrangement emitted light literals here and was the reason dark mode
+ * showed near-black text on a near-black background.
  */
 
 /** `textPrimary` → `text-primary`, and `space4` → `space-4`. Digits need their
@@ -20,11 +22,24 @@ import type { TypeToken } from './tokens';
 const kebab = (camel: string): string =>
   camel.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`).replace(/([a-z])(\d)/g, '$1-$2');
 
-/** `text-primary`, `accent-subtle`, `surface-raised` — the names the design
- *  document uses, so a reviewer reading a class can find the row. */
+/**
+ * `text-primary`, `accent-subtle`, `surface-raised` — the names the design
+ * document uses, so a reviewer reading a class can find the row.
+ *
+ * **Each name resolves to a variable, not a literal, and that is the whole
+ * point.** This used to emit `colours.light` values directly, which made every
+ * colour class a light-theme colour in both themes. Backgrounds were unaffected
+ * — they are set inline from `colours[theme]` and were correctly dark — so the
+ * result on a dark phone was `#111112` text on a `#0B0B0C` background: the
+ * design system rendering itself invisible, on every screen.
+ *
+ * `cssVariables()` below already existed to carry both palettes, and this file's
+ * own header already claimed dark resolved through it. Nothing called it. The
+ * variables are now what the classes point at, and `ThemeVariables` applies them.
+ */
 export function colourScale(): Record<string, string> {
   return Object.fromEntries(
-    Object.entries(colours.light).map(([name, value]) => [kebab(name), value]),
+    Object.keys(colours.light).map((name) => [kebab(name), `var(--colour-${kebab(name)})`]),
   );
 }
 
