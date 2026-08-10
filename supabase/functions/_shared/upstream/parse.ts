@@ -37,6 +37,19 @@ export const DEFAULT_PARSE_MODEL = 'claude-haiku-4-5';
 /** Enough for a long list, short enough that a runaway response is bounded. */
 export const PARSE_MAX_TOKENS = 2048;
 
+/**
+ * The system prompt, exported as a builder.
+ *
+ * Both provider adapters use it verbatim. Two copies would drift, and the copy
+ * that drifted would be the one carrying the injection defence — the paragraph
+ * below is what tells the model that `<user_content>` is material rather than
+ * instruction, and a provider that got a shortened version of it would be the
+ * weakest link with nothing to show for it.
+ */
+export function buildSystemPrompt(): string {
+  return SYSTEM_PROMPT;
+}
+
 const SYSTEM_PROMPT = [
   'You extract postal addresses from material the user pasted, photographed or dictated.',
   '',
@@ -87,6 +100,10 @@ export type ParseOutcome =
   | { readonly ok: true; readonly result: ParseResult }
   | { readonly ok: false; readonly failure: ParseFailure };
 
+/** What every provider implements. The endpoint depends on this and never on a
+ *  provider, which is the whole point of the switch (ADR-0017). */
+export type ParseAdapter = (input: ParseInput) => Promise<ParseOutcome>;
+
 export interface ParseAdapterOptions {
   readonly apiKey: string;
   readonly fetchImpl: typeof fetch;
@@ -95,7 +112,7 @@ export interface ParseAdapterOptions {
   readonly timeoutMs?: number;
 }
 
-export function createParseAdapter(options: ParseAdapterOptions) {
+export function createParseAdapter(options: ParseAdapterOptions): ParseAdapter {
   const { apiKey, fetchImpl, maxCandidates } = options;
   const model = options.model ?? DEFAULT_PARSE_MODEL;
   const timeoutMs = options.timeoutMs ?? 12_000;
@@ -182,6 +199,32 @@ function toContent(input: ParseInput): readonly unknown[] {
   ];
 }
 
+/**
+ * The user turn as plain text, for a provider with no content-block format.
+ *
+ * Text only. A provider reached through this builder does not get the image
+ * path, because free vision models are scarce and inconsistent and a
+ * photographed delivery note that silently comes back empty is worse than one
+ * refused with a reason.
+ */
+export function toUserText(input: ParseInput): string {
+  const blocks = toContent(input);
+  const first = blocks[0];
+  if (typeof first === 'object' && first !== null && 'text' in first) {
+    return String((first as { text: unknown }).text);
+  }
+  // An image-only input reaching a text provider. Returning the instruction
+  // alone would ask the model to extract addresses from nothing and get a
+  // confident, empty answer.
+  return 'No readable text was supplied.';
+}
+
+/** Shared by both providers: the model's JSON is validated field by field, and
+ *  the cap applied, before anything is believed. */
+export function readParsedJson(text: string, maxCandidates: number): ParseOutcome {
+  return readJsonPayload(text, maxCandidates);
+}
+
 function readResult(payload: unknown, maxCandidates: number): ParseOutcome {
   if (typeof payload !== 'object' || payload === null) {
     return { ok: false, failure: { kind: 'malformed', retryable: false } };
@@ -200,6 +243,19 @@ function readResult(payload: unknown, maxCandidates: number): ParseOutcome {
     return { ok: false, failure: { kind: 'malformed', retryable: false } };
   }
 
+  return readJsonPayload(text, maxCandidates);
+}
+
+/**
+ * Validate the model's JSON, whichever provider produced it.
+ *
+ * **This is where the schema stops being a request and becomes a guarantee.**
+ * A structured-output declaration is something the provider may or may not
+ * honour — free and open models frequently do not — so every field is checked
+ * here rather than trusted. That is what makes a weaker model a quality
+ * question rather than a safety one (ADR-0017).
+ */
+function readJsonPayload(text: string, maxCandidates: number): ParseOutcome {
   let parsed: unknown;
   try {
     parsed = JSON.parse(text);

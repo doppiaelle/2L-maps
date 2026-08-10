@@ -1,4 +1,5 @@
-import { createParseAdapter } from './upstream/parse';
+import { createParseAdapter, type ParseAdapter } from './upstream/parse';
+import { createOpenRouterParseAdapter } from './upstream/parse-openrouter';
 import { createPlacesAdapter } from './upstream/places';
 import { createRoutesAdapter } from './upstream/routes';
 import { MAX_STOPS } from '../../../types/constants';
@@ -53,7 +54,32 @@ export function placesAdapter(): ReturnType<typeof createPlacesAdapter> {
   return createPlacesAdapter({ apiKey: googleServerKey(), fetchImpl: fetch });
 }
 
-export function parseAdapter(): ReturnType<typeof createParseAdapter> {
+/**
+ * Which model parses a paste.
+ *
+ * A switch rather than a replacement ([ADR-0017](../../../docs/adr/0017-parse-provider-switch.md)):
+ * ADR-0016's choice of `claude-haiku-4-5` stands as the default, and OpenRouter
+ * exists so the endpoint can be exercised against a free model without a paid
+ * account.
+ *
+ * **Anthropic is the default deliberately.** Many free endpoints retain prompts
+ * for training, and a pasted delivery list is third-party personal data —
+ * customers' addresses, not the user's. Nobody should reach the cheaper path by
+ * omission; it has to be asked for.
+ */
+export function parseAdapter(): ParseAdapter {
+  const provider = (typeof Deno === 'undefined' ? undefined : Deno.env.get('PARSE_PROVIDER')) ?? '';
+
+  if (provider === 'openrouter') {
+    const model = typeof Deno === 'undefined' ? undefined : Deno.env.get('PARSE_MODEL');
+    return createOpenRouterParseAdapter({
+      apiKey: requireEnv('OPENROUTER_API_KEY'),
+      fetchImpl: fetch,
+      maxCandidates: MAX_STOPS,
+      ...(model === undefined || model === '' ? {} : { model }),
+    });
+  }
+
   return createParseAdapter({
     apiKey: requireEnv('ANTHROPIC_API_KEY'),
     fetchImpl: fetch,
