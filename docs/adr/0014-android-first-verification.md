@@ -53,6 +53,29 @@ CI.**
 6. **EAS Build is not used.** Gradle on GitHub Actions produces the same artifact with no monthly
    build ceiling and no subscription, which removes a fixed cost from the model.
 
+### Amended 2026-08-10 — the development build assumed a development machine
+
+Point 2 above says the artifact is installed once and every change then arrives by QR code.
+**That holds only where a machine on the same network is running `npx expo start`.** Without
+one, a development build cannot start at all: it opens on a dashboard asking for a server URL
+and there is no URL to give it. It is not an error state, and there is no way past it.
+
+That was discovered on the first real install, by the only person holding the phone — who had
+been operating entirely through GitHub and the two consoles, and had no checkout anywhere.
+
+So `android-preview` now takes a variant, and **`standalone` is the default**: the JavaScript is
+compiled in, and the APK runs on its own. The development build remains available as
+`dev-server` for anyone who does have a machine, because the QR loop is genuinely much faster
+and this ADR's reasoning about it was correct — it was the *precondition* that went unstated.
+
+The alternative rejected below, "Release APK downloaded per change", is therefore now the
+default path rather than a rejected one. Its stated cost is real and unchanged: a full rebuild,
+five to ten minutes, for every change. That is the price of not having a development machine,
+and it is worth paying over not being able to open the app.
+
+Both variants are signed with the same `debug.keystore` — Expo's template applies it to the
+`release` build type too — so the Maps key needs only one registered fingerprint either way.
+
 ## Consequences
 
 **Positive.** Verification happens on real hardware, with real GPS, real network conditions and

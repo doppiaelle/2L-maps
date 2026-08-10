@@ -282,21 +282,43 @@ twolmaps://auth-callback
    > `types/database.generated.ts` → re-run the workflow. **Your database is already
    > migrated either way**, so you can also just carry on to the build and tidy this up
    > later.
-2. **`android-preview`** → *Run workflow* → *Run workflow*.
+2. **`android-preview`** → *Run workflow* → leave **Which build** on **`standalone`** →
+   *Run workflow*.
 
    **First run: 15–25 minutes. After that: 5–10.** Gradle downloads its own
    distribution and every Android dependency before compiling anything, and only the
    second run finds them cached. A build that has been going for half an hour is
-   almost certainly working rather than stuck — Gradle prints a `EXECUTING [12m]`
+   almost certainly working rather than stuck — Gradle prints an `EXECUTING [12m]`
    progress line, and GitHub kills a job at six hours regardless.
+
+   When it finishes: open the run → **Artifacts** → **`2l-maps-standalone`** →
+   download → unzip → send the `.apk` to your phone → open it. Android will warn
+   about installing from an unknown source; that is expected.
 
    The APK is built for **`arm64-v8a` only** — every Android phone sold since about
    2017. It will not install on an x86 emulator or a 32-bit device; if you ever need
    one, add the architectures back in `.github/workflows/android-preview.yml`.
 
-   When it finishes: open the run → **Artifacts** → **`2l-maps-development-build`** → download →
-   unzip → send the `.apk` to your phone → open it. Android will warn about installing from an
-   unknown source; that is expected.
+### The two variants, and why `standalone` is the default
+
+| | `standalone` | `dev-server` |
+|---|---|---|
+| Contains the JavaScript | **Yes** — install and it runs | No — it fetches it over the network |
+| On first open | The app | A dashboard asking for a server URL |
+| Needs a computer | No | **Yes** — one running `npx expo start` on the same wifi |
+| To see a change | Run this workflow again, 5–10 min | Save the file; the phone reloads in seconds |
+
+**If you pick `dev-server` without a machine running Metro, the app cannot start at
+all** — the dashboard it shows is not an error, it is the build waiting for a server
+that does not exist. That is what makes `standalone` the right default, even though
+its edit-to-phone loop is far slower.
+
+**Both are signed with the same key**, so the SHA-1 you registered in step 4 is
+correct for either and nothing needs changing to switch between them.
+
+If you do have a computer with Node, the fast loop is worth setting up later: clone
+the repository, `npm ci`, `npx expo start`, install the `dev-server` APK once, and
+scan the QR code it prints.
 
 ---
 
