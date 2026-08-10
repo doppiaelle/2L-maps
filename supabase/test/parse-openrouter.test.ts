@@ -32,6 +32,33 @@ describe('reading a completion', () => {
     });
   });
 
+  it('reads JSON the model wrapped in a markdown fence', async () => {
+    // We no longer send `response_format` — OpenRouter treats it as a routing
+    // filter and answered 404 when no provider for a free model supported it,
+    // which is the production failure this replaces. Without the flag, fenced
+    // output is the ordinary behaviour of exactly the models this path exists
+    // to use, so refusing it would have moved the failure rather than fixed it.
+    const body = JSON.stringify({ addresses: ['Via Roma 1, Bergamo'], unparsed: [] });
+    const parse = adapter((async () =>
+      completion(`Here you go:\n\`\`\`json\n${body}\n\`\`\`\n`)) as typeof fetch);
+
+    await expect(parse({ text: 'x' })).resolves.toMatchObject({
+      ok: true,
+      result: { addresses: ['Via Roma 1, Bergamo'] },
+    });
+  });
+
+  it('does not send response_format, which is what made free models unreachable', async () => {
+    let sent: Record<string, unknown> = {};
+    const parse = adapter((async (_url: string, init: RequestInit) => {
+      sent = JSON.parse(String(init.body)) as Record<string, unknown>;
+      return completion(JSON.stringify({ addresses: [], unparsed: [] }));
+    }) as unknown as typeof fetch);
+
+    await parse({ text: 'x' });
+    expect(sent['response_format']).toBeUndefined();
+  });
+
   it('validates the shape rather than trusting the schema declaration', async () => {
     // Free and open models frequently ignore `response_format`. This is the
     // difference between a weaker model being a quality question and a safety

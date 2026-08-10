@@ -76,10 +76,18 @@ export function createOpenRouterParseAdapter(options: OpenRouterAdapterOptions):
           // "copy the addresses out" and costs reproducibility when a user
           // re-parses the same paste after a correction.
           temperature: 0,
-          // OpenAI-compatible structured output. Not every free model honours
-          // it, which is why `readParsedJson` validates rather than trusts —
-          // the same validation the Anthropic path runs, for the same reason.
-          response_format: { type: 'json_object' },
+          // **`response_format` is deliberately not sent.** OpenRouter treats it
+          // as a routing *filter*, not a hint: if no provider serving the chosen
+          // model supports structured output it matches nothing and answers 404
+          // — which is what this endpoint returned in production, with a valid
+          // key and a real model, and which reads identically to a model that
+          // does not exist.
+          //
+          // Asking for it bought nothing anyway. `readParsedJson` validates
+          // every field regardless, precisely because a structured-output
+          // declaration is something a provider may or may not honour, and free
+          // models frequently do not. The guarantee was never coming from the
+          // flag; only the 404 was.
           messages: [
             { role: 'system', content: buildSystemPrompt() },
             { role: 'user', content: toUserText(input) },

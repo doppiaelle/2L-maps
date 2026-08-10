@@ -255,18 +255,50 @@ function readResult(payload: unknown, maxCandidates: number): ParseOutcome {
  * here rather than trusted. That is what makes a weaker model a quality
  * question rather than a safety one (ADR-0017).
  */
+/**
+ * The model's JSON, whether or not it sent JSON and nothing else.
+ *
+ * **Tolerant on purpose, and it has to be.** The provider is no longer asked for
+ * structured output — that request is a routing filter on OpenRouter and made
+ * free models unreachable — so a model is free to wrap its answer in a
+ * ```json fence, or to introduce it with a sentence. Both are the ordinary
+ * behaviour of the models this path exists to use, and refusing them would move
+ * the failure rather than remove it.
+ *
+ * Tolerant about the *envelope* only. What is inside is validated field by field
+ * exactly as before: this finds the object, it does not trust it.
+ */
+function parseJsonLoosely(text: string): Record<string, unknown> | null {
+  const candidates = [text];
+
+  // The outermost braces. A fence, a preamble and a trailing apology all fall
+  // away, and a nested object is still contained by this span.
+  const start = text.indexOf('{');
+  const end = text.lastIndexOf('}');
+  if (start !== -1 && end > start) candidates.push(text.slice(start, end + 1));
+
+  for (const candidate of candidates) {
+    try {
+      const parsed: unknown = JSON.parse(candidate);
+      if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
+    } catch {
+      // Try the next shape rather than giving up: the first attempt failing is
+      // the expected case for a fenced answer.
+    }
+  }
+
+  return null;
+}
+
 function readJsonPayload(text: string, maxCandidates: number): ParseOutcome {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(text);
-  } catch {
+  const parsed = parseJsonLoosely(text);
+  if (parsed === null) {
     return { ok: false, failure: { kind: 'malformed', retryable: false } };
   }
 
-  if (typeof parsed !== 'object' || parsed === null) {
-    return { ok: false, failure: { kind: 'malformed', retryable: false } };
-  }
-  const result = parsed as Record<string, unknown>;
+  const result = parsed;
 
   const addresses = readStringArray(result['addresses']);
   const unparsed = readStringArray(result['unparsed']);
