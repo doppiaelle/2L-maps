@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist, type PersistStorage } from 'zustand/middleware';
 
+import { isRouteId, newRouteId } from '@/lib/route/route-id';
 import {
   addStop,
   applyOptimizedOrder,
@@ -121,17 +122,22 @@ export const DRAFT_SCHEMA_VERSION = 1;
  */
 export function migrateDraft(persisted: unknown, _version: number): { draft: DraftRoute } {
   const draft = (persisted as { draft?: unknown } | null)?.draft;
-  // `emptyDraft('draft')` matches the store's own initial value: the id is
+  // A fresh, valid id: the store's initial value is one too, and the literal
+  // 'draft' it used to be is
   // replaced by `reset` the moment a real route is opened, and inventing a
   // different one here would make an unreadable draft look like a saved route.
-  if (draft === null || typeof draft !== 'object') return { draft: emptyDraft('draft') };
+  if (draft === null || typeof draft !== 'object') return { draft: emptyDraft(newRouteId()) };
 
   const shaped = draft as Partial<DraftRoute> & { stops?: unknown };
   const stops = Array.isArray(shaped.stops) ? (shaped.stops as Partial<Stop>[]) : [];
 
   return {
     draft: {
-      routeId: typeof shaped.routeId === 'string' ? shaped.routeId : 'draft',
+      // A draft stored before route ids were real carries the literal 'draft',
+      // which `/optimize` refuses as a non-UUID. Migrated rather than preserved:
+      // keeping it faithfully would carry the defect forward into a 400 the user
+      // cannot act on.
+      routeId: isRouteId(shaped.routeId) ? shaped.routeId : newRouteId(),
       originPlaceId: typeof shaped.originPlaceId === 'string' ? shaped.originPlaceId : null,
       originIsCurrentLocation: shaped.originIsCurrentLocation !== false,
       shape: shaped.shape === 'round-trip' ? 'round-trip' : 'one-way',
@@ -156,7 +162,10 @@ export function createDraftRouteStore(storage?: DraftStorage) {
   return create<DraftRouteState>()(
     persist(
       (set, get) => ({
-        draft: emptyDraft('draft'),
+        // A real UUID from the first render. `/optimize` validates this field as
+        // a UUID and nothing ever called `reset` with one, so every new install
+        // would have had its first optimization refused with 400.
+        draft: emptyDraft(newRouteId()),
         lastRefusal: null,
         undoable: null,
         result: null,

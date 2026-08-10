@@ -51,6 +51,16 @@ export type StopListState =
 export interface StopListProps {
   readonly state: StopListState;
   onSelectStop: (stopId: string) => void;
+  /**
+   * Editing, when the route may still be changed.
+   *
+   * All three absent means a read-only list, which is what a route in progress
+   * is: reordering under a driver following the list is a hazard, not an edit.
+   * The store already owned `removeStopById`, `undoRemove` and `moveStopTo` —
+   * this is the surface that reaches them.
+   */
+  onRemoveStop?: ((stopId: string) => void) | undefined;
+  onMoveStop?: ((fromIndex: number, toIndex: number) => void) | undefined;
   /** Rendered between the header and the rows — the ad slot goes here, so the
    *  list does not have to know what advertising is. */
   readonly header?: React.ReactElement | null;
@@ -65,10 +75,18 @@ export const DEFAULT_ROW_HEIGHT = 72;
 const Row = memo(
   function Row({
     item,
+    index,
+    total,
     onSelect,
+    onRemove,
+    onMove,
   }: {
     item: StopListItem;
+    index: number;
+    total: number;
     onSelect: (stopId: string) => void;
+    onRemove: ((stopId: string) => void) | undefined;
+    onMove: ((fromIndex: number, toIndex: number) => void) | undefined;
   }): React.JSX.Element {
     return (
       <StopRow
@@ -81,6 +99,30 @@ const Row = memo(
         onPress={() => {
           onSelect(item.id);
         }}
+        {...(onRemove === undefined
+          ? {}
+          : {
+              onRemove: () => {
+                onRemove(item.id);
+              },
+            })}
+        // Undefined at the ends rather than a no-op: the control renders
+        // disabled, so the row keeps its width and the list does not shift as
+        // the user scrolls past the first and last stops.
+        {...(onMove === undefined || index === 0
+          ? {}
+          : {
+              onMoveUp: () => {
+                onMove(index, index - 1);
+              },
+            })}
+        {...(onMove === undefined || index === total - 1
+          ? {}
+          : {
+              onMoveDown: () => {
+                onMove(index, index + 1);
+              },
+            })}
       />
     );
   },
@@ -95,19 +137,36 @@ const Row = memo(
     a.item.state === b.item.state &&
     a.item.hasCoordinate === b.item.hasCoordinate &&
     a.item.meta === b.item.meta &&
-    a.onSelect === b.onSelect,
+    a.index === b.index &&
+    a.total === b.total &&
+    a.onSelect === b.onSelect &&
+    a.onRemove === b.onRemove &&
+    a.onMove === b.onMove,
 );
 
 export function StopList({
   state,
   onSelectStop,
+  onRemoveStop,
+  onMoveStop,
   header = null,
   rowHeight = DEFAULT_ROW_HEIGHT,
   testID,
 }: StopListProps): React.JSX.Element {
+  const total = state.kind === 'ready' ? state.stops.length : 0;
+
   const renderItem = useCallback(
-    ({ item }: { item: StopListItem }) => <Row item={item} onSelect={onSelectStop} />,
-    [onSelectStop],
+    ({ item, index }: { item: StopListItem; index: number }) => (
+      <Row
+        item={item}
+        index={index}
+        total={total}
+        onSelect={onSelectStop}
+        onRemove={onRemoveStop}
+        onMove={onMoveStop}
+      />
+    ),
+    [onSelectStop, onRemoveStop, onMoveStop, total],
   );
 
   const getItemLayout = useCallback(

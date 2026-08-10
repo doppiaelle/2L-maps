@@ -1,0 +1,58 @@
+/**
+ * The identifier a new route carries.
+ *
+ * **A route needs a real UUID from the moment it exists.** The store opened with
+ * the literal string `'draft'` and nothing ever replaced it: `reset(routeId)`
+ * was called from no screen in the repository. `/optimize` validates
+ * `routeId` as `z.string().uuid()`, so the first optimization of every new
+ * install would have been refused with 400 INVALID_REQUEST — the same failure
+ * that made address search return nothing, waiting one step further along.
+ *
+ * Generated here rather than taken from a library because `expo-crypto` cannot
+ * be installed in this environment, and because the requirement is weaker than
+ * it looks: this is a row key the client chooses for its own draft, not a
+ * capability, a session or anything an attacker gains by guessing. Ownership is
+ * enforced by RLS on `user_id`, never by the unguessability of this value
+ * ([`docs/19_SECURITY.md`](../../docs/19_SECURITY.md)).
+ *
+ * If that ever stops being true — an id that grants access to something — this
+ * must be replaced by a CSPRNG, and the reason it was acceptable is written
+ * above so the change is obvious rather than archaeological.
+ */
+
+/** Version 4, variant 1 — the shape `z.string().uuid()` accepts. */
+export function newRouteId(random: () => number = Math.random): string {
+  const hex: string[] = [];
+  for (let index = 0; index < 16; index += 1) {
+    hex.push(
+      Math.floor(random() * 256)
+        .toString(16)
+        .padStart(2, '0'),
+    );
+  }
+
+  // Byte 6 high nibble is the version; byte 8 high bits are the variant. Both
+  // are fixed rather than random, and a generator that skips them produces a
+  // string that looks like a UUID and fails validation.
+  hex[6] = `4${(hex[6] ?? '00').slice(1)}`;
+  const variant = ((parseInt((hex[8] ?? '00').slice(0, 1), 16) & 0x3) | 0x8).toString(16);
+  hex[8] = `${variant}${(hex[8] ?? '00').slice(1)}`;
+
+  const joined = hex.join('');
+  return [
+    joined.slice(0, 8),
+    joined.slice(8, 12),
+    joined.slice(12, 16),
+    joined.slice(16, 20),
+    joined.slice(20, 32),
+  ].join('-');
+}
+
+/** Whether a stored id is one the server will accept, so a draft persisted
+ *  before this existed can be migrated rather than refused at optimize time. */
+export function isRouteId(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+  );
+}

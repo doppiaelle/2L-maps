@@ -54,6 +54,16 @@ export interface PlanViewProps {
   onDetentChange: (detent: SheetDetent) => void;
   readonly selectedStopId: string | null;
   onSelectStop: (stopId: string) => void;
+  /**
+   * Editing the itinerary.
+   *
+   * Passed straight to the list, and omitted while a route is in progress —
+   * `isRouteInProgress` already governs the other controls that must not be
+   * reachable from a moving vehicle.
+   */
+  onRemoveStop: (stopId: string) => void;
+  onMoveStop: (fromIndex: number, toIndex: number) => void;
+  onClearRoute: () => void;
   onClearSelection: () => void;
 
   onPrimaryAction: () => void;
@@ -97,6 +107,9 @@ export function PlanView({
   onDetentChange,
   selectedStopId,
   onSelectStop,
+  onRemoveStop,
+  onMoveStop,
+  onClearRoute,
   onClearSelection,
   onPrimaryAction,
   onAddStop,
@@ -226,6 +239,24 @@ export function PlanView({
                   <Text className="text-body text-accent">Add a stop</Text>
                 </Pressable>
 
+                {stops.length > 0 && (
+                  <Pressable
+                    onPress={onClearRoute}
+                    accessibilityRole="button"
+                    // Says what it does, not what it is. "Reset" describes the
+                    // mechanism; this describes the outcome the user wants.
+                    accessibilityLabel="Start a new route, clearing every stop"
+                    style={{
+                      minHeight: layout.touchMin,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                    testID="plan-clear-route"
+                  >
+                    <Text className="text-body text-text-secondary">Start over</Text>
+                  </Pressable>
+                )}
+
                 <Pressable
                   onPress={onImport}
                   accessibilityRole="button"
@@ -247,6 +278,9 @@ export function PlanView({
         <StopList
           state={listStateFor(state, stops)}
           onSelectStop={onSelectStop}
+          // Read-only while driving: reordering under someone following the list
+          // is a hazard rather than an edit.
+          {...(state.kind === 'in-progress' ? {} : { onRemoveStop, onMoveStop })}
           testID="plan-stop-list"
         />
       </RouteSheet>

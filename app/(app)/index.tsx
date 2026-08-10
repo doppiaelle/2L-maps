@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Linking, useColorScheme, useWindowDimensions } from 'react-native';
 
 import { useHandoff } from '@/features/handoff/use-handoff';
@@ -16,11 +16,13 @@ import { useOpenRoute } from '@/features/routes/use-open-route';
 import { useRouteSync } from '@/features/routes/use-route-sync';
 import { useDraftRouteStore, useRouteProgressStore, useUiStore } from '@/features/stores';
 import { AdSlot } from '@/components/primitives/AdSlot';
+import { UndoToast } from '@/components/feedback/UndoToast';
 import { readMapIds } from '@/lib/config/map-ids';
 import { isOffline } from '@/lib/network/connectivity';
 import { formatDistance, formatDuration } from '@/lib/format/units';
 import { buildPlanRows, placeIdsToResolve, straightLineMeters } from '@/lib/route/plan-rows';
 import { buildRouteGeometry } from '@/lib/map/route-geometry';
+import { newRouteId } from '@/lib/route/route-id';
 import { actionIntentOf, planStateOf } from '@/lib/route/plan-state';
 import { summarise } from '@/lib/route/progress';
 import { wasAlreadyOptimal } from '@/lib/route/draft';
@@ -55,6 +57,18 @@ export default function PlanScreen(): React.JSX.Element {
   const selectedStopId = useUiStore((store) => store.selectedStopId);
   const selectStop = useUiStore((store) => store.selectStop);
   const clearSelection = useUiStore((store) => store.clearSelection);
+  // The three actions the store has always had and no screen ever called. The
+  // list could be built and optimized but never edited: no removal, no
+  // reordering, no way to start again short of reinstalling.
+  const removeStopById = useDraftRouteStore((store) => store.removeStopById);
+  const undoRemove = useDraftRouteStore((store) => store.undoRemove);
+  const moveStopTo = useDraftRouteStore((store) => store.moveStopTo);
+  const resetDraft = useDraftRouteStore((store) => store.reset);
+
+  // What the undo toast is offering. Null means nothing was just removed —
+  // the removal has already happened in the store, and `undoRemove` is what
+  // puts it back (docs/06 P8: execute and offer undo, never confirm first).
+  const [pendingRemoval, setPendingRemoval] = useState<string | null>(null);
 
   const destination = useLaunchDestination({
     isStoreHydrated: true,
@@ -182,80 +196,113 @@ export default function PlanScreen(): React.JSX.Element {
   });
 
   return (
-    <PlanView
-      state={state}
-      intent={actionIntentOf(state, availability)}
-      stops={rows}
-      markers={markers}
-      route={geometry}
-      distance={distance}
-      duration={duration}
-      detent={detent}
-      onDetentChange={setDetent}
-      selectedStopId={selectedStopId}
-      onSelectStop={selectStop}
-      onClearSelection={clearSelection}
-      onPrimaryAction={() => {
-        // The control's own state already says which of the two this is; the
-        // screen only has to route the tap. `planStateOf` decided that, and
-        // re-deriving it here would be the same rule in two places.
-        // Mid-route the same control means Done, and the state machine already
-        // said so — re-deriving it here would be one rule in two places.
-        if (state.kind === 'in-progress') {
-          advance('completed');
-          return;
-        }
+    <>
+      <PlanView
+        state={state}
+        intent={actionIntentOf(state, availability)}
+        stops={rows}
+        markers={markers}
+        route={geometry}
+        distance={distance}
+        duration={duration}
+        detent={detent}
+        onDetentChange={setDetent}
+        selectedStopId={selectedStopId}
+        onSelectStop={selectStop}
+        onRemoveStop={(stopId) => {
+          removeStopById(stopId);
+          setPendingRemoval(stopId);
+        }}
+        onMoveStop={moveStopTo}
+        onClearRoute={() => {
+          // A fresh id, because a new route is a new row rather than an edit of
+          // the last one — History would otherwise show one route that keeps
+          // changing shape.
+          resetDraft(newRouteId());
+          clearSelection();
+        }}
+        onClearSelection={clearSelection}
+        onPrimaryAction={() => {
+          // The control's own state already says which of the two this is; the
+          // screen only has to route the tap. `planStateOf` decided that, and
+          // re-deriving it here would be the same rule in two places.
+          // Mid-route the same control means Done, and the state machine already
+          // said so — re-deriving it here would be one rule in two places.
+          if (state.kind === 'in-progress') {
+            advance('completed');
+            return;
+          }
 
-        if (state.kind !== 'optimized') {
-          optimize();
-          return;
-        }
+          if (state.kind !== 'optimized') {
+            optimize();
+            return;
+          }
 
-        void handoff.start().then((outcome) => {
-          // A first handoff with no provider chosen presents the picker rather
-          // than guessing — sending a twelve-stop day to the wrong app is a bad
-          // introduction to the one feature the product is for.
-          if (outcome.kind === 'needs-provider') router.push('/provider');
-        });
-      }}
-      // Nothing at all until an ad provider exists. `<AdSlot>` reserves its
-      // height from the first render to avoid a reflow, so rendering it with no
-      // provider would reserve a gap that could never be filled.
-      adSlot={
-        ads === null ? null : (
-          <AdSlot
-            slot="stop-list"
-            allowances={quota.allowances}
-            isRouteInProgress={progress !== null}
-            ads={ads}
-            testID="plan-ad-slot"
-          />
-        )
-      }
-      onAddStop={() => {
-        router.push('/add-stop');
-      }}
-      onImport={() => {
-        router.push('/import');
-      }}
-      onOpenHistory={() => {
-        router.push('/history');
-      }}
-      onOpenSettings={() => {
-        router.push('/settings');
-      }}
-      onSkipStop={() => {
-        advance('skipped');
-      }}
-      theme={scheme === 'dark' ? 'dark' : 'light'}
-      mapIds={readMapIds()}
-      // The map's own offline state, which the component has always had and
-      // nothing ever put it into. Tiles cannot be cached or pre-fetched
-      // (`CLAUDE.md` §13 rule 4), so with no signal there is nothing to draw
-      // and saying so beats a grey rectangle.
-      mapStatus={isOffline(connectivity) ? 'offline' : 'ready'}
-      screenHeight={height}
-      testID="plan-screen"
-    />
+          void handoff.start().then((outcome) => {
+            // A first handoff with no provider chosen presents the picker rather
+            // than guessing — sending a twelve-stop day to the wrong app is a bad
+            // introduction to the one feature the product is for.
+            if (outcome.kind === 'needs-provider') router.push('/provider');
+          });
+        }}
+        // Nothing at all until an ad provider exists. `<AdSlot>` reserves its
+        // height from the first render to avoid a reflow, so rendering it with no
+        // provider would reserve a gap that could never be filled.
+        adSlot={
+          ads === null ? null : (
+            <AdSlot
+              slot="stop-list"
+              allowances={quota.allowances}
+              isRouteInProgress={progress !== null}
+              ads={ads}
+              testID="plan-ad-slot"
+            />
+          )
+        }
+        onAddStop={() => {
+          router.push('/add-stop');
+        }}
+        onImport={() => {
+          router.push('/import');
+        }}
+        onOpenHistory={() => {
+          router.push('/history');
+        }}
+        onOpenSettings={() => {
+          router.push('/settings');
+        }}
+        onSkipStop={() => {
+          advance('skipped');
+        }}
+        theme={scheme === 'dark' ? 'dark' : 'light'}
+        mapIds={readMapIds()}
+        // The map's own offline state, which the component has always had and
+        // nothing ever put it into. Tiles cannot be cached or pre-fetched
+        // (`CLAUDE.md` §13 rule 4), so with no signal there is nothing to draw
+        // and saying so beats a grey rectangle.
+        mapStatus={isOffline(connectivity) ? 'offline' : 'ready'}
+        screenHeight={height}
+        testID="plan-screen"
+      />
+
+      {pendingRemoval !== null && (
+        // The removal already happened; this is the window in which it can be
+        // taken back. A dialog before the fact would tax every deletion to guard
+        // against a mistake that is both rare and reversible (docs/06 P8).
+        <UndoToast
+          message="Stop removed"
+          onUndo={() => {
+            undoRemove();
+            setPendingRemoval(null);
+          }}
+          onExpire={() => {
+            // Nothing to commit: the store removed it immediately. Closing the
+            // window is only about giving up the ability to reverse it.
+            setPendingRemoval(null);
+          }}
+          testID="plan-undo-remove"
+        />
+      )}
+    </>
   );
 }
