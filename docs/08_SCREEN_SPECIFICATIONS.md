@@ -18,7 +18,7 @@ the tokens in [`07_DESIGN_SYSTEM.md`](07_DESIGN_SYSTEM.md).
 ## 2. Goals
 
 1. Specify every state, including the ones that are easy to skip.
-2. Keep the primary action fixed in the thumb zone across every screen and detent.
+2. Keep the primary action fixed in the thumb zone across every screen and section.
 3. Make the optimization result legible in a glance.
 4. Give every failure a designed appearance.
 
@@ -38,11 +38,11 @@ the tokens in [`07_DESIGN_SYSTEM.md`](07_DESIGN_SYSTEM.md).
 ## 4. Text diagrams
 
 Screen layouts are drawn in place, beside the state tables that govern them — the Plan layout in
-§7, the sheet detents in §7, and the route summary in §8. They are not collected here because a
+§7, the Route section in §7, and the route summary in §8. They are not collected here because a
 layout separated from its states is read without the constraints that shaped it.
 
 ```
-   Plan  ──tap Route──▶  sheet detents  ──tap Start──▶  handoff
+   Map  ──tap Route──▶  Route section  ──tap Start──▶  handoff
      │                    peek/half/full                   │
      │                                                     ▼
      └──tap stop──▶ stop detail                    external nav app
@@ -69,7 +69,7 @@ state machine; only the content differs.
 is not the loading state; the loading state is a skeleton matching the eventual layout, so the
 transition does not reflow.
 
-**How the primary action stays constant.** Across all three sheet detents the primary action
+**How the primary action stays constant.** Across every section the primary action
 holds its position. The sheet moves; the button does not — a control that relocates under the
 thumb during a gesture is a control the user misses while driving.
 
@@ -115,16 +115,21 @@ thumb during a gesture is a control the user misses while driving.
   └──────────────────────────────────────┘
 ```
 
-### Sheet detents
+### The Route section
 
-| Detent | Height | Contents |
-|---|---|---|
-| Peek | ~180 pt | Summary metrics + primary action |
-| Half | ~50% | Above, plus a scrollable stop list |
-| Full | ~90% | Above, plus per-stop actions and reorder handles |
+Opened from the dock, full-screen above a map that stays mounted underneath
+([ADR-0018](adr/0018-bottom-dock-navigation.md)). One layout, not three: what used to be
+three sheet detents was three sizes of the same content, and the two smaller ones existed
+only because the container could be dragged.
 
-The primary action is **pinned to the sheet bottom at every detent**. Changing detent never
-moves it — its position is learned once and stays true.
+| Region | Contents |
+|---|---|
+| Top | Summary metrics, status chip, ad slot when a provider exists |
+| Middle | The stop list — scrollable, with remove and reorder on every row |
+| Bottom | The primary action, plus Add a stop · Start over · Paste a list |
+
+The primary action is **pinned to the bottom of the section**. Its position is learned once
+and stays true, which is the property the pinned-at-every-detent rule was protecting.
 
 ### States
 
@@ -266,7 +271,7 @@ Grouped so the two things users come for are immediately visible: **Subscription
 
 | ID | Decision | Applies to |
 |---|---|---|
-| [0010](adr/0010-mobile-only-scope.md) | The stop list is a bottom sheet with detents, never a sidebar | Plan, and every screen that lists stops |
+| [0018](adr/0018-bottom-dock-navigation.md) | Navigation is a bottom dock; the stop list is a full-screen section over the map | Every screen |
 | [0009](adr/0009-visual-direction.md) | Degraded results are visibly labelled | Plan header, polyline style, history rows |
 | [0004](adr/0004-external-navigation-handoff.md) | Handoff replaces in-app navigation | The absence of a navigation screen |
 | [0011](adr/0011-server-side-quota-enforcement.md) | Quota decided server-side | The quota-exhausted state on every metered screen |
@@ -279,7 +284,7 @@ achievable at all.
 
 | # | Condition | Expected behaviour |
 |---|---|---|
-| 1 | 25 stops at the full detent | List scrolls; header and primary action stay pinned |
+| 1 | 25 stops in the Route section | List scrolls; header and primary action stay pinned |
 | 2 | Very long address | Two lines, then ellipsis; full text in stop detail |
 | 3 | Dynamic Type at 200% | Rows grow; metrics drop one step; nothing truncates |
 | 4 | Marker tapped while the sheet is full | Sheet drops to half so the marker is visible |
@@ -289,7 +294,7 @@ achievable at all.
 | 8 | Import of 40 addresses | First 25 added, limit explained, remainder offered as a second route |
 | 9 | All stops unreachable | Sheet states the specific cause; the map shows markers without a route |
 | 10 | Trial expires while Plan is open | Paywall appears modally; the current route stays intact underneath |
-| 11 | Theme changes with the sheet open | Tokens swap without remount; detent preserved |
+| 11 | Theme changes with a section open | Tokens swap without remount; the open section is preserved |
 | 12 | Recenter tapped with no location permission | Camera fits the route instead; no error |
 
 ## 11. Error handling
@@ -318,10 +323,10 @@ achievable at all.
 ## 13. Checklist
 
 - [ ] Every state in §7 and §8 implemented and tested.
-- [ ] Primary action position identical across all three detents.
+- [ ] Primary action position identical whichever section is open.
 - [ ] Order preserved through every optimization failure, verified by test.
 - [ ] Degraded label present in header, polyline style, and history.
-- [ ] Attribution visible at every detent.
+- [ ] Attribution visible, and never covered by the dock.
 - [ ] Dynamic Type verified at 200% on Plan at 25 stops.
 - [ ] Every gesture has a non-gesture equivalent.
 - [ ] Paywall verified against Guideline 3.1.2.
@@ -341,7 +346,8 @@ achievable at all.
 
 | Date | Change | Reason | Author |
 |---|---|---|---|
-| 2026-08-06 | Primary action pinned across detents | Position learned once; thumb reach | Design |
+| 2026-08-06 | Primary action pinned to the section bottom | Position learned once; thumb reach | Design |
+| 2026-08-10 | Sheet detents replaced by dock sections | The list was behind a gesture and navigation was out of thumb reach (ADR-0018) | Product |
 | 2026-08-06 | Recents and favourites before search results | Reuse is free; search is the dominant cost | Design |
 | 2026-08-06 | List remains visible and unchanged during optimization | Losing the visible order on failure is the worst outcome | Design |
 | 2026-08-06 | Route summary states honestly when saving is zero | An inflated number, once disbelieved, discredits every other number | Design |
@@ -373,7 +379,7 @@ is what makes the number believable the other ninety percent of the time.
 |---|---|---|
 | Full-screen list separate from the map | More room; simpler layout | Breaks the connection between order and geography, which is what the user is checking |
 | Clearing the list during optimization | Feels responsive; allows a richer animation | Destroys the user's visible work if the request fails |
-| Primary action floating over the map | More list space; conventional FAB | Position shifts with detent, and it covers map content at the peek detent |
+| Primary action floating over the map | More list space; conventional FAB | Covers map content, and puts permanent furniture on a surface whose whole job is to be quiet |
 | Search results before recents | Conventional search behaviour | Triples the dominant cost line and is slower for the common case of revisiting a customer |
 | Silent handling of an already-optimal order | Avoids explaining a non-result | Reads as a failure. Stating it positively is the honest and reassuring option |
 | Confirmation before deleting a stop | Prevents accidental loss | [`06`](06_UX_GUIDELINES.md) P8: undo protects only the user who erred, rather than taxing everyone |

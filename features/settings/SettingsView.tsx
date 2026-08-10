@@ -1,14 +1,19 @@
-import { router } from 'expo-router';
-import { Pressable, Text, View, useColorScheme } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
-import { useSession } from '@/features/auth/session-provider';
-import { useUsageQuota } from '@/features/quota/use-usage-quota';
-import { usePreferencesStore } from '@/features/stores';
 import { colours, layout, space } from '@/lib/design/tokens';
+import type { ThemeName } from '@/lib/design/tokens';
 
 /**
  * Settings — account, preferences, legal
  * ([`docs/08_SCREEN_SPECIFICATIONS.md`](../../docs/08_SCREEN_SPECIFICATIONS.md) §6).
+ *
+ * Extracted from `app/(app)/settings.tsx`, which was the one screen in the app
+ * with its markup inline. That was survivable while Settings was a pushed route;
+ * it is not once Settings is a dock section, because a section is rendered by the
+ * screen that owns the map rather than navigated to
+ * ([ADR-0018](../../docs/adr/0018-bottom-dock-navigation.md)). The move is
+ * mechanical — no behaviour changed — and it puts this file where every other
+ * view already lives, taking callbacks and no router.
  *
  * **The allowance is stated as a number, not as a bar.** A driver deciding
  * whether to optimize now or wait for the reset needs "12 of 15 used, resets on
@@ -18,54 +23,57 @@ import { colours, layout, space } from '@/lib/design/tokens';
  * than offering undo for, because it is the one undo cannot reverse
  * ([`docs/06_UX_GUIDELINES.md`](../../docs/06_UX_GUIDELINES.md) P8).
  */
-export default function SettingsScreen(): React.JSX.Element {
-  const scheme = useColorScheme();
-  const palette = colours[scheme === 'dark' ? 'dark' : 'light'];
 
-  const { signOut } = useSession();
-  const { quota, allowances } = useUsageQuota();
-  const provider = usePreferencesStore((store) => store.preferences.navigationProvider);
+export interface SettingsViewProps {
+  readonly planLabel: string;
+  /** Already worded by the caller — it needs the quota and the allowances, and
+   *  this view should not have to know that one can be absent. */
+  readonly usageLabel: string;
+  readonly providerLabel: string;
+  onOpenPaywall: () => void;
+  onOpenProvider: () => void;
+  onSignOut: () => void;
+  readonly theme: ThemeName;
+  readonly testID?: string;
+}
 
+export function SettingsView({
+  planLabel,
+  usageLabel,
+  providerLabel,
+  onOpenPaywall,
+  onOpenProvider,
+  onSignOut,
+  theme,
+  testID,
+}: SettingsViewProps): React.JSX.Element {
   return (
-    <View
-      style={{ flex: 1, backgroundColor: palette.bg, padding: layout.screenPadding }}
-      testID="settings-screen"
-    >
+    <View style={{ flex: 1, padding: layout.screenPadding }} testID={testID}>
       <Text accessibilityRole="header" className="text-title-md text-text-primary">
         Settings
       </Text>
 
-      <Section title="Plan" theme={scheme === 'dark' ? 'dark' : 'light'}>
+      <Section title="Plan" theme={theme}>
         <Text className="text-body text-text-primary" testID="settings-plan">
-          {allowances.plan === 'pro'
-            ? '2L Maps Pro'
-            : allowances.plan === 'day-pass'
-              ? 'Day pass'
-              : 'Free'}
+          {planLabel}
         </Text>
         <Text className="text-caption text-text-secondary" testID="settings-usage">
-          {quota === null
-            ? 'Allowance unavailable — showing free limits'
-            : `${quota.usage.optimizations} of ${allowances.optimizationsPerPeriod} optimizations used, resets ${quota.periodEndsAt}`}
+          {usageLabel}
         </Text>
         <Row
           label="See plans"
           hint="Opens the plans and prices"
-          onPress={() => {
-            router.push('/paywall');
-          }}
-          theme={scheme === 'dark' ? 'dark' : 'light'}
+          onPress={onOpenPaywall}
+          theme={theme}
         />
       </Section>
 
-      <Section title="Navigation" theme={scheme === 'dark' ? 'dark' : 'light'}>
+      <Section title="Navigation" theme={theme}>
         <Row
-          label={provider === null ? 'Choose a navigation app' : `Navigating with ${provider}`}
+          label={providerLabel}
           hint="Changes which app your routes are handed to"
-          onPress={() => {
-            router.push('/provider');
-          }}
-          theme={scheme === 'dark' ? 'dark' : 'light'}
+          onPress={onOpenProvider}
+          theme={theme}
         />
       </Section>
 
@@ -74,10 +82,8 @@ export default function SettingsScreen(): React.JSX.Element {
       <Row
         label="Sign out"
         hint="Signs you out on this device. Your saved routes stay in your account."
-        onPress={() => {
-          void signOut();
-        }}
-        theme={scheme === 'dark' ? 'dark' : 'light'}
+        onPress={onSignOut}
+        theme={theme}
         testID="settings-sign-out"
       />
     </View>
@@ -90,7 +96,7 @@ function Section({
   children,
 }: {
   title: string;
-  theme: 'light' | 'dark';
+  theme: ThemeName;
   children: React.ReactNode;
 }): React.JSX.Element {
   return (
@@ -117,7 +123,7 @@ function Row({
   label: string;
   hint: string;
   onPress: () => void;
-  theme: 'light' | 'dark';
+  theme: ThemeName;
   testID?: string;
 }): React.JSX.Element {
   return (

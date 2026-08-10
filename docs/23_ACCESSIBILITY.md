@@ -156,7 +156,7 @@ one.
 Supported to **200%**. Layouts reflow: rows grow vertically, metrics may drop one step in the
 type scale, and text wraps to a second line. **Nothing truncates and no function is lost.**
 
-The densest case is Plan at 25 stops with the sheet at full detent, and it is the case that must
+The densest case is the Route section at 25 stops, and it is the case that must
 be tested.
 
 ### Screen readers
@@ -166,7 +166,8 @@ be tested.
 | Stop row | "Stop 3, Farmacia Centrale, Via Roma 12, 2.4 kilometres, 8 minutes" |
 | Map | "Route map, 12 stops, 34 kilometres, 1 hour 12 minutes" |
 | Primary action | Its outcome — "Optimize route", "Start navigation" — never "Button" |
-| Sheet handle | "Route details, half open. Double-tap to expand" |
+| Dock item | "Open your route and its stops", with `selected` state announced |
+| Dock close | "Close this section and show the map" |
 | Marker (when reached) | Same composed label as the row |
 | Degraded chip | "Warning: route estimated without traffic data" |
 
@@ -193,7 +194,7 @@ Every gesture has a visible, non-gesture equivalent
 |---|---|
 | Drag to reorder | Move up / move down, as accessibility actions on the row |
 | Swipe to delete | Delete action in stop detail, and as an accessibility action |
-| Drag the sheet | Tap the handle to cycle detents |
+| — | No gesture opens a section: the dock is the only way, and it is a button (ADR-0018) |
 | Pinch to zoom | Zoom controls, and the Recenter action |
 
 ---
@@ -204,7 +205,7 @@ Every gesture has a visible, non-gesture equivalent
 |---|---|---|
 | [0009](adr/0009-visual-direction.md) | Mint accent darkened in light theme to reach 4.5:1 | Contrast |
 | [0009](adr/0009-visual-direction.md) | Never colour alone; every state carries a glyph | All states |
-| [0010](adr/0010-mobile-only-scope.md) | Sheet rather than sidebar — thumb reach serves motor impairment too | Layout |
+| [0018](adr/0018-bottom-dock-navigation.md) | Dock rather than sheet — a button serves motor impairment where a drag does not | Layout |
 
 **Decided here:** the map is a single accessibility element, with the stop list as its
 traversable equivalent (§14). This is a departure from exposing every marker, and it is
@@ -222,7 +223,7 @@ deliberate.
 | 6 | Screen reader active during handoff | The transition to the external app is announced |
 | 7 | Gloved touch between two rows | Target separation prevents mis-hits |
 | 8 | Bold Text system setting | Weights increase without layout breakage |
-| 9 | Landscape with Dynamic Type at maximum | Sheet detents recompute; the primary action stays reachable |
+| 9 | Landscape with Dynamic Type at maximum | The section reflows; the dock and the primary action stay reachable |
 | 10 | Colour filters active | All states remain distinguishable by glyph and shape |
 
 ## 9. Error handling

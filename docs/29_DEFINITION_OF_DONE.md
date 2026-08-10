@@ -207,7 +207,7 @@ Everything in §7 for every feature, plus:
 
 - [ ] Paywall verified against Guideline 3.1.2, **both languages, by screenshot**.
 - [ ] Privacy manifest and Play Data Safety match actual behaviour.
-- [ ] Google attribution visible at every sheet detent.
+- [ ] Google attribution visible, and never covered by the dock.
 - [ ] Coordinate purge job running, monitored, alerting verified.
 - [ ] Audit query confirms no coordinate older than 30 days.
 - [ ] Listing free of offline-map and turn-by-turn claims.

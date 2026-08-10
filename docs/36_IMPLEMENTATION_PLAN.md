@@ -499,15 +499,14 @@ already owns the splash lifecycle — a second copy of the module would race it.
 
 ### Wave 5b closed — recorded 2026-08-09
 
-**Done.** `<RouteSheet>` with its three detents and snapping, `lib/route/plan-state.ts` for the
+**Superseded by ADR-0018.** `<RouteSheet>` and its detents were deleted and replaced by the dock; `lib/route/plan-state.ts` for the
 screen's eleven states, `<RouteSummaryHeader>`, and `<PlanView>` composing map, sheet, list,
 header and action. **817 tests.**
 
-**Snapping is a pure function, because it is the part that is wrong in most sheets.** A sheet
-that only snaps to the nearest detent ignores a deliberate flick; one that only follows velocity
-jumps two detents from a nudge. Both feel broken in a way nobody can describe afterwards, and
-neither is visible in review. The tie case resolves to the *lower* detent: at an exact midpoint
-the user has not committed, and revealing less is the recoverable mistake.
+~~**Snapping is a pure function, because it is the part that is wrong in most sheets.**~~
+Deleted with the sheet (ADR-0018). The reasoning was sound and the component it protected was
+the wrong component: careful snapping makes a drag feel right, and the objection to the sheet
+was never that the drag felt wrong — it was that a drag was the way in at all.
 
 **Two native modules had to be mocked, and one of them earns more than it costs.**
 `react-native-gesture-handler` had to be — the real package imports React Native's deprecated

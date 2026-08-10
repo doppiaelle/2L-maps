@@ -261,7 +261,7 @@ surface lightness rather than shadow, since shadows are invisible on near-black.
 |---|---|---|---|
 | `motion-instant` | 100 ms | ease-out | Press feedback |
 | `motion-quick` | 180 ms | ease-out | Selection, toggles |
-| `motion-standard` | 240 ms | spring (damping 0.8) | Sheet detents, card entry |
+| `motion-standard` | 240 ms | spring (damping 0.8) | Dock sections, card entry |
 | `motion-deliberate` | 400 ms | spring (damping 0.75) | **Marker reorder after optimization** |
 
 `motion-deliberate` is the only slow animation in the product, and it earns its length: the

@@ -166,7 +166,7 @@ Small, feature-scoped stores. No single global store.
 | `routeProgressStore` | Current index, completed, skipped, active route id | **Yes** |
 | `preferencesStore` | Navigation provider, theme override, units | **Yes** |
 | `mutationQueueStore` | Pending offline operations | **Yes** |
-| `uiStore` | Sheet detent, selected stop, camera | No |
+| `uiStore` | Open dock section, selected stop, camera | No |
 
 Stores expose **actions, not setters**. `markStopCompleted(id)` rather than
 `setCompletedStops(array)` — the store owns its invariants, so no caller can leave it in an

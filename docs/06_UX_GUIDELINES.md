@@ -55,8 +55,8 @@ pressure, constant interruption — rather than from general design taste.
    │     lower third          │   Optimize. Start. Done.
    └──────────────────────────┘
 
-   This is why the stop list is a bottom sheet and never a
-   sidebar, at any screen size (ADR-0010).
+   This is why navigation is a dock at the bottom and never a
+   sidebar or a drawer, at any screen size (ADR-0018).
 ```
 
 ### The three-tap budget
@@ -170,8 +170,10 @@ data loss.
 
 ### P7 — Gestures are accelerators, never requirements
 
-Drag to reorder, swipe to delete and drag the sheet all have visible non-gesture equivalents. A
-gesture-only action is invisible to a new user and inaccessible to an assistive-technology user.
+Reordering and deleting are buttons on every row, and sections are opened by tapping the dock —
+there is no gesture on the critical path at all. A gesture-only action is invisible to a new user
+and inaccessible to an assistive-technology user, which is why the sheet it replaced was wrong
+even with a tappable handle: nothing on screen said the handle was there.
 
 ### P8 — Undo, don't confirm
 

@@ -43,13 +43,13 @@ in the sun.
 ## 4. Text diagrams
 
 ```
-  WHERE THE FRAME BUDGET GOES — 25 stops, sheet at full detent
+  WHERE THE FRAME BUDGET GOES — 25 stops, Route section open
 
   ┌────────────────────────────────────────────┐
   │ map: 25 markers + polyline                 │  memoised by id+state,
   │                                            │  decoded once, clustered
   ├────────────────────────────────────────────┤  ← 16 ms frame boundary
-  │ sheet: virtualised list, native gestures   │  no JS-thread work
+  │ section: virtualised list                  │  no JS-thread work
   │                                            │  during a drag
   └────────────────────────────────────────────┘
 
@@ -127,7 +127,7 @@ flash reads as a defect and costs more perceived quality than the extra 300 ms.
 | Metric | Budget |
 |---|---|
 | Stop list scroll, 25 stops | **60 fps, zero dropped frames** |
-| Sheet detent transition | < 300 ms, gesture-driven, interruptible |
+| Dock section transition | < 300 ms, interruptible |
 | Marker render, 25 stops | < 16 ms per frame |
 | Marker reorder animation | 400 ms, 60 fps throughout |
 | Map pan and zoom | 60 fps |
@@ -176,11 +176,11 @@ user is between charges for a working day.
 
 ### Gestures and animation
 
-6. **No JS-thread work during a gesture.** Sheet and map interactions run on the native driver or
+6. **No JS-thread work during a gesture.** Map interactions run on the native driver or
    Reanimated worklets.
-7. **Interruptible animations.** A user grabbing the sheet mid-transition takes control
+7. **Interruptible animations.** A user tapping the dock mid-transition takes control
    immediately.
-8. **Test with the JS thread deliberately blocked** — if the sheet still drags smoothly, the
+8. **Test with the JS thread deliberately blocked** — if the map still pans smoothly, the
    gesture is genuinely native.
 
 ### Network and cost
@@ -205,7 +205,7 @@ user is between charges for a working day.
 | ID | Decision | Applies to |
 |---|---|---|
 | [0005](adr/0005-map-engine-and-route-preview.md) | `react-native-maps` behind `<AppMap>` | Marker and polyline rendering budgets |
-| [0010](adr/0010-mobile-only-scope.md) | Sheet with gesture-driven detents | The no-JS-thread-work-during-a-gesture rule |
+| [0018](adr/0018-bottom-dock-navigation.md) | Dock sections instead of a dragged sheet | Removes the gesture from the critical path entirely |
 | [0003](adr/0003-tiered-optimization-cascade.md) | Cascade T0–T3 | The T1 and T2 latency budgets, and the async threshold |
 | [0007](adr/0007-place-id-durable-coordinates-perishable.md) | Coordinates perishable | The batched re-hydration budget |
 
@@ -217,7 +217,7 @@ product in that condition.
 
 | # | Condition | Expected behaviour |
 |---|---|---|
-| 1 | 25 stops, sheet full, Dynamic Type 200% | 60 fps maintained; virtualisation recalculates row height |
+| 1 | 25 stops, Route section open, Dynamic Type 200% | 60 fps maintained; virtualisation recalculates row height |
 | 2 | Rapid marker tapping | Debounced; only the final selection animates |
 | 3 | Optimization completes during a sheet drag | Result applies on gesture end, never mid-gesture |
 | 4 | Slow network, 3G | Progress after 1 s; timeouts per [`33`](33_API_CONTRACTS.md); T0 offered |

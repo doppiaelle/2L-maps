@@ -8,6 +8,10 @@ appId: com.doppiaelle.twolmaps
 - launchApp:
     clearState: true
 
+# The route lives in a dock section since ADR-0018; the app opens on the map.
+- tapOn:
+    id: 'dock-itinerary'
+
 - tapOn:
     id: 'plan-add-stop'
 - inputText: 'Via Roma'

@@ -1,13 +1,14 @@
 import { create } from 'zustand';
 
 import type { LatLng } from '@/lib/geo/haversine';
+import type { ActiveSection, DockSection } from '@/lib/ui/dock';
 
 /**
  * Transient interface state.
  *
  * **Deliberately not persisted**, and that is the whole design decision
  * ([`docs/11_STATE_MANAGEMENT.md`](../../docs/11_STATE_MANAGEMENT.md) §7).
- * Restoring a sheet detent, a selected stop and a camera position across a cold
+ * Restoring an open section, a selected stop and a camera position across a cold
  * start would drop the user back into a view they have no memory of choosing —
  * scrolled to a stop they looked at yesterday, over a city they have left.
  * Everything here should be re-derivable from the route and the device's
@@ -18,12 +19,17 @@ import type { LatLng } from '@/lib/geo/haversine';
  * place.
  */
 
-/** The stop list is a bottom sheet at every size, never a sidebar
- *  ([ADR-0010](../../docs/adr/0010-mobile-only-scope.md)). */
-export type SheetDetent = 'collapsed' | 'half' | 'expanded';
-
 export interface UiStore {
-  readonly detent: SheetDetent;
+  /**
+   * Which dock section is open, or `null` for the bare map
+   * ([ADR-0018](../../docs/adr/0018-bottom-dock-navigation.md)).
+   *
+   * This replaces `detent`, which described how far a bottom sheet had been
+   * dragged. The type also used to be declared twice — once here and once in
+   * `lib/ui/sheet.ts` — as two structurally identical types with no relationship
+   * to each other. `DockSection` is imported, so there is one.
+   */
+  readonly activeSection: ActiveSection;
   readonly selectedStopId: string | null;
   readonly camera: LatLng | null;
   /** True from the moment an optimization is requested until a result or a
@@ -31,10 +37,11 @@ export interface UiStore {
    *  overlay — the map stays usable while we wait. */
   readonly isOptimizing: boolean;
 
-  setDetent: (detent: SheetDetent) => void;
-  /** Selecting a stop raises the sheet, because a selection the user cannot see
-   *  is not a selection. Coupling the two here keeps every call site from
-   *  having to remember it. */
+  openSection: (section: DockSection) => void;
+  closeSection: () => void;
+  /** Selecting a stop opens the route section, because a selection the user
+   *  cannot see is not a selection. Coupling the two here keeps every call site
+   *  from having to remember it. */
   selectStop: (stopId: string) => void;
   clearSelection: () => void;
   moveCamera: (camera: LatLng) => void;
@@ -43,19 +50,28 @@ export interface UiStore {
 
 export const createUiStore = () =>
   create<UiStore>()((set, get) => ({
-    detent: 'half',
+    // Opens on the map. The route section is one tap away and the map is what
+    // orients someone who has just unlocked their phone (ADR-0018).
+    activeSection: null,
     selectedStopId: null,
     camera: null,
     isOptimizing: false,
 
-    setDetent: (detent) => {
-      set({ detent });
+    openSection: (section) => {
+      set({ activeSection: section });
+    },
+
+    closeSection: () => {
+      set({ activeSection: null });
     },
 
     selectStop: (stopId) => {
       set({
         selectedStopId: stopId,
-        detent: get().detent === 'collapsed' ? 'half' : get().detent,
+        // Tapping a marker on the bare map opens the route, so the row that was
+        // just selected is somewhere the user can actually see it. A section
+        // already open is left alone: they chose it.
+        activeSection: get().activeSection ?? 'itinerary',
       });
     },
 

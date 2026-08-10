@@ -219,7 +219,7 @@ function centroid(points: readonly LatLng[]): LatLng {
  * route behind it and the user sees the top third of their own day. The padding
  * is applied as extra span at the south edge, which is where the sheet is.
  */
-export function boundsFor(coordinates: readonly LatLng[], sheetFraction = 0.4): Viewport | null {
+export function boundsFor(coordinates: readonly LatLng[], bottomObstruction = 0): Viewport | null {
   if (coordinates.length === 0) return null;
 
   const lats = coordinates.map((c) => c.latitude);
@@ -239,7 +239,7 @@ export function boundsFor(coordinates: readonly LatLng[], sheetFraction = 0.4): 
   return {
     northEast: { latitude: north + latSpan * 0.1, longitude: east + lngSpan * 0.1 },
     southWest: {
-      latitude: south - latSpan * (0.1 + sheetFraction),
+      latitude: south - latSpan * (0.1 + bottomObstruction),
       longitude: west - lngSpan * 0.1,
     },
   };

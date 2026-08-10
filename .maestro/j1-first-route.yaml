@@ -1,16 +1,26 @@
 # J1 — a first route, from nothing to a handoff.
 #
-# The journey the three-tap guarantee is measured against
+# The journey the four-tap guarantee is measured against
 # (docs/03_USER_JOURNEYS.md, CLAUDE.md §7 rule 1). The tap count is asserted by
 # the flow's own shape: every `tapOn` between launch and `Start` is one of them.
+#
+# It was three until ADR-0018. The app now opens on the map and the route lives
+# in a dock section, so opening that section is the first tap — deliberately
+# spent, and visible here rather than hidden in a gesture.
 appId: com.doppiaelle.twolmaps
 ---
 - launchApp:
     clearState: true
 
-# Tap 1 — add a stop.
+# Tap 1 — open the route section. The map is the opening view.
 - assertVisible:
     id: 'plan-screen'
+- tapOn:
+    id: 'dock-itinerary'
+- assertVisible:
+    id: 'section-itinerary'
+
+# Tap 2 — add a stop.
 - tapOn:
     id: 'plan-add-stop'
 - assertVisible:

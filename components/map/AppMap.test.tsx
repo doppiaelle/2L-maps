@@ -163,7 +163,7 @@ describe('states', () => {
     expect(screen.queryByTestId('app-map-loading')).toBeNull();
   });
 
-  it('says the sheet still works when offline', () => {
+  it('says the dock still works when offline', () => {
     // The failure is explained and bounded: the stop list, the order and the
     // handoff do not depend on tiles rendering.
     render(<AppMap {...baseProps} status="offline" />);
@@ -237,10 +237,10 @@ describe('accessibility', () => {
     }
   });
 
-  it('keeps attribution on screen, above where the sheet sits', () => {
+  it('keeps attribution on screen, above where the dock sits', () => {
     // A terms obligation: visible wherever the map is, never dismissible
     // (docs/32_LEGAL_COMPLIANCE.md).
-    render(<AppMap {...baseProps} testID="map-container" sheetFraction={0.5} />);
+    render(<AppMap {...baseProps} testID="map-container" bottomObstructionFraction={0.5} />);
     fireEvent(screen.getByTestId('map-container'), 'layout', {
       nativeEvent: { layout: { height: 800, width: 400 } },
     });
@@ -318,9 +318,9 @@ describe('the camera', () => {
     expect(mapCalls.fitToCoordinates.length).toBeGreaterThan(0);
   });
 
-  it('leaves room for the sheet at the bottom', () => {
+  it('leaves room for the dock at the bottom', () => {
     // A route fitted behind a half-open sheet is fitted wrongly (docs/14 §9).
-    render(<AppMap {...baseProps} testID="map-container" sheetFraction={0.5} />);
+    render(<AppMap {...baseProps} testID="map-container" bottomObstructionFraction={0.5} />);
     fireEvent(screen.getByTestId('map-container'), 'layout', {
       nativeEvent: { layout: { height: 800, width: 400 } },
     });

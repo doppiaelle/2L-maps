@@ -82,10 +82,12 @@ describe('the remembered navigation provider', () => {
 
 describe('interface state is deliberately not persisted', () => {
   it('starts fresh every time', () => {
-    // Restoring a detent, a selection and a camera would drop the user into a
-    // view they have no memory of choosing — over a city they have left.
+    // Restoring an open section, a selection and a camera would drop the user
+    // into a view they have no memory of choosing — over a city they have left.
     const store = createUiStore();
-    expect(store.getState().detent).toBe('half');
+    // The map, not a section: it is what orients someone who has just unlocked
+    // their phone (ADR-0018).
+    expect(store.getState().activeSection).toBeNull();
     expect(store.getState().selectedStopId).toBeNull();
     expect(store.getState().camera).toBeNull();
     expect(store.getState().isOptimizing).toBe(false);
@@ -98,21 +100,30 @@ describe('interface state is deliberately not persisted', () => {
     expect(store.persist).toBeUndefined();
   });
 
-  it('raises the sheet when a stop is selected from a collapsed sheet', () => {
-    // A selection the user cannot see is not a selection.
+  it('opens the route section when a stop is selected from the bare map', () => {
+    // A selection the user cannot see is not a selection: tapping a marker has
+    // to put the row it selected somewhere on screen.
     const store = createUiStore();
-    store.getState().setDetent('collapsed');
     store.getState().selectStop('stop-1');
 
     expect(store.getState().selectedStopId).toBe('stop-1');
-    expect(store.getState().detent).toBe('half');
+    expect(store.getState().activeSection).toBe('itinerary');
   });
 
-  it('leaves an already-open sheet where the user put it', () => {
+  it('leaves an already-open section where the user put it', () => {
+    // They chose History; a marker tap must not throw them out of it.
     const store = createUiStore();
-    store.getState().setDetent('expanded');
+    store.getState().openSection('history');
     store.getState().selectStop('stop-1');
 
-    expect(store.getState().detent).toBe('expanded');
+    expect(store.getState().activeSection).toBe('history');
+  });
+
+  it('closes back to the map', () => {
+    const store = createUiStore();
+    store.getState().openSection('settings');
+    store.getState().closeSection();
+
+    expect(store.getState().activeSection).toBeNull();
   });
 });

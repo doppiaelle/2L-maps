@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { render, screen } from '@testing-library/react-native';
 
 import { PlanView } from './PlanView';
 import type { PlanViewProps } from './PlanView';
@@ -13,7 +13,6 @@ import type { OptimizeAvailability } from '@/lib/entitlement/plans';
  * themselves are proven in `lib/route/plan-state.test.ts`.
  */
 
-const visually = { includeHiddenElements: true } as const;
 const noop = () => undefined;
 
 const stopItem = (i: number) => ({
@@ -24,13 +23,6 @@ const stopItem = (i: number) => ({
   state: 'pending' as const,
   hasCoordinate: true,
   meta: null,
-});
-
-const marker = (i: number) => ({
-  stopId: `stop-${i}`,
-  position: i + 1,
-  coordinate: { latitude: 45.65 + i * 0.01, longitude: 9.6 },
-  state: 'pending' as const,
 });
 
 const allowed: OptimizeAvailability = { kind: 'allowed', remaining: 3 };
@@ -60,27 +52,15 @@ const renderPlan = (
       state={state}
       intent={actionIntentOf(state, availability)}
       stops={Array.from({ length: count }, (_, i) => stopItem(i))}
-      markers={Array.from({ length: count }, (_, i) => marker(i))}
-      route={null}
       distance={{ value: '34 KM', spoken: '34 kilometres' }}
       duration={{ value: '1h 12m', spoken: '1 hour 12 minutes' }}
-      detent="half"
-      onDetentChange={noop}
-      selectedStopId={null}
       onSelectStop={noop}
       onRemoveStop={noop}
       onMoveStop={noop}
       onClearRoute={noop}
-      onClearSelection={noop}
       onPrimaryAction={noop}
       onAddStop={noop}
       onImport={noop}
-      onOpenHistory={noop}
-      onOpenSettings={noop}
-      theme="light"
-      mapIds={{ light: 'l', dark: 'd' }}
-      mapStatus="ready"
-      screenHeight={800}
       {...overrides}
     />,
   );
@@ -206,32 +186,10 @@ describe('loading a saved route', () => {
   });
 });
 
-describe('the map and the sheet together', () => {
-  it('pads the camera for the sheet at the current detent', () => {
-    // A route fitted behind a half-open sheet is fitted wrongly, and the
-    // fraction comes from the same arithmetic the sheet is drawn with.
-    renderPlan({}, allowed, { detent: 'expanded' });
-    expect(screen.getByTestId('app-map')).toBeTruthy();
-  });
-
-  it('draws a marker for every stop', () => {
-    renderPlan({ stopCount: 4 });
-    expect(screen.getAllByTestId('map-marker', visually)).toHaveLength(4);
-  });
-
-  it('reports the stop a marker tap selected', () => {
-    let selected: string | null = null;
-    renderPlan({}, allowed, {
-      onSelectStop: (id) => {
-        selected = id;
-      },
-    });
-
-    const markers = screen.getAllByTestId('map-marker', visually);
-    const second = markers[1];
-    if (second === undefined) throw new Error('expected a second marker');
-
-    fireEvent.press(second);
-    expect(selected).toBe('stop-1');
-  });
-});
+/**
+ * The map used to be rendered by this component, and three cases here asserted
+ * markers and camera padding. It now belongs to the screen, behind every dock
+ * section (ADR-0018), and `components/map/AppMap.test.tsx` already owns those
+ * properties — keeping copies here would have been the same assertion in two
+ * places, one of which no longer renders a map.
+ */

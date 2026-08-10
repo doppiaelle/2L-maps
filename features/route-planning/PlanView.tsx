@@ -1,29 +1,26 @@
-import { useMemo, useRef } from 'react';
+import { useMemo } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { StopList } from '@/components/lists/StopList';
 import type { StopListItem } from '@/components/lists/StopList';
-import { AppMap } from '@/components/map/AppMap';
 import { PrimaryAction } from '@/components/primitives/PrimaryAction';
 import type { PrimaryActionState } from '@/components/primitives/PrimaryAction';
-import { MapControls } from '@/components/map/MapControls';
 import { RouteSummaryHeader } from '@/components/route/RouteSummaryHeader';
-import { RouteSheet } from '@/components/sheet/RouteSheet';
 import { layout, radius, space } from '@/lib/design/tokens';
-import type { ThemeName } from '@/lib/design/tokens';
-import type { MarkerInput } from '@/lib/map/clustering';
-import type { MapIdConfig } from '@/lib/map/style';
-import type { AppMapHandle, RouteGeometry } from '@/lib/providers/types';
 import { metricsAreEstimated } from '@/lib/route/plan-state';
 import type { ActionIntent, PlanState } from '@/lib/route/plan-state';
-import { detentFraction } from '@/lib/ui/sheet';
-import type { SheetDetent } from '@/lib/ui/sheet';
 
 /**
  * Plan, composed.
  *
- * The screen the whole product is built around: a quiet map with the stop list
- * as a sheet over it, and one control ([`docs/08_SCREEN_SPECIFICATIONS.md`](../../docs/08_SCREEN_SPECIFICATIONS.md) §7).
+ * The Route section of the dock: the stop list, its metrics, and one control
+ * ([`docs/08_SCREEN_SPECIFICATIONS.md`](../../docs/08_SCREEN_SPECIFICATIONS.md) §7).
+ *
+ * **The map is no longer here.** It belongs to the screen, behind every section,
+ * and this renders over it ([ADR-0018](../../docs/adr/0018-bottom-dock-navigation.md)).
+ * That is why nothing in this file knows about markers, a camera or a map id: a
+ * section that had to be handed the map's props in order to render a list was
+ * carrying them for a component it no longer contains.
  *
  * **It decides nothing.** Which state this is, what the control says, whether
  * the metrics are an estimate — all of it arrives as `PlanState` and
@@ -31,9 +28,9 @@ import type { SheetDetent } from '@/lib/ui/sheet';
  * thing that cannot live in `lib/`: translating a semantic intent into the
  * component's props, which is the job of the only layer allowed to see both.
  *
- * **No navigation transition on the critical path.** Everything else in the
- * product is a modal over this screen, which is what makes three taps to an
- * optimized route reachable at all (`CLAUDE.md` §7 rule 1).
+ * **No navigation transition on the critical path.** Add-stop and import are
+ * modals over the section rather than pushed screens, so adding a stop never
+ * leaves the route being built (`CLAUDE.md` §7 rule 1).
  */
 
 export interface PlanMetric {
@@ -45,14 +42,9 @@ export interface PlanViewProps {
   readonly state: PlanState;
   readonly intent: ActionIntent;
   readonly stops: readonly StopListItem[];
-  readonly markers: readonly MarkerInput[];
-  readonly route: RouteGeometry | null;
   readonly distance: PlanMetric | null;
   readonly duration: PlanMetric | null;
 
-  readonly detent: SheetDetent;
-  onDetentChange: (detent: SheetDetent) => void;
-  readonly selectedStopId: string | null;
   onSelectStop: (stopId: string) => void;
   /**
    * Editing the itinerary.
@@ -64,7 +56,6 @@ export interface PlanViewProps {
   onRemoveStop: (stopId: string) => void;
   onMoveStop: (fromIndex: number, toIndex: number) => void;
   onClearRoute: () => void;
-  onClearSelection: () => void;
 
   onPrimaryAction: () => void;
   onAddStop: () => void;
@@ -73,8 +64,6 @@ export interface PlanViewProps {
    *  it was previously reachable only from *inside* add-stop, which put a
    *  first-class way of building a route behind a search that had to fail. */
   onImport: () => void;
-  onOpenHistory: () => void;
-  onOpenSettings: () => void;
   /**
    * The advertising slot, or nothing.
    *
@@ -87,11 +76,6 @@ export interface PlanViewProps {
   /** Mid-route only, beside **Done**. */
   onSkipStop?: () => void;
 
-  readonly theme: ThemeName;
-  readonly mapIds: MapIdConfig;
-  readonly mapStatus: 'ready' | 'offline' | 'failed';
-  readonly screenHeight: number;
-  readonly prefersReducedMotion?: boolean;
   readonly testID?: string;
 }
 
@@ -99,182 +83,44 @@ export function PlanView({
   state,
   intent,
   stops,
-  markers,
-  route,
   distance,
   duration,
-  detent,
-  onDetentChange,
-  selectedStopId,
   onSelectStop,
   onRemoveStop,
   onMoveStop,
   onClearRoute,
-  onClearSelection,
   onPrimaryAction,
   onAddStop,
   onImport,
-  onOpenHistory,
-  onOpenSettings,
   adSlot,
   onSkipStop,
-  theme,
-  mapIds,
-  mapStatus,
-  screenHeight,
-  prefersReducedMotion = false,
   testID,
 }: PlanViewProps): React.JSX.Element {
-  const mapRef = useRef<AppMapHandle>(null);
-
-  // The map fits the route above the sheet, not behind it, and the fraction
-  // comes from the same arithmetic the sheet is drawn with — so the padding
-  // cannot drift from the thing it is padding for.
-  const sheetFraction = detentFraction(detent, screenHeight);
-
   const actionState = useMemo(() => toActionState(intent, state), [intent, state]);
 
   return (
     <View style={{ flex: 1 }} testID={testID}>
-      <AppMap
-        ref={mapRef}
-        stops={markers}
-        route={route}
-        selectedStopId={selectedStopId}
-        theme={theme}
-        mapIds={mapIds}
-        status={mapStatus}
-        onStopPress={onSelectStop}
-        onMapPress={onClearSelection}
-        sheetFraction={sheetFraction}
-        prefersReducedMotion={prefersReducedMotion}
-      />
+      {/* The header, the list and the action, in that order and nothing between
+          them. This used to be three slots of a draggable sheet over a map; the
+          map now lives on the screen behind every section, and the sheet is
+          gone (ADR-0018). */}
+      <View style={{ paddingHorizontal: layout.screenPadding }}>
+        {/* Above the summary rather than between the list rows: the top of the
+            section is the one part of it that does not move under a thumb
+            (ADR-0015). `<AdSlot>` hides itself during a route. */}
+        {adSlot}
+        <RouteSummaryHeader
+          title={titleFor(state)}
+          distance={distance}
+          duration={duration}
+          {...chipFor(state)}
+          {...noteFor(state)}
+        />
+      </View>
 
-      <MapControls
-        onOpenHistory={onOpenHistory}
-        onOpenSettings={onOpenSettings}
-        // Hidden mid-route: the user is driving, and neither destination is
-        // something they should be one tap from (docs/05 §194).
-        isRouteInProgress={state.kind === 'in-progress'}
-        theme={theme}
-        testID="plan-map-controls"
-      />
-
-      <RouteSheet
-        detent={detent}
-        onDetentChange={onDetentChange}
-        screenHeight={screenHeight}
-        theme={theme}
-        prefersReducedMotion={prefersReducedMotion}
-        testID="plan-sheet"
-        header={
-          <>
-            {/* Above the summary rather than between the list rows: the sheet
-                header is the one part of this screen that does not move under a
-                thumb (ADR-0015). `<AdSlot>` hides itself during a route. */}
-            {adSlot}
-            <RouteSummaryHeader
-              title={titleFor(state)}
-              distance={distance}
-              duration={duration}
-              {...chipFor(state)}
-              {...noteFor(state)}
-            />
-          </>
-        }
-        action={
-          <View>
-            {actionState !== null && (
-              <PrimaryAction state={actionState} onPress={onPrimaryAction} testID="plan-action" />
-            )}
-
-            {/* Mid-route the two controls sit side by side. Skip is quieter but
-                the same height: the user is driving, and a smaller target is a
-                mis-tap on somebody's delivery. */}
-            {state.kind === 'in-progress' && onSkipStop !== undefined && (
-              <Pressable
-                onPress={onSkipStop}
-                accessibilityRole="button"
-                accessibilityLabel="Skip this stop and move to the next"
-                style={{
-                  minHeight: layout.actionMinHeight,
-                  marginTop: space.space2,
-                  borderRadius: radius.radiusLg,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-                testID="plan-skip"
-              >
-                <Text className="text-body-strong text-text-secondary">Skip</Text>
-              </Pressable>
-            )}
-
-            {/* Always reachable, at every detent and in every state that has a
-                list — adding a stop is the first of the three taps.
-                **Import sits beside it**, because the two are the same choice:
-                one address or a whole day's worth. It used to be reachable only
-                from inside add-stop, which meant a user with a pasted list had
-                to open a search, fail to find what they wanted, and notice a
-                secondary link. */}
-            {state.kind !== 'in-progress' && (
-              <View
-                style={{
-                  flexDirection: 'row',
-                  marginTop: space.space2,
-                  justifyContent: 'center',
-                  gap: space.space5,
-                }}
-              >
-                <Pressable
-                  onPress={onAddStop}
-                  accessibilityRole="button"
-                  accessibilityLabel="Add a stop"
-                  style={{
-                    minHeight: layout.touchMin,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                  testID="plan-add-stop"
-                >
-                  <Text className="text-body text-accent">Add a stop</Text>
-                </Pressable>
-
-                {stops.length > 0 && (
-                  <Pressable
-                    onPress={onClearRoute}
-                    accessibilityRole="button"
-                    // Says what it does, not what it is. "Reset" describes the
-                    // mechanism; this describes the outcome the user wants.
-                    accessibilityLabel="Start a new route, clearing every stop"
-                    style={{
-                      minHeight: layout.touchMin,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                    testID="plan-clear-route"
-                  >
-                    <Text className="text-body text-text-secondary">Start over</Text>
-                  </Pressable>
-                )}
-
-                <Pressable
-                  onPress={onImport}
-                  accessibilityRole="button"
-                  accessibilityLabel="Paste a list of addresses"
-                  style={{
-                    minHeight: layout.touchMin,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                  testID="plan-import"
-                >
-                  <Text className="text-body text-accent">Paste a list</Text>
-                </Pressable>
-              </View>
-            )}
-          </View>
-        }
-      >
+      {/* The list takes the space the header and action do not. It scrolls;
+          they do not. */}
+      <View style={{ flex: 1 }}>
         <StopList
           state={listStateFor(state, stops)}
           onSelectStop={onSelectStop}
@@ -283,7 +129,98 @@ export function PlanView({
           {...(state.kind === 'in-progress' ? {} : { onRemoveStop, onMoveStop })}
           testID="plan-stop-list"
         />
-      </RouteSheet>
+      </View>
+
+      <View style={{ paddingHorizontal: layout.screenPadding, paddingBottom: space.space3 }}>
+        {actionState !== null && (
+          <PrimaryAction state={actionState} onPress={onPrimaryAction} testID="plan-action" />
+        )}
+
+        {/* Mid-route the two controls sit side by side. Skip is quieter but
+                the same height: the user is driving, and a smaller target is a
+                mis-tap on somebody's delivery. */}
+        {state.kind === 'in-progress' && onSkipStop !== undefined && (
+          <Pressable
+            onPress={onSkipStop}
+            accessibilityRole="button"
+            accessibilityLabel="Skip this stop and move to the next"
+            style={{
+              minHeight: layout.actionMinHeight,
+              marginTop: space.space2,
+              borderRadius: radius.radiusLg,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+            testID="plan-skip"
+          >
+            <Text className="text-body-strong text-text-secondary">Skip</Text>
+          </Pressable>
+        )}
+
+        {/* Always reachable, at every detent and in every state that has a
+                list — adding a stop is the first of the three taps.
+                **Import sits beside it**, because the two are the same choice:
+                one address or a whole day's worth. It used to be reachable only
+                from inside add-stop, which meant a user with a pasted list had
+                to open a search, fail to find what they wanted, and notice a
+                secondary link. */}
+        {state.kind !== 'in-progress' && (
+          <View
+            style={{
+              flexDirection: 'row',
+              marginTop: space.space2,
+              justifyContent: 'center',
+              gap: space.space5,
+            }}
+          >
+            <Pressable
+              onPress={onAddStop}
+              accessibilityRole="button"
+              accessibilityLabel="Add a stop"
+              style={{
+                minHeight: layout.touchMin,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              testID="plan-add-stop"
+            >
+              <Text className="text-body text-accent">Add a stop</Text>
+            </Pressable>
+
+            {stops.length > 0 && (
+              <Pressable
+                onPress={onClearRoute}
+                accessibilityRole="button"
+                // Says what it does, not what it is. "Reset" describes the
+                // mechanism; this describes the outcome the user wants.
+                accessibilityLabel="Start a new route, clearing every stop"
+                style={{
+                  minHeight: layout.touchMin,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                testID="plan-clear-route"
+              >
+                <Text className="text-body text-text-secondary">Start over</Text>
+              </Pressable>
+            )}
+
+            <Pressable
+              onPress={onImport}
+              accessibilityRole="button"
+              accessibilityLabel="Paste a list of addresses"
+              style={{
+                minHeight: layout.touchMin,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              testID="plan-import"
+            >
+              <Text className="text-body text-accent">Paste a list</Text>
+            </Pressable>
+          </View>
+        )}
+      </View>
     </View>
   );
 }
