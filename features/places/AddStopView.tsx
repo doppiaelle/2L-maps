@@ -4,7 +4,7 @@ import { Skeleton } from '@/components/primitives/Skeleton';
 import { StatusChip } from '@/components/primitives/StatusChip';
 import { colours, layout, radius, space } from '@/lib/design/tokens';
 import type { ThemeName } from '@/lib/design/tokens';
-import type { SearchState, SourcedOption } from '@/lib/places/search';
+import type { SearchFailure, SearchState, SourcedOption } from '@/lib/places/search';
 import { AUTOCOMPLETE_MIN_CHARACTERS } from '@/types';
 
 /**
@@ -36,6 +36,9 @@ export interface AddStopViewProps {
    *  fallback — a driver who knows where they are going should not be blocked
    *  because Google has not heard of the address. */
   onAddManually: (text: string) => void;
+  /** Re-runs the current query after a failure. Every failed state offers this
+   *  except the ones retrying cannot fix. */
+  onRetry: () => void;
   onDismiss: () => void;
   readonly theme: ThemeName;
   readonly prefersReducedMotion?: boolean;
@@ -56,6 +59,7 @@ export function AddStopView({
   onQueryChange,
   onSelect,
   onAddManually,
+  onRetry,
   onDismiss,
   theme,
   prefersReducedMotion = false,
@@ -136,6 +140,10 @@ export function AddStopView({
           </View>
         )}
       </View>
+
+      {state.kind === 'failed' && (
+        <SearchFailed reason={state.reason} onRetry={onRetry} theme={theme} />
+      )}
 
       {state.kind === 'no-match' ? (
         <NoMatch query={state.query} onAddManually={onAddManually} theme={theme} />
@@ -222,6 +230,106 @@ function OptionRow({
     </Pressable>
   );
 }
+
+/**
+ * The search was attempted and failed.
+ *
+ * **Never "no results".** Until this existed every failure — a dead network, an
+ * exhausted allowance, an Edge Function that was never deployed — arrived here
+ * as an empty list and was rendered as "No match for what you typed". The user's
+ * only available response was to retype a correct address and watch it fail
+ * again, which is the precise shape of a product that looks broken while every
+ * test passes.
+ *
+ * Each reason states what happened and what to do next (`CLAUDE.md` §0 rule 5).
+ * Retry appears only where retrying can work: offering it against an exhausted
+ * monthly allowance would invite the user to keep pressing a button that cannot
+ * help them.
+ */
+function SearchFailed({
+  reason,
+  onRetry,
+  theme,
+}: {
+  reason: SearchFailure;
+  onRetry: () => void;
+  theme: ThemeName;
+}): React.JSX.Element {
+  const palette = colours[theme];
+  const copy = FAILURE_COPY[reason];
+
+  return (
+    <View style={{ paddingHorizontal: layout.screenPadding, marginTop: space.space3 }}>
+      <StatusChip kind={copy.chip} label={copy.title} />
+      <Text className="text-caption text-text-secondary mt-space-2">{copy.detail}</Text>
+
+      {copy.canRetry && (
+        <Pressable
+          onPress={onRetry}
+          accessibilityRole="button"
+          accessibilityLabel="Search again"
+          style={{
+            minHeight: layout.touchMin,
+            marginTop: space.space3,
+            borderRadius: radius.radiusMd,
+            borderWidth: 1,
+            borderColor: palette.border,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+          testID="add-stop-retry"
+        >
+          <Text className="text-body-strong text-accent">Try again</Text>
+        </Pressable>
+      )}
+    </View>
+  );
+}
+
+interface FailureCopy {
+  readonly chip: 'offline' | 'quota';
+  readonly title: string;
+  readonly detail: string;
+  readonly canRetry: boolean;
+}
+
+/**
+ * What each failure says, and whether trying again is honest.
+ *
+ * The wording names our fault as ours. "Search is not responding" is true and
+ * actionable; "no match" was neither.
+ */
+const FAILURE_COPY: Readonly<Record<SearchFailure, FailureCopy>> = {
+  offline: {
+    chip: 'offline',
+    title: 'Search needs a connection',
+    detail: 'Your saved and recent addresses are still below, and still free to reuse.',
+    canRetry: true,
+  },
+  'quota-exhausted': {
+    chip: 'quota',
+    title: 'Search limit reached',
+    detail:
+      'Your allowance resets next month. Saved and recent addresses still work, and cost nothing.',
+    // Retrying spends nothing and changes nothing. A button that cannot help is
+    // worse than no button.
+    canRetry: false,
+  },
+  'no-entitlement': {
+    chip: 'quota',
+    title: 'Search is unavailable on your plan',
+    detail: 'Saved and recent addresses still work.',
+    canRetry: false,
+  },
+  unavailable: {
+    chip: 'quota',
+    title: 'Search is not responding',
+    // Deliberately ours. The address is not the problem and telling the user to
+    // check their spelling would send them to fix something that is not broken.
+    detail: 'Something on our side is not answering. Your saved addresses still work.',
+    canRetry: true,
+  },
+};
 
 function NoMatch({
   query,
