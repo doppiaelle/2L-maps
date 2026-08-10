@@ -1,0 +1,72 @@
+name: deploy-functions
+
+# Deploys the Edge Functions.
+#
+# **This workflow did not exist**, and nothing else deployed them. The
+# migrations created every table and the app was built with the right project
+# URL, so sign-in worked and the map drew — and then every single call to
+# `/functions/v1/...` answered 404. Address search returned nothing, the parser
+# did nothing, and Optimize would have failed the same way, all silently,
+# because a 404 from a URL that is supposed to exist is indistinguishable from
+# an empty answer at the point where a user is looking.
+#
+# Manual, like `migrate`, and for a weaker version of the same reason: a deploy
+# replaces the code that spends money on Google's APIs.
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Which project to deploy to
+        required: true
+        type: choice
+        options: [staging, production]
+
+concurrency:
+  group: deploy-functions-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: deploy Edge Functions
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Pinned for the reason `migrate` is: a CLI that changes its own flags
+      # overnight breaks the workflow on the day it is needed, and did.
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.113.0
+
+      - name: Link the project
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          # Declared with `env(...)` in config.toml and configured in the
+          # dashboard instead; empty is correct and is not the same as unset to
+          # a config parser.
+          SUPABASE_AUTH_APPLE_CLIENT_ID: ''
+          SUPABASE_AUTH_APPLE_SECRET: ''
+          SUPABASE_AUTH_GOOGLE_CLIENT_ID: ''
+          SUPABASE_AUTH_GOOGLE_SECRET: ''
+        run: supabase link --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}" --yes
+
+      # No function name deploys all of them. Naming them here would be a list
+      # to keep in step with `supabase/functions/`, and the one that fell out of
+      # step would be the one nobody noticed was missing.
+      #
+      # `verify_jwt` is per function in `config.toml` — true everywhere except
+      # the RevenueCat webhook, which has no Supabase JWT and is gated by a
+      # signature check instead (docs/19_SECURITY.md §6).
+      - name: Deploy
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: supabase functions deploy --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}"
+
+      - name: What was deployed
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        continue-on-error: true
+        run: supabase functions list --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}"
