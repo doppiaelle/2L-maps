@@ -17,11 +17,12 @@ import { useRouteSync } from '@/features/routes/use-route-sync';
 import { useDraftRouteStore, useRouteProgressStore, useUiStore } from '@/features/stores';
 import { AdSlot } from '@/components/primitives/AdSlot';
 import { AppMap } from '@/components/map/AppMap';
-import { Dock, DOCK_HEIGHT } from '@/components/navigation/Dock';
+import { Dock, DOCK_OUTER_HEIGHT } from '@/components/navigation/Dock';
+import { useLocation } from '@/features/location/location-provider';
 import { SectionPanel } from '@/components/navigation/SectionPanel';
 import { HistorySection } from '@/features/routes/HistorySection';
 import { SettingsSection } from '@/features/settings/SettingsSection';
-import { dockItems, dockObstructionFraction, showsClose, toggleSection } from '@/lib/ui/dock';
+import { dockItems, dockObstructionFraction, toggleSection } from '@/lib/ui/dock';
 import { UndoToast } from '@/components/feedback/UndoToast';
 import { readMapIds } from '@/lib/config/map-ids';
 import { isOffline } from '@/lib/network/connectivity';
@@ -93,6 +94,11 @@ export default function PlanScreen(): React.JSX.Element {
   useDrainOnReconnect();
 
   const { open: openRoute } = useOpenRoute();
+
+  // Nothing is requested here: the provider follows a permission that was
+  // already granted and asks for one only when a control is pressed
+  // (docs/18_PERMISSIONS.md §4).
+  const location = useLocation();
 
   useEffect(() => {
     // Cleared once honoured. Leaving it set would re-open the same route on
@@ -222,9 +228,26 @@ export default function PlanScreen(): React.JSX.Element {
         status={isOffline(connectivity) ? 'offline' : 'ready'}
         onStopPress={selectStop}
         onMapPress={clearSelection}
+        // Drawn only once the fix is one we would route from — `locationStateOf`
+        // holds a first, wildly inaccurate GPS reading back rather than putting
+        // the driver a kilometre from where they are.
+        userLocation={
+          location.state.kind === 'ready'
+            ? {
+                coordinate: location.state.location.coordinate,
+                headingDegrees: location.state.location.headingDegrees,
+              }
+            : null
+        }
+        // The press is what asks for the permission the first time. Awaited
+        // nowhere: the answer arrives through `location.state`, and the camera
+        // follows it.
+        onRecenter={() => {
+          void location.enable();
+        }}
         // The dock covers the bottom edge; the camera pads for it so a marker
         // never lands underneath.
-        bottomObstructionFraction={dockObstructionFraction(DOCK_HEIGHT, height)}
+        bottomObstructionFraction={dockObstructionFraction(DOCK_OUTER_HEIGHT, height)}
       />
 
       {activeSection === 'itinerary' && (
@@ -313,15 +336,12 @@ export default function PlanScreen(): React.JSX.Element {
 
       <Dock
         items={dockItems(activeSection, { isRouteInProgress: progress !== null })}
-        showsClose={showsClose(activeSection)}
         onSelect={(section) => {
           // `toggleSection` decides; the screen only routes. Tapping the open
-          // section closes it, which is the second way back to the map.
-          const next = toggleSection(activeSection, section);
-          if (next === null) closeSection();
-          else openSection(next);
+          // section returns to the map, which is the job the close control used
+          // to do (ADR-0020).
+          openSection(toggleSection(activeSection, section));
         }}
-        onClose={closeSection}
         theme={theme}
         testID="plan-dock"
       />

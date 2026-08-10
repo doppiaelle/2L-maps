@@ -7,8 +7,9 @@ import { useAddressBook } from '@/features/places/use-address-book';
 import { usePlaceSearch } from '@/features/places/use-place-search';
 import { useUsageQuota } from '@/features/quota/use-usage-quota';
 import { useDraftRouteStore } from '@/features/stores';
+import { useLocation } from '@/features/location/location-provider';
 import { isOffline } from '@/lib/network/connectivity';
-import { searchStateOf } from '@/lib/places/search';
+import { canSubmitSearch, offersCurrentLocation, searchStateOf } from '@/lib/places/search';
 import type { SourcedOption } from '@/lib/places/search';
 
 /**
@@ -28,13 +29,19 @@ export default function AddStopScreen(): React.JSX.Element {
 
   const draft = useDraftRouteStore((store) => store.draft);
   const addStopToDraft = useDraftRouteStore((store) => store.addStopToDraft);
+  const setOrigin = useDraftRouteStore((store) => store.setOrigin);
   const { allowances } = useUsageQuota();
   const search = usePlaceSearch();
   const book = useAddressBook();
   const connectivity = useConnectivity();
+  const location = useLocation();
 
   const state = searchStateOf({
     query: search.query,
+    // What the results on screen are answers to. Without it a half-typed address
+    // over the previous address's results is indistinguishable from a search
+    // that found nothing (ADR-0019).
+    submittedQuery: search.submittedQuery,
     // The two sections of one address book, split by when each place was last
     // used (`lib/places/address-book.ts`). Both are free to reuse and both are
     // readable with no signal, which is what makes this modal useful in a
@@ -90,6 +97,30 @@ export default function AddStopScreen(): React.JSX.Element {
       state={state}
       query={search.query}
       onQueryChange={search.setQuery}
+      onSubmit={search.submit}
+      canSubmit={canSubmitSearch({
+        query: search.query,
+        submittedQuery: search.submittedQuery,
+        isOffline: isOffline(connectivity),
+        isSearching: search.isSearching,
+      })}
+      offersCurrentLocation={offersCurrentLocation(search.query)}
+      isLocationDenied={location.permission === 'denied'}
+      onUseCurrentLocation={() => {
+        void location.enable().then((started) => {
+          // Refused, and that is an answer rather than an error: the row stays
+          // and explains itself, and the user picks an address instead. Nothing
+          // is blocked (docs/18_PERMISSIONS.md §4).
+          if (!started) return;
+
+          // The origin, not a stop. A current-location origin has no `place_id`
+          // and the draft has modelled it as its own field since the first
+          // commit — adding it to the list would put a stop with no durable key
+          // into a list keyed by one (ADR-0007).
+          setOrigin(null, true);
+          router.back();
+        });
+      }}
       onSelect={add}
       onRetry={search.retry}
       onAddManually={() => {

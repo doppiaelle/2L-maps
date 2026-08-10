@@ -59,7 +59,33 @@ const config: ExpoConfig = {
       },
     },
   },
-  plugins: ['expo-router', 'expo-localization'],
+  plugins: [
+    'expo-router',
+    'expo-localization',
+    [
+      'expo-location',
+      {
+        /**
+         * The purpose strings, which are the permission dialog's entire text on
+         * iOS and are quoted verbatim in App Review.
+         *
+         * They say what the location is *for* rather than what it is — "to set
+         * your starting point" is a reason a driver can weigh; "to access your
+         * location" is a request with no argument attached
+         * (docs/18_PERMISSIONS.md §4).
+         *
+         * **Foreground only.** No background permission is declared, and adding
+         * one would be a store-review decision rather than a code change: it is
+         * the most scrutinised permission in App Review (risk C7), and this
+         * product hands navigation off to an app that has its own.
+         */
+        locationWhenInUsePermission:
+          'Used to start your route from where you are and to show your position on the map.',
+        isAndroidBackgroundLocationEnabled: false,
+        isIosBackgroundLocationEnabled: false,
+      },
+    ],
+  ],
   experiments: {
     typedRoutes: true,
   },

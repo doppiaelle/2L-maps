@@ -13,11 +13,13 @@ import { ThemeVariables } from '@/components/design/ThemeVariables';
 import { ServicesProvider } from '@/features/api/services-provider';
 import { SessionProvider, useSession } from '@/features/auth/session-provider';
 import { DeepLinkProvider } from '@/features/navigation/deep-link-provider';
+import { LocationProvider } from '@/features/location/location-provider';
 import type { DeepLinkPort } from '@/features/navigation/use-pending-deep-link';
 import { useStoresHydrated } from '@/features/navigation/use-launch-destination';
 import { MonetisationProvider } from '@/features/monetisation/monetisation-provider';
 import { ConnectivityProvider } from '@/features/network/connectivity-provider';
 import { PERSISTED_STORES } from '@/features/stores';
+import { createLocationPort } from '@/lib/location/expo-location-adapter';
 import { createConnectivityPort } from '@/lib/network/netinfo-adapter';
 import { isOffline, connectivityOf } from '@/lib/network/connectivity';
 import { createQueryClient } from '@/lib/query/client';
@@ -56,6 +58,11 @@ void SplashScreen.preventAutoHideAsync();
 const queryClient = createQueryClient();
 const persistOptions = queryPersistOptions(createQueryPersister({ storage: AsyncStorage }));
 const connectivity = createConnectivityPort();
+// Built once, at the composition root, like every other port. Nothing is
+// requested by constructing it: the provider reads a permission that was already
+// granted and asks for a new one only when a control is pressed
+// (docs/18_PERMISSIONS.md §4).
+const location = createLocationPort();
 
 /**
  * React Query's own idea of online, taken from the same port as everybody
@@ -120,10 +127,15 @@ export default function RootLayout(): React.JSX.Element {
                   EEA (ADR-0015). Absence is the ordinary case until they exist,
                   which is what keeps every screen that touches them working. */}
                 <MonetisationProvider billing={null} ads={null}>
-                  <DeepLinkProvider port={linking}>
-                    <StatusBar style="auto" />
-                    <RestorationGate />
-                  </DeepLinkProvider>
+                  {/* Above the screens rather than inside one, because the map
+                      follows the driver and the add-stop modal needs the same
+                      fix: two subscribers would be two GPS subscriptions. */}
+                  <LocationProvider port={location}>
+                    <DeepLinkProvider port={linking}>
+                      <StatusBar style="auto" />
+                      <RestorationGate />
+                    </DeepLinkProvider>
+                  </LocationProvider>
                 </MonetisationProvider>
               </ServicesProvider>
             </SessionProvider>
