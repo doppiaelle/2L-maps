@@ -38,15 +38,36 @@ jobs:
 
       - run: npm ci
 
+      # Pinned, not `latest`. This workflow was written against a CLI whose
+      # flags have since changed, and it failed on the first real run for that
+      # reason alone — a migration tool that can break overnight without a
+      # commit is a tool that will break on the day it is needed.
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.113.0
+
+      # `db push` has no `--project-ref`; the project is chosen by linking
+      # first, and every subsequent command in the job inherits it.
+      - name: Link the project
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          # `config.toml` declares the OAuth providers with `env(...)`
+          # placeholders. They are configured in the Supabase dashboard rather
+          # than pushed from here (docs/38 step 8), so empty is correct — but
+          # unset and empty are not the same to a config parser, and this is
+          # cheaper than finding out which.
+          SUPABASE_AUTH_APPLE_CLIENT_ID: ''
+          SUPABASE_AUTH_APPLE_SECRET: ''
+          SUPABASE_AUTH_GOOGLE_CLIENT_ID: ''
+          SUPABASE_AUTH_GOOGLE_SECRET: ''
+        run: supabase link --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}" --yes
 
       - name: Push migrations
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-        run: supabase db push --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}"
+        run: supabase db push --linked --yes
 
       - name: Regenerate database types
         env:
@@ -56,8 +77,42 @@ jobs:
             --project-id "${{ secrets.SUPABASE_PROJECT_REF }}" \
             > types/database.generated.ts
 
-      # Types are generated, never hand-written (CLAUDE.md §3). A diff here means
-      # the schema moved without the repository following, which is exactly the
-      # drift that makes a "typed" client a lie.
+      # Uploaded before the check below can fail, and unconditionally: this is
+      # the only way to obtain the file without a local Supabase CLI and a
+      # database password on a laptop. On the first ever migration it is the
+      # expected outcome — the file does not exist in the repository yet.
+      - name: Upload the generated types
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: database-types
+          path: types/database.generated.ts
+          if-no-files-found: warn
+
+      # Types are generated, never hand-written (CLAUDE.md §3). A difference
+      # here means the schema moved without the repository following, which is
+      # exactly the drift that makes a "typed" client a lie.
+      #
+      # `git status --porcelain` rather than `git diff --exit-code`, because the
+      # file is untracked until it is committed for the first time and `git
+      # diff` says nothing at all about untracked files — the check passed
+      # vacuously on exactly the run that mattered most.
       - name: Fail if the generated types are out of date
-        run: git diff --exit-code types/database.generated.ts
+        run: |
+          if [ -z "$(git status --porcelain -- types/database.generated.ts)" ]; then
+            echo "Generated types match the live schema."
+            exit 0
+          fi
+
+          echo "::notice::The migrations were applied successfully. Only this last"
+          echo "::notice::check failed, and it is about the repository rather than"
+          echo "::notice::the database — your schema is live either way."
+          echo ""
+          echo "::error::types/database.generated.ts does not match the live schema."
+          echo "Download the 'database-types' artifact from this run, commit it to"
+          echo "types/database.generated.ts, and re-run this workflow."
+          echo ""
+          echo "On the first ever migration this failure is expected: the file does"
+          echo "not exist in the repository yet and this run is what produces it."
+          git --no-pager diff -- types/database.generated.ts || true
+          exit 1

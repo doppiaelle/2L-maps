@@ -274,6 +274,14 @@ twolmaps://auth-callback
 1. **`migrate`** → *Run workflow* → environment **`staging`** → *Run workflow*.
    Creates every table, policy and function, and schedules the coordinate purge job.
    **Do this before the build.** Otherwise sign-in succeeds and everything after it fails.
+
+   > **The first run ends red, and that is expected.** The migrations apply
+   > successfully; the last step then fails because `types/database.generated.ts` does
+   > not exist in the repository yet — this run is what produces it. Open the run →
+   > **Artifacts** → **`database-types`** → download → commit the file to
+   > `types/database.generated.ts` → re-run the workflow. **Your database is already
+   > migrated either way**, so you can also just carry on to the build and tidy this up
+   > later.
 2. **`android-preview`** → *Run workflow* → *Run workflow*. About ten minutes.
    When it finishes: open the run → **Artifacts** → **`2l-maps-development-build`** → download →
    unzip → send the `.apk` to your phone → open it. Android will warn about installing from an
