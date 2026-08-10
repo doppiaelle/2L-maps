@@ -117,38 +117,50 @@ and this document inherits that. No re-statement of any requirement, schema or b
 | 6 | `feat/w6-delivery` | EAS profiles, remaining CI, Maestro flows, store declarations | §6 W6 | ✅ |
 | 7 | `docs/go-live-runbook` | **Go-live runbook** — every external account, key and limit, step by step | §6 W7 | ✅ |
 
-### What is built, and what is specified but not built — audited 2026-08-09
+### What is built, and what is specified but not built — re-audited 2026-08-10
 
 The table above says which *waves* closed. It does not say which *features* exist, and the two
-had begun to drift. This is the honest list, re-derived from the code rather than from memory.
+had drifted far enough that eleven correctly-designed things were unreachable from the app. Wave
+8 closed that gap; this is the list re-derived from the code, not from memory.
 
-**Complete and wired:** the launch sequence and both guards, deep links, the map, the sheet, the
-plan state machine, add-stop search with its debounce and session token, optimization, the
-handoff and the provider picker, mid-route Done and Skip, the summary, Settings.
+**Complete and wired:** the launch sequence and both guards, deep links including
+`twolmaps://route/{id}`, the map, the sheet, the plan state machine, add-stop search with its
+debounce and session token, the address book behind it, optimization, the handoff and the
+provider picker, mid-route Done and Skip, the summary, Settings, **route persistence and
+History**, **import**, and **offline detection** with a persisted query cache.
 
-**Written, tested, and never wired to anything:**
+**Closed in wave 8, and worth recording because none of it was visible from the wave table:**
 
-| Thing | State | Consequence today |
+| Thing | What was wrong | Fixed in |
 |---|---|---|
-| `BillingProvider` adapter | Complete with tests, never constructed | The paywall shows no products, because there are none to show |
-| `AdsProvider` adapter, `<AdSlot>` | Complete with tests, never rendered | The free tier of [ADR-0015](adr/0015-ad-supported-free-tier.md) shows no advertising at all |
-| Mutation queue store | Complete with tests, never read | Writes are not queued offline ([ADR-0008](adr/0008-offline-scope.md)) |
+| Edge Function composition root | `setContextFactory` was never called, so every deployed function answered `INTERNAL` to every request | 8a |
+| Import map | `zod` imported by bare specifier with none, so nothing would have deployed | 8a |
+| `places_cache` | Never written. `stops.place_id` and `favourites.place_id` are foreign keys into it and the client cannot write there — so every save was a constraint violation, and the shared cache the cost model rests on saved nobody anything | 8a |
+| Pipeline step 2 | Still a boolean eleven months after [ADR-0015](adr/0015-ad-supported-free-tier.md) replaced it with a three-value plan. Every new account was refused 402 on its first search | 8a |
+| `user_entitlements` | The webhook and `/usage-quota` between them read and wrote seven columns that were never created | 8a |
+| `ServicesProvider` | Never mounted, so every hook behind `useServices()` returned null and autocomplete, optimize and place-details did nothing in the running app | 8a |
+| Zustand persistence | No storage passed, so it fell back to `localStorage` — which React Native does not have. Every "persisted" store was persisted in name only | 8a |
+| Route persistence and History | Nothing wrote `routes` or `stops`; History was a heading | 8a |
+| Address book | Add-stop passed two hard-coded empty arrays where reuse belonged, so the largest cost lever was inert | 8b |
+| Offline | `isOffline` was the literal `false` and `mapStatus` the literal `"ready"`; the persisted query cache `11_STATE_MANAGEMENT.md` §6 depends on did not exist; React Query's own online state used a browser heuristic that is always true in React Native | 8c |
+| Import | The modal was a heading over an empty view, and "add manually" pushed to it | 8d |
+| Ads and billing | `<AdSlot>` was never rendered; the paywall hard-coded two null offers and a no-op buy | 8e |
 
-**Specified and not built:**
+**Still specified and not built:**
 
-| Thing | Where specified | Consequence today |
-|---|---|---|
-| Route persistence | [`12_DATABASE.md`](12_DATABASE.md) | **Nothing is ever written to `routes` or `stops`.** The tables and their policies exist and no code inserts a row — client or Edge Function |
-| History | [`08_SCREEN_SPECIFICATIONS.md`](08_SCREEN_SPECIFICATIONS.md) §6 | A stub, and it would have nothing to list |
-| Recents and favourites | docs/08 §8 | The add-stop state machine handles them; the source is a hard-coded empty list, so the free path in the most expensive screen is inert |
-| Import, and AI-assisted entry | docs/08 §8, [ADR-0016](adr/0016-ai-assisted-stop-entry.md) | The `parse-addresses` Edge Function exists; no screen calls it |
-| Analytics events | [`21_ANALYTICS.md`](21_ANALYTICS.md) | No `lib/analytics` exists |
-| Offline detection | [`17_OFFLINE_MODE.md`](17_OFFLINE_MODE.md) | `isOffline` and the map's status are hard-coded optimistic, so every offline state is reachable in tests and unreachable in the app |
+| Thing | Where specified | Consequence today | What it needs |
+|---|---|---|---|
+| Analytics events | [`21_ANALYTICS.md`](21_ANALYTICS.md) | No `lib/analytics` exists; nothing is measured | A Firebase project and `google-services.json` in the build |
+| Real advertising | [ADR-0015](adr/0015-ad-supported-free-tier.md) | The seam exists and the provider is null, so the free tier shows nothing | An AdMob account and a certified CMP for the EEA |
+| Real billing | [`20_SUBSCRIPTIONS.md`](20_SUBSCRIPTIONS.md) | The paywall states the reason and offers the free plan; there are no products | RevenueCat and three products on Play Console |
+| Offline mutation queue, drained | [ADR-0008](adr/0008-offline-scope.md) | Reconnection re-syncs the route and re-reads; individual edits made offline are not yet queued and replayed | The queue store is complete and tested; wiring it is a wave of its own |
+| iOS | [ADR-0014](adr/0014-android-first-verification.md) | Unverified on hardware and deliberately so | A Mac, or a paid build service |
 
-**Why this list matters more than the wave table.** Every row above is a decision that was made
-correctly and then not connected. None of it is a defect in what exists; all of it is the
-difference between "the architecture supports this" and "the user can do this", and that
-difference is exactly what a status table hides.
+**Why this list matters more than the wave table.** Every row in the first table was a decision
+made correctly and then not connected. None of it was a defect in what existed; all of it was
+the difference between "the architecture supports this" and "the user can do this" — and that
+difference is exactly what a status-by-wave table hides. The lesson is recorded rather than
+merely fixed: **a wave-status table must never be the only status table.**
 
 **Decisions taken at implementation start, and open to revision:**
 
