@@ -9,261 +9,310 @@
 
 ## 1. Purpose
 
-**The shortest path from nothing to the app running on an Android phone.** Nine steps, in order,
-each one saying where to go, what to do, and what to copy where.
+**The shortest path from nothing to the app running on an Android phone.**
 
-This is not [`37_GO_LIVE_RUNBOOK.md`](37_GO_LIVE_RUNBOOK.md). That document is the full
-go-live procedure — every account, every limit, every store requirement — and it is what to
-read before shipping to real users. **This one deliberately leaves out everything the first
-test does not need.**
+The shape of it is: **collect eight values from two consoles, paste them into three places, run
+two workflows.** Nothing is ever pasted into a file, into the app, or into this repository — the
+build reads them from GitHub, the server reads them from Supabase.
 
-**Left out on purpose, and safe to leave out:** analytics (Firebase), advertising (AdMob and a
-consent platform), billing (RevenueCat and Play Console products), Apple sign-in, iOS
-altogether, Cloud Map Styling, and a release keystore. None of them blocks a first run, and
-each is a separate account to create for something that cannot yet be observed.
-
-**Order matters in exactly one place: step 1 comes first.** Spend caps go on before a
-credential exists, because the risk starts the moment a key exists rather than the moment code
-calls it.
+This is not [`37_GO_LIVE_RUNBOOK.md`](37_GO_LIVE_RUNBOOK.md). That is the full go-live
+procedure and it is what to read before real users. **This one leaves out everything a first
+test does not need:** analytics, advertising, billing, Apple sign-in, iOS, Cloud Map Styling
+and a release keystore.
 
 ---
 
-## 2. What you end up with
+## 2. Does any of this cost money?
 
-An APK on your phone that signs in with Google, shows a map, searches addresses, optimizes a
-route, hands it to Google Maps or Waze, and remembers everything you did.
+**No.** Nothing in this document is a purchase, and no step commits you to spending.
 
-Roughly 45 minutes, most of it waiting for consoles to save.
+| Service | Card needed? | What you pay for testing |
+|---|---|---|
+| **Supabase** | No | €0 — free tier, no card at all |
+| **GitHub Actions** | No | €0 — Linux runners, free on public repositories |
+| **OpenRouter** *(optional)* | No | €0 — free models |
+| **Google Cloud** | **Yes, a card must be on file** | €0 in practice — see below |
+
+**Google is the only one that asks for a card**, and it asks in order to *enable* the Maps APIs
+at all, not in order to charge you. Every Google Maps API has a **free monthly allowance —
+roughly 10,000 calls per month per Essentials SKU** since March 2025
+([`33_API_CONTRACTS.md`](33_API_CONTRACTS.md) §8). One person testing makes tens of calls a
+day, not thousands.
+
+**A budget is not a payment and not a commitment.** It is a threshold that sends you an email.
+Setting a €20 budget does not reserve, charge or promise €20 — it means "tell me if I ever
+approach this", and you will not.
+
+**The thing that actually stops spending is the per-API quota** in step 3. A budget notifies
+after the fact; a quota refuses the request. Set both, and a runaway loop becomes a broken
+feature instead of a bill.
 
 ---
 
-## 3. The nine steps
+## 3. The eight values, and where each one ends up
 
-### Step 1 — Google Cloud: spend caps, before anything else
+Write these down as you go. **Every one of them is collected in part A and pasted in part B** —
+nothing is used anywhere else, and nothing goes into a file in this repository.
 
-**Where:** [console.cloud.google.com](https://console.cloud.google.com) → create a project →
-**Billing → Budgets & alerts**
+| # | Value | Collected in | Pasted into |
+|---|---|---|---|
+| ① | Supabase **Project URL** | Step 1 | GitHub repository secret `SUPABASE_URL` |
+| ② | Supabase **anon key** | Step 1 | GitHub repository secret `SUPABASE_ANON_KEY` |
+| ③ | Supabase **project ref** | Step 1 | GitHub *environment* secret `SUPABASE_PROJECT_REF` |
+| ④ | Supabase **database password** | Step 1 | GitHub *environment* secret `SUPABASE_DB_PASSWORD` |
+| ⑤ | Supabase **access token** | Step 1 | GitHub *environment* secret `SUPABASE_ACCESS_TOKEN` |
+| ⑥ | Google **Android API key** | Step 4 | GitHub repository secret `MAPS_API_KEY_ANDROID` |
+| ⑦ | Google **server API key** | Step 4 | Supabase secret `GOOGLE_SERVER_API_KEY` |
+| ⑧ | Google **OAuth client ID + secret** | Step 5 | Supabase → Authentication → Providers → Google |
 
-1. Create a budget. €20/month is generous for testing and small enough to notice.
-2. Set alert thresholds at 50%, 90%, 100%.
+Six go to GitHub, two go to Supabase. That is the whole picture.
 
-> A budget alert **notifies**, it does not stop spending. The thing that actually stops spending
-> is the per-API quota in step 3. Set both.
+---
 
-### Step 2 — Google Cloud: enable four APIs
+# Part A — collect the eight values
 
-**Where:** **APIs & Services → Library**, search each by name and press Enable.
+## Step 1 — Supabase: create the project → gives you ①②③④⑤
+
+**Go to:** [supabase.com/dashboard](https://supabase.com/dashboard) → **New project**
+
+- Name: anything. Region: **`eu-central-1`** if you are in Italy.
+- It generates a **database password**. **Copy it now** — it is shown once. → this is **④**
+
+Wait for the project to finish provisioning, then:
+
+**Go to:** **Settings → API**
+
+- **Project URL** — looks like `https://abcdefgh.supabase.co` → this is **①**
+- **Project API keys → `anon` `public`** — a long string starting `eyJ` → this is **②**
+- The **project ref** is the part of the URL before `.supabase.co`, e.g. `abcdefgh` → this is **③**
+
+> ⚠️ On the same page there is a **`service_role`** key. **Do not copy it anywhere.** The anon
+> key is public by design and grants nothing on its own — every table has row-level security.
+> The service-role key bypasses all of it.
+
+**Go to:** [supabase.com/dashboard/account/tokens](https://supabase.com/dashboard/account/tokens)
+→ **Generate new token** → name it `2l-maps-ci` → copy it → this is **⑤**
+
+## Step 2 — Google Cloud: project, billing, budget
+
+**Go to:** [console.cloud.google.com](https://console.cloud.google.com) → **Select a project →
+New project** → name it `2l-maps`.
+
+**Go to:** **Billing** → link a billing account, adding a card if you have none.
+
+> This is the card step. It enables the APIs; it does not charge you. See §2.
+
+**Go to:** **Billing → Budgets & alerts → Create budget**
+
+- Amount: **€20/month**
+- Alert thresholds: 50%, 90%, 100%
+
+## Step 3 — Google Cloud: enable four APIs, then cap them
+
+**Go to:** **APIs & Services → Library**. Search each name, open it, press **Enable**:
 
 | API | Used for |
 |---|---|
-| Maps SDK for Android | Drawing the map in the app |
+| Maps SDK for Android | Drawing the map |
 | Routes API | Optimizing the stop order |
-| Places API (New) | Address search — **"(New)", not the legacy "Places API"** |
+| **Places API (New)** | Address search — the one with "(New)", not the legacy "Places API" |
 | Geocoding API | Turning pasted addresses into places |
 
-### Step 3 — Google Cloud: cap each API
+Then, for **each** of the four:
 
-**Where:** **APIs & Services → [each API] → Quotas & System Limits**
+**Go to:** **APIs & Services → [the API] → Quotas & System Limits** → find the per-day request
+quota → **Edit** → set **500 per day**.
 
-Set a low daily cap on each — 500 requests a day is far more than one person testing can use
-and turns a runaway loop into a dead feature rather than a bill.
+> 500 a day is far more than one person can use and turns a runaway loop into a dead feature
+> rather than a bill. This is the control that actually stops spending.
 
-### Step 4 — Google Cloud: two API keys
+## Step 4 — Google Cloud: two API keys → gives you ⑥⑦
 
-**Where:** **APIs & Services → Credentials → Create credentials → API key**
+**Go to:** **APIs & Services → Credentials → Create credentials → API key**
 
-Create **two**, and restrict both. An unrestricted key found in a repository is drained within
-hours by automated scanners.
+Do this **twice**. Each time, press **Edit API key** immediately after it is created and apply
+the restrictions below — an unrestricted key found in a repository is drained within hours by
+automated scanners.
 
-**Key A — goes in the app.** Name it `2l-maps-android-client`.
+### Key ⑥ — name it `2l-maps-android`
 
-| Setting | Value |
+| Field | Set it to |
 |---|---|
-| Application restrictions | **Android apps** |
-| Package name | `com.doppiaelle.twolmaps` |
-| SHA-1 certificate fingerprint | `5E:8F:16:06:2E:A3:CD:2C:4A:0D:54:78:76:BA:A6:F3:8C:AB:F6:25` |
-| API restrictions | **Maps SDK for Android only** |
+| Application restrictions | **Android apps** → Add → |
+| · Package name | `com.doppiaelle.twolmaps` |
+| · SHA-1 certificate fingerprint | `5E:8F:16:06:2E:A3:CD:2C:4A:0D:54:78:76:BA:A6:F3:8C:AB:F6:25` |
+| API restrictions | **Restrict key** → tick **Maps SDK for Android** only |
 
-> That SHA-1 is not a secret and is knowable before any build exists: Expo ships a fixed
-> `debug.keystore`, so every development build from every machine is signed with it. It is also
-> not a release credential, which is why it may only ever be paired with a key restricted to
-> the Maps SDK ([`19_SECURITY.md`](19_SECURITY.md) §5).
+**Where it goes:** GitHub repository secret `MAPS_API_KEY_ANDROID`, in step 6.
+**You never paste it into the app yourself** — the build workflow injects it when it compiles
+the APK.
 
-**Key B — goes in Supabase, never in the app.** Name it `2l-maps-server`.
+> The SHA-1 above is not a secret and is already known before any build exists: Expo ships a
+> fixed `debug.keystore`, so every development build is signed with it. It is also not a release
+> credential, which is why it may only ever be paired with a key restricted to the Maps SDK
+> ([`19_SECURITY.md`](19_SECURITY.md) §5).
 
-| Setting | Value |
+### Key ⑦ — name it `2l-maps-server`
+
+| Field | Set it to |
 |---|---|
 | Application restrictions | **None** — it is called from a server, which has no package name |
-| API restrictions | Routes API, Places API (New), Geocoding API |
+| API restrictions | **Restrict key** → tick **Routes API**, **Places API (New)**, **Geocoding API** |
 
-### Step 5 — Supabase: create the project
+**Where it goes:** Supabase secret `GOOGLE_SERVER_API_KEY`, in step 7. **Never into the app.**
 
-**Where:** [supabase.com/dashboard](https://supabase.com/dashboard) → New project
+## Step 5 — Google Cloud: an OAuth client for sign-in → gives you ⑧
 
-Choose a region close to you (`eu-central-1` for Italy). **Save the database password** — it is
-shown once and step 8 needs it.
+**Go to:** **APIs & Services → Credentials → Create credentials → OAuth client ID**
 
-Then **Settings → API** and copy three things:
+If it asks you to configure a consent screen first: **External** → app name `2L Maps` → your own
+email in both contact fields → Save and continue through the remaining screens. No verification
+is needed while you are the only user.
 
-| What | Looks like | Where it goes |
-|---|---|---|
-| Project URL | `https://abcdefgh.supabase.co` | GitHub secret `SUPABASE_URL` |
-| `anon` `public` key | a long `eyJ…` string | GitHub secret `SUPABASE_ANON_KEY` |
-| Project ref | `abcdefgh` — the part before `.supabase.co` | GitHub secret `SUPABASE_PROJECT_REF` |
-
-> The anon key is **public by design**. It grants nothing on its own: every table has
-> row-level security, and access is decided server-side ([ADR-0011](adr/0011-server-side-quota-enforcement.md)).
-> The `service_role` key on the same page is the opposite — it bypasses everything. Never copy
-> that one anywhere.
-
-### Step 6 — Google Cloud: an OAuth client for sign-in
-
-**Where:** **APIs & Services → Credentials → Create credentials → OAuth client ID**
-
-If asked to configure a consent screen first: **External**, app name "2L Maps", your own email
-for both contact fields, save. No verification is needed while you are the only user.
-
-| Setting | Value |
+| Field | Set it to |
 |---|---|
-| Application type | **Web application** — web, not Android |
-| Authorised redirect URI | `https://<your-project-ref>.supabase.co/auth/v1/callback` |
+| Application type | **Web application** |
+| Name | `2l-maps-auth` |
+| Authorised redirect URIs → Add URI | `https://<③>.supabase.co/auth/v1/callback` |
 
-> Web and not Android, even though this is an Android app. The browser talks to Supabase's auth
-> server; Supabase talks to Google. An Android OAuth client would be for an app that talks to
-> Google directly, which this one does not.
+Substitute **③** — your project ref. With `abcdefgh` it reads
+`https://abcdefgh.supabase.co/auth/v1/callback`.
 
-Copy the **Client ID** and **Client secret**.
+> **Web, not Android**, even though this is an Android app. The browser talks to Supabase's auth
+> server, and Supabase talks to Google. An Android OAuth client is for an app that talks to
+> Google directly, which this one never does.
 
-### Step 7 — Supabase: turn on Google sign-in
+Copy the **Client ID** and the **Client secret** → together these are **⑧**
 
-**Where:** **Authentication → Providers → Google**
+---
 
-1. Enable it, paste the Client ID and Client secret from step 6, save.
-2. Go to **Authentication → URL Configuration** and make sure the Redirect URLs list contains:
+# Part B — paste them into three places
 
-   ```
-   twolmaps://auth-callback
-   ```
+## Step 6 — GitHub secrets, in two different scopes
 
-> Sign-in is the first thing the app does and everything else is behind it. A redirect the auth
-> server does not recognise is refused with an error page in a browser you did not ask to open.
+**Go to:** your repository on GitHub → **Settings → Secrets and variables → Actions**
 
-### Step 8 — Supabase: the Edge Function secrets
+### 6a — Repository secrets
 
-**Where:** **Settings → Edge Functions → Secrets** (or `supabase secrets set NAME=value`)
+Press **New repository secret**, three times:
 
-| Secret name | Value |
+| Name (type it exactly) | Value |
 |---|---|
-| `GOOGLE_SERVER_API_KEY` | **Key B** from step 4 |
+| `MAPS_API_KEY_ANDROID` | ⑥ |
+| `SUPABASE_URL` | ① |
+| `SUPABASE_ANON_KEY` | ② |
 
-Optional, only if you want the AI import today:
+### 6b — Environment secrets
 
-| Secret name | Value |
+Same page → **Environments** tab → **New environment** → name it exactly **`staging`** → Create.
+
+Now, **inside that environment**, press **Add environment secret**, three times:
+
+| Name (type it exactly) | Value |
+|---|---|
+| `SUPABASE_PROJECT_REF` | ③ |
+| `SUPABASE_DB_PASSWORD` | ④ |
+| `SUPABASE_ACCESS_TOKEN` | ⑤ |
+
+> **The split is not arbitrary and it is the easiest thing to get wrong.** The migration
+> workflow runs against a named GitHub Environment, so its secrets must live inside that
+> environment. The build workflow does not, so its secrets are repository-wide. A migration
+> secret set at repository level is simply invisible to the workflow that needs it, and the
+> error message does not say so.
+
+## Step 7 — Supabase: the server key
+
+**Go to:** Supabase → **Settings → Edge Functions → Secrets** → **Add new secret**
+
+| Name | Value |
+|---|---|
+| `GOOGLE_SERVER_API_KEY` | ⑦ |
+
+Optional, only if you want AI-assisted import today — **the import works without it**, because
+the line splitter is the primary path and needs no key:
+
+| Name | Value |
 |---|---|
 | `PARSE_PROVIDER` | `openrouter` |
 | `OPENROUTER_API_KEY` | a key from [openrouter.ai](https://openrouter.ai) → Keys |
 
 > **Do not set** `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` or
-> `SUPABASE_DB_URL`. The platform injects all four into every function; setting them by hand
-> creates a second copy that will eventually be wrong.
+> `SUPABASE_DB_URL` here. The platform injects all four into every function automatically;
+> setting them by hand creates a second copy that will eventually be wrong.
 >
-> **Before switching the parser to OpenRouter, read [ADR-0017](adr/0017-parse-provider-switch.md).**
-> Many free inference endpoints retain prompts for training, and a pasted delivery list is your
-> customers' addresses rather than your own. Fine for test data; a decision to take deliberately
-> before real ones. **The import works without any of this** — the line splitter is the primary
-> path and needs no key at all.
+> Before switching the parser to OpenRouter, read [ADR-0017](adr/0017-parse-provider-switch.md):
+> many free inference endpoints retain prompts for training, and a pasted delivery list is your
+> customers' addresses rather than your own. Fine for test data, a deliberate decision before
+> real ones.
 
-### Step 9 — GitHub: the secrets, in two different places
+## Step 8 — Supabase: turn on Google sign-in
 
-Two scopes, and putting one in the wrong place fails with a confusing error.
+**Go to:** Supabase → **Authentication → Providers → Google** → toggle **Enable**
 
-**9a — Repository secrets.** **Settings → Secrets and variables → Actions → Repository secrets**
-
-| Secret name | Value |
+| Field | Value |
 |---|---|
-| `MAPS_API_KEY_ANDROID` | **Key A** from step 4 |
-| `SUPABASE_URL` | the project URL from step 5 |
-| `SUPABASE_ANON_KEY` | the anon key from step 5 |
+| Client ID | the client ID from ⑧ |
+| Client secret | the client secret from ⑧ |
 
-**9b — Environment secrets.** Same page → **Environments** → New environment → name it exactly
-`staging` → add three secrets **inside it**:
+Save. Then **Authentication → URL Configuration** → under **Redirect URLs**, make sure this
+line is present, adding it if not:
 
-| Secret name | Value |
-|---|---|
-| `SUPABASE_PROJECT_REF` | the project ref from step 5 |
-| `SUPABASE_ACCESS_TOKEN` | [supabase.com/dashboard/account/tokens](https://supabase.com/dashboard/account/tokens) → Generate new token |
-| `SUPABASE_DB_PASSWORD` | the database password from step 5 |
+```
+twolmaps://auth-callback
+```
 
-> The split is not arbitrary: the migration workflow runs against a named GitHub Environment, so
-> its secrets have to live in that environment. The build workflow does not, so its secrets are
-> repository-wide. A migration secret set at repository level is simply invisible to the
-> workflow that needs it.
+> Sign-in is the first thing the app does and every other screen is behind it. A redirect the
+> auth server does not recognise is refused with an error page in a browser you did not ask to
+> open.
 
 ---
 
-## 4. Running it
+# Part C — run it
 
-**Where:** the repository on GitHub → **Actions**
+**Go to:** your repository on GitHub → **Actions**
 
-1. **`migrate`** → Run workflow → environment `staging` → Run.
-   Creates every table, policy, function and the coordinate purge job. **Do this before the
-   build**, or the app signs in successfully and then fails on everything it tries to read.
-2. **`android-preview`** → Run workflow → Run.
-   Takes about ten minutes. When it finishes, open the run → **Artifacts** →
-   `2l-maps-development-build` → download → unzip → transfer the `.apk` to your phone and open
-   it. Android will ask permission to install from an unknown source; that is expected.
+1. **`migrate`** → *Run workflow* → environment **`staging`** → *Run workflow*.
+   Creates every table, policy and function, and schedules the coordinate purge job.
+   **Do this before the build.** Otherwise sign-in succeeds and everything after it fails.
+2. **`android-preview`** → *Run workflow* → *Run workflow*. About ten minutes.
+   When it finishes: open the run → **Artifacts** → **`2l-maps-development-build`** → download →
+   unzip → send the `.apk` to your phone → open it. Android will warn about installing from an
+   unknown source; that is expected.
 
 ---
 
-## 5. Checking it worked
+## 4. Checking it worked
 
-In order — each one exercises a different piece, so where it stops tells you which step to
+In order. Each row exercises a different piece, so wherever it stops tells you which step to
 revisit.
 
-| What you do | What should happen | If not |
+| Do this | Should happen | If it does not |
 |---|---|---|
-| Open the app, tap **Continue with Google** | A Google page opens, you choose an account, the app comes back signed in | Steps 6 and 7 |
-| The map appears | Streets and labels, not a grey rectangle | Step 4 Key A — check the SHA-1 and package name |
-| Type three characters in **Add stop** | Address suggestions appear | Step 8 `GOOGLE_SERVER_API_KEY`, or step 2 Places API (New) |
-| Add two stops, tap **Optimize** | The order changes and a route draws | Step 2 Routes API |
-| Tap **Start** | Google Maps or Waze opens with the route | The app you chose is installed |
-| Close the app entirely, reopen it | The route is still there | Step 9a Supabase secrets |
-| Open **History** | The route is listed | Step 4 `migrate` ran successfully |
-| Add a stop, reopen **Add stop** | It appears under Recent, with no network call | Nothing — this one is local |
+| Open the app, tap **Continue with Google** | A Google page opens; after choosing an account the app comes back signed in | Steps 5 and 8 |
+| Look at the map | Streets and labels | Key ⑥ — see §5 below |
+| Type three characters in **Add stop** | Address suggestions appear | Step 7 `GOOGLE_SERVER_API_KEY`, or Places API **(New)** not enabled |
+| Add two stops, tap **Optimize** | The order changes and a line draws | Routes API not enabled |
+| Tap **Start** | Google Maps or Waze opens with the route | That app is not installed on the phone |
+| Close the app fully, reopen it | The route is still there | Step 6a |
+| Open **History** | The route is listed | `migrate` did not run, or failed |
+| Add a stop, then reopen **Add stop** | It is there under Recent, instantly | Nothing — this one is local |
 
----
+## 5. A grey map
 
-## 6. What a grey map means
+The one failure with no error message anywhere, so it is worth naming: **a grey rectangle means
+the Maps key rejected the app.** Tiles never load and nothing is reported. Three causes, in
+order of likelihood:
 
-It is the one failure with no error message anywhere, so it is worth naming: **the map renders
-grey when the Maps key rejects the app.** Tiles simply never load. Three causes, in order of
-likelihood:
+1. **The SHA-1 does not match.** The `android-preview` run prints the fingerprint the APK was
+   actually signed with — open the run log and compare it to what you registered on key ⑥.
+2. **The package name is not exactly** `com.doppiaelle.twolmaps`.
+3. **The key's API restrictions** do not include Maps SDK for Android.
 
-1. The SHA-1 in step 4 does not match the one the APK was signed with. The `android-preview`
-   run prints the fingerprint it actually used — compare them.
-2. The package name is not exactly `com.doppiaelle.twolmaps`.
-3. The key's API restrictions do not include Maps SDK for Android.
-
----
-
-## 7. Costs
-
-| Item | Cost for testing |
-|---|---|
-| Google Cloud | Effectively €0. The free monthly allowances far exceed one person testing, and step 1 and step 3 cap what happens if something loops |
-| Supabase | €0 on the free tier |
-| GitHub Actions | €0 — the workflows run on Linux runners, billed at 1× and free for public repositories |
-| OpenRouter | €0 on a free model |
-
-Nothing in this document requires a payment method beyond the one Google Cloud asks for to
-enable billing at all.
-
----
-
-## 8. Decision log
+## 6. Decision log
 
 | Date | Decision | Rationale | Decided by |
 |---|---|---|---|
-| 2026-08-10 | A quick-start separate from the go-live runbook | The runbook is correct and long; a first test abandoned halfway through it is a first test that does not happen | Product owner |
+| 2026-08-10 | A quick-start separate from the go-live runbook | The runbook is correct and long; a first test abandoned halfway through a correct document is a first test that does not happen | Product owner |
 | 2026-08-10 | Analytics, ads, billing and iOS excluded | Each is a separate account for something that cannot be observed on a first run | Product owner |
-| 2026-08-10 | Budget and quotas before any key is created | The risk begins when the credential exists, not when code calls it | Product owner |
+| 2026-08-10 | Collect-then-paste structure, with every value numbered | The first draft said a key "goes in the app", which is not a place anybody can go. Every value now names its destination before it is created | Product owner |
+| 2026-08-10 | §2 states plainly that nothing here is a purchase | A budget threshold reads as a spending commitment, and the free allowances are the reason none of this costs anything | Product owner |
