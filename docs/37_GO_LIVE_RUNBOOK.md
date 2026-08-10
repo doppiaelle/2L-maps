@@ -178,6 +178,27 @@ iOS submission — that is deferred ([ADR-0014](adr/0014-android-first-verificat
     read by anyone who downloads the app — which is fine for these four and fatal for anything
     else.
 
+15b. **Google sign-in** — Supabase → Authentication → Providers → Google.
+
+    Sign-in is the first thing the app does and everything else is behind it, so
+    this is not optional for a first run.
+
+    In Google Cloud → APIs & Services → Credentials, create an **OAuth 2.0 Client
+    ID of type "Web application"** — web, not Android, even though this is an
+    Android app: the browser talks to Supabase's auth server, and Supabase is
+    what talks to Google. Set the authorised redirect URI to
+    `https://<project-ref>.supabase.co/auth/v1/callback`.
+
+    Paste the client ID and client secret into Supabase's Google provider and
+    enable it. The app's own callback, `twolmaps://auth-callback`, is already in
+    `supabase/config.toml` — check it appears under Authentication → URL
+    Configuration → Redirect URLs, because a redirect the auth server does not
+    recognise is refused with an error page in a browser the user did not ask to
+    open.
+
+    Apple sign-in is iOS-only and needs a paid Apple Developer account
+    ([ADR-0014](adr/0014-android-first-verification.md)); skip it.
+
 16. **Supabase secrets** (`supabase secrets set`, or Settings → Edge Functions → Secrets):
 
     | Name | Value | Needed for |

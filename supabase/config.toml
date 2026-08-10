@@ -29,7 +29,17 @@ enabled = true
 # Deep links come back to the app, not to a web page: React Native has no URL
 # bar to read a callback fragment from (docs/10_NAVIGATION_FLOW.md).
 site_url = "twolmaps://"
-additional_redirect_urls = ["twolmaps://", "2lmaps://"]
+# `twolmaps://auth-callback` is the exact value `AUTH_REDIRECT_URL` sends, and a
+# redirect the auth server does not recognise is refused with an error page in a
+# browser the user did not ask to open. The wildcards cover the deep links the
+# app already parses.
+additional_redirect_urls = [
+  "twolmaps://auth-callback",
+  "twolmaps://",
+  "twolmaps://**",
+  "2lmaps://",
+  "2lmaps://**",
+]
 jwt_expiry = 3600
 enable_refresh_token_rotation = true
 # A token refresh that arrives mid-route must not sign the driver out.

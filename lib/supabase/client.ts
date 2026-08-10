@@ -1,9 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import * as WebBrowser from 'expo-web-browser';
 
 import { createAuthProvider } from './auth-adapter';
-import type { SupabaseAuthPort } from './auth-adapter';
+import type { AuthBrowserPort, SupabaseAuthPort } from './auth-adapter';
 import { createFavouritesProvider } from './favourites-adapter';
 import type { FavouritesPort, FavouritesProvider } from './favourites-adapter';
 import { createRoutesProvider } from './routes-adapter';
@@ -58,6 +59,17 @@ export function functionsBaseUrl(config: SupabaseConfig | null): string | null {
   return `${config.url.replace(/\/+$/, '')}/functions/v1`;
 }
 
+/**
+ * Where the provider sends the user back.
+ *
+ * A literal rather than `Linking.createURL`, because the value has to match what
+ * the auth server is configured to allow: it appears in `supabase/config.toml`
+ * under `additional_redirect_urls`, and a mismatch is refused with an error page
+ * in a browser the user did not ask to open. One string in two places that must
+ * agree is better than a computed one in two places that might not.
+ */
+export const AUTH_REDIRECT_URL = 'twolmaps://auth-callback';
+
 export function createSupabaseClient(config: SupabaseConfig): SupabaseClient {
   return createClient(config.url, config.anonKey, {
     auth: {
@@ -71,8 +83,27 @@ export function createSupabaseClient(config: SupabaseConfig): SupabaseClient {
       // link handler owns that, and leaving this on makes the SDK look for a
       // browser that is not there.
       detectSessionInUrl: false,
+      // PKCE rather than the implicit flow. The callback then carries a
+      // short-lived code exchanged over HTTPS instead of a token in a URL — and
+      // a URL on a phone is handed to the OS, logged by it, and visible to any
+      // app registered for the scheme.
+      flowType: 'pkce',
     },
   });
+}
+
+/**
+ * The browser half of sign-in.
+ *
+ * `openAuthSessionAsync` uses the platform's authentication session — a Custom
+ * Tab on Android — rather than a plain browser window. The difference matters:
+ * it shares the system cookie jar, so a user already signed in to Google is not
+ * asked again, and it closes itself when the redirect fires.
+ */
+export function createAuthBrowser(): AuthBrowserPort {
+  return {
+    openAuthSession: (url, redirectTo) => WebBrowser.openAuthSessionAsync(url, redirectTo),
+  };
 }
 
 /**
@@ -87,7 +118,9 @@ export function createSupabaseAuth(config: SupabaseConfig | null): AuthProvider 
   // The SDK's auth surface is wider than the port; narrowing here is what keeps
   // the adapter honest about what it depends on.
   const client = createSupabaseClient(config);
-  return createAuthProvider(client.auth as unknown as SupabaseAuthPort);
+  return createAuthProvider(client.auth as unknown as SupabaseAuthPort, createAuthBrowser(), {
+    redirectTo: AUTH_REDIRECT_URL,
+  });
 }
 
 /**
