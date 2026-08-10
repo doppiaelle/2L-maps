@@ -3,6 +3,7 @@ import { useEffect, useMemo } from 'react';
 import { Linking, useColorScheme, useWindowDimensions } from 'react-native';
 
 import { useHandoff } from '@/features/handoff/use-handoff';
+import { useMonetisation } from '@/features/monetisation/monetisation-provider';
 import { useConnectivity } from '@/features/network/connectivity-provider';
 import { useDrainOnReconnect } from '@/features/network/use-drain-on-reconnect';
 import { usePendingDeepLinkContext } from '@/features/navigation/deep-link-provider';
@@ -14,6 +15,7 @@ import { useOptimizeRoute } from '@/features/route-planning/use-optimize-route';
 import { useOpenRoute } from '@/features/routes/use-open-route';
 import { useRouteSync } from '@/features/routes/use-route-sync';
 import { useDraftRouteStore, useRouteProgressStore, useUiStore } from '@/features/stores';
+import { AdSlot } from '@/components/primitives/AdSlot';
 import { readMapIds } from '@/lib/config/map-ids';
 import { isOffline } from '@/lib/network/connectivity';
 import { formatDistance, formatDuration } from '@/lib/format/units';
@@ -42,6 +44,7 @@ export default function PlanScreen(): React.JSX.Element {
 
   const pending = usePendingDeepLinkContext();
   const connectivity = useConnectivity();
+  const { ads } = useMonetisation();
   const draft = useDraftRouteStore((store) => store.draft);
   const result = useDraftRouteStore((store) => store.result);
   const progress = useRouteProgressStore((store) => store.progress);
@@ -215,6 +218,20 @@ export default function PlanScreen(): React.JSX.Element {
           if (outcome.kind === 'needs-provider') router.push('/provider');
         });
       }}
+      // Nothing at all until an ad provider exists. `<AdSlot>` reserves its
+      // height from the first render to avoid a reflow, so rendering it with no
+      // provider would reserve a gap that could never be filled.
+      adSlot={
+        ads === null ? null : (
+          <AdSlot
+            slot="stop-list"
+            allowances={quota.allowances}
+            isRouteInProgress={progress !== null}
+            ads={ads}
+            testID="plan-ad-slot"
+          />
+        )
+      }
       onAddStop={() => {
         router.push('/add-stop');
       }}

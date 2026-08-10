@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { useColorScheme } from 'react-native';
 
 import { PaywallView } from '@/features/billing/PaywallView';
+import { useOffers } from '@/features/billing/use-offers';
 import { useUsageQuota } from '@/features/quota/use-usage-quota';
 
 /**
@@ -17,17 +18,16 @@ import { useUsageQuota } from '@/features/quota/use-usage-quota';
 export default function PaywallScreen(): React.JSX.Element {
   const scheme = useColorScheme();
   const { quota } = useUsageQuota();
+  const offers = useOffers();
 
   return (
     <PaywallView
       reason={quota === null ? 'chosen' : 'quota-exhausted'}
-      // Null until the billing SDK is configured. Rendering a row with no
-      // product behind it would give the user a button that fails on tap.
-      dayPass={null}
-      subscription={null}
-      isTrialAvailable={quota?.trialEndsAt === null}
-      isPurchasing={false}
-      onBuy={() => undefined}
+      dayPass={offers.dayPass}
+      subscription={offers.subscription}
+      isTrialAvailable={offers.isTrialAvailable}
+      isPurchasing={offers.isPurchasing}
+      onBuy={offers.buy}
       onContinueFree={() => {
         router.back();
       }}
