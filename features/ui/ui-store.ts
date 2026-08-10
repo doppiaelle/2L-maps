@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 
 import type { LatLng } from '@/lib/geo/haversine';
+import { DEFAULT_SECTION } from '@/lib/ui/dock';
 import type { ActiveSection, DockSection } from '@/lib/ui/dock';
 
 /**
@@ -21,13 +22,18 @@ import type { ActiveSection, DockSection } from '@/lib/ui/dock';
 
 export interface UiStore {
   /**
-   * Which dock section is open, or `null` for the bare map
-   * ([ADR-0018](../../docs/adr/0018-bottom-dock-navigation.md)).
+   * Which dock section is showing
+   * ([ADR-0018](../../docs/adr/0018-bottom-dock-navigation.md),
+   * [ADR-0020](../../docs/adr/0020-four-section-dock.md)).
    *
    * This replaces `detent`, which described how far a bottom sheet had been
    * dragged. The type also used to be declared twice — once here and once in
    * `lib/ui/sheet.ts` — as two structurally identical types with no relationship
    * to each other. `DockSection` is imported, so there is one.
+   *
+   * **No longer nullable.** Null meant the map, which made the most common state
+   * in the app the one with no name, and left every reader translating an
+   * absence into a destination. `'map'` is a section like the other three.
    */
   readonly activeSection: ActiveSection;
   readonly selectedStopId: string | null;
@@ -38,6 +44,11 @@ export interface UiStore {
   readonly isOptimizing: boolean;
 
   openSection: (section: DockSection) => void;
+  /** Returns to the map. Kept as its own name rather than folded into
+   *  `openSection('map')` at every call site, because the callers that use it —
+   *  opening a saved route, dismissing a panel — mean "I am done here", not
+   *  "take me to the map", and the two would diverge if the map ever stopped
+   *  being the answer. */
   closeSection: () => void;
   /** Selecting a stop opens the route section, because a selection the user
    *  cannot see is not a selection. Coupling the two here keeps every call site
@@ -52,7 +63,7 @@ export const createUiStore = () =>
   create<UiStore>()((set, get) => ({
     // Opens on the map. The route section is one tap away and the map is what
     // orients someone who has just unlocked their phone (ADR-0018).
-    activeSection: null,
+    activeSection: DEFAULT_SECTION,
     selectedStopId: null,
     camera: null,
     isOptimizing: false,
@@ -62,16 +73,17 @@ export const createUiStore = () =>
     },
 
     closeSection: () => {
-      set({ activeSection: null });
+      set({ activeSection: DEFAULT_SECTION });
     },
 
     selectStop: (stopId) => {
+      const active = get().activeSection;
       set({
         selectedStopId: stopId,
-        // Tapping a marker on the bare map opens the route, so the row that was
-        // just selected is somewhere the user can actually see it. A section
-        // already open is left alone: they chose it.
-        activeSection: get().activeSection ?? 'itinerary',
+        // Tapping a marker on the map opens the route, so the row that was just
+        // selected is somewhere the user can actually see it. Any other section
+        // is left alone: they chose it.
+        activeSection: active === DEFAULT_SECTION ? 'itinerary' : active,
       });
     },
 

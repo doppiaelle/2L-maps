@@ -86,8 +86,9 @@ describe('interface state is deliberately not persisted', () => {
     // into a view they have no memory of choosing — over a city they have left.
     const store = createUiStore();
     // The map, not a section: it is what orients someone who has just unlocked
-    // their phone (ADR-0018).
-    expect(store.getState().activeSection).toBeNull();
+    // their phone (ADR-0018). It is a named section rather than an absence
+    // since ADR-0020.
+    expect(store.getState().activeSection).toBe('map');
     expect(store.getState().selectedStopId).toBeNull();
     expect(store.getState().camera).toBeNull();
     expect(store.getState().isOptimizing).toBe(false);
@@ -124,6 +125,6 @@ describe('interface state is deliberately not persisted', () => {
     store.getState().openSection('settings');
     store.getState().closeSection();
 
-    expect(store.getState().activeSection).toBeNull();
+    expect(store.getState().activeSection).toBe('map');
   });
 });

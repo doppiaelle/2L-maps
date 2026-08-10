@@ -6,39 +6,51 @@ import type { DockItem, DockSection } from '@/lib/ui/dock';
 
 /**
  * The dock — the app's navigation, and the only one
- * ([ADR-0018](../../docs/adr/0018-bottom-dock-navigation.md)).
+ * ([ADR-0018](../../docs/adr/0018-bottom-dock-navigation.md),
+ * [ADR-0020](../../docs/adr/0020-four-section-dock.md)).
  *
- * It replaces a swipeable sheet and two glyphs floating over the map. The sheet
- * put the whole stop list behind a gesture, and a gesture is the one affordance a
- * one-handed driver cannot find without already knowing it is there
- * (`CLAUDE.md` §7 rule 4). The glyphs sat in the top-right corner — the furthest
- * point on the screen from a thumb — and vanished mid-route.
+ * **One object, four pills inside it.** The first version was a full-bleed bar
+ * welded to the bottom edge, with a border only along its top — which read as a
+ * wall the map ended at rather than as a control floating above it, and left the
+ * outermost items' touch targets running off the side of the screen. It is now
+ * inset from all three edges and fully bordered, so it is legible as a single
+ * object with its own shape, and the map is visible around it.
  *
- * **The close control appears only when a section is open**, and is the reason
- * the dock is four items wide sometimes and three others. A permanently visible
- * X on the bare map would be a control that does nothing, which is worse than an
- * absent one: it invites a tap and answers with silence.
+ * **The row never changes width.** Nothing is added or removed while the app is
+ * running: no close control, no conditional item. An item is where the user last
+ * saw it, always, which is the property that lets a thumb learn a position
+ * (ADR-0020).
  *
  * **No blur.** The translucency is a background colour, not `expo-blur`, which is
  * a native module and would put the Expo SDK / react-native-maps pair back
- * through the C6 verification for a visual effect ([ADR-0005](../../docs/adr/0005-map-engine-and-route-preview.md)).
- * The seam is here if it is ever wanted: one background, one file.
+ * through the C6 verification for a visual effect
+ * ([ADR-0005](../../docs/adr/0005-map-engine-and-route-preview.md)). The seam is
+ * here if it is ever wanted: one background, one file.
  *
- * Renders what it is given. Which items exist, which is selected and whether the
- * close control shows are all decided in `lib/ui/dock.ts`, where they are tested
- * without a renderer.
+ * Renders what it is given. Which items exist and which is selected are decided
+ * in `lib/ui/dock.ts`, where they are tested without a renderer.
  */
 
-/** Points, excluding the safe-area inset the device adds beneath it. Exported so
- *  the map can pad its camera by the same number rather than guessing. */
-export const DOCK_HEIGHT = 64;
+/** The pill row's own height, in points. */
+export const DOCK_HEIGHT = 60;
+
+/** The gap between the dock and each screen edge. Enough that the map reads as
+ *  continuing underneath rather than being cut off by it. */
+export const DOCK_INSET = space.space3;
+
+/**
+ * What the dock actually covers at the bottom of the screen, excluding the
+ * device's own safe-area inset.
+ *
+ * Exported because the map pads its camera by this number rather than guessing,
+ * and because the previous version exported only the bar height — which was
+ * correct when the bar was flush with the edge and wrong the moment it floated.
+ */
+export const DOCK_OUTER_HEIGHT = DOCK_HEIGHT + DOCK_INSET * 2;
 
 export interface DockProps {
   readonly items: readonly DockItem[];
-  /** Absent when nothing is open — see `showsClose`. */
-  readonly showsClose: boolean;
   onSelect: (section: DockSection) => void;
-  onClose: () => void;
   /**
    * The bottom safe-area inset, in points — the gesture bar on Android, the home
    * indicator on iOS.
@@ -55,9 +67,7 @@ export interface DockProps {
 
 export function Dock({
   items,
-  showsClose,
   onSelect,
-  onClose,
   bottomInset = 0,
   theme,
   testID,
@@ -71,24 +81,38 @@ export function Dock({
         left: 0,
         right: 0,
         bottom: 0,
-        // The gesture bar on Android and the home indicator on iOS both live
-        // here. Padding rather than margin, so the translucent surface still
-        // reaches the bottom edge instead of leaving a strip of map under it.
-        paddingBottom: bottomInset,
-        borderTopLeftRadius: radius.radiusLg,
-        borderTopRightRadius: radius.radiusLg,
-        borderTopWidth: 1,
-        borderColor: palette.border,
-        // Translucent rather than opaque: the map moving underneath is what says
-        // the dock is above the map rather than a wall at the bottom of it.
-        backgroundColor: withAlpha(palette.surface, 0.92),
+        // The gesture bar sits below the dock, not behind it: a control the user
+        // has to reach past the system's own is a control they mis-tap.
+        paddingBottom: bottomInset + DOCK_INSET,
+        paddingHorizontal: DOCK_INSET,
       }}
-      // The map behind must stay draggable everywhere the dock is not.
+      // The map behind must stay draggable everywhere the dock is not — which,
+      // now that the dock is inset, includes the strip down either side of it.
       pointerEvents="box-none"
-      accessibilityRole="tablist"
       testID={testID}
     >
-      <View style={{ flexDirection: 'row', height: DOCK_HEIGHT, alignItems: 'stretch' }}>
+      <View
+        style={{
+          flexDirection: 'row',
+          height: DOCK_HEIGHT,
+          alignItems: 'stretch',
+          // Fully rounded rather than a large radius: the shape says "one
+          // object", and a square-cornered bar floating in the middle of the
+          // screen reads as a cropped bar.
+          borderRadius: radius.radiusFull,
+          borderWidth: 1,
+          borderColor: palette.border,
+          // Translucent rather than opaque: the map moving underneath is what
+          // says the dock is above the map rather than a wall at the bottom.
+          backgroundColor: withAlpha(palette.surface, 0.94),
+          // The pills breathe inside the container instead of touching its
+          // border, which is the difference between four buttons in a box and
+          // one dock with four sections in it.
+          padding: space.space1,
+          overflow: 'hidden',
+        }}
+        accessibilityRole="tablist"
+      >
         {items.map((item) => (
           <DockButton
             key={item.section}
@@ -103,32 +127,19 @@ export function Dock({
             testID={`dock-${item.section}`}
           />
         ))}
-
-        {showsClose && (
-          <DockButton
-            glyph="✕"
-            label="Close"
-            // Names the destination, not the mechanism. "Close" alone leaves a
-            // screen-reader user asking what they are returning to.
-            accessibilityLabel="Close this section and show the map"
-            isSelected={false}
-            onPress={onClose}
-            theme={theme}
-            testID="dock-close"
-          />
-        )}
       </View>
     </View>
   );
 }
 
 /**
- * One item.
+ * One pill.
  *
  * The glyph is decoration and is hidden from the screen reader: the label beneath
  * it already says the word, and announcing both reads the picture and then the
- * fact. Selection is carried by `accessibilityState` as well as by colour,
- * because colour alone is not a state anyone can rely on (`CLAUDE.md` §10 rule 4).
+ * fact. Selection is carried by `accessibilityState` and by a filled background
+ * as well as by colour, because colour alone is not a state anyone can rely on
+ * (`CLAUDE.md` §10 rule 4).
  */
 function DockButton({
   glyph,
@@ -158,10 +169,15 @@ function DockButton({
       accessibilityState={{ selected: isSelected }}
       style={{
         flex: 1,
-        minHeight: layout.touchMin,
+        minHeight: layout.touchMin - space.space2,
         alignItems: 'center',
         justifyContent: 'center',
         gap: space.space1,
+        borderRadius: radius.radiusFull,
+        // The selected pill is a shape, not only a colour. `accentSubtle` is the
+        // one tint in the palette quiet enough to sit under mint text without
+        // the pair failing contrast in either theme.
+        backgroundColor: isSelected ? palette.accentSubtle : 'transparent',
       }}
       testID={testID}
     >

@@ -129,6 +129,9 @@ owning your area (see §Areas below) → [`29`](29_DEFINITION_OF_DONE.md).
 | [0015](adr/0015-ad-supported-free-tier.md) | Ad-supported free tier capped on address search, day pass, Pro; amends ADR-0002 |
 | [0016](adr/0016-ai-assisted-stop-entry.md) | Paste, photo and dictation parsed to stops by a model, behind the Edge Function |
 | [0017](adr/0017-parse-provider-switch.md) | The parse provider is a switch, not a choice made once — Anthropic by default, OpenRouter opt-in |
+| [0018](adr/0018-bottom-dock-navigation.md) | A bottom dock replaces the sheet and the floating controls |
+| [0019](adr/0019-explicit-address-search.md) | Address search is submitted by a press, never typed ahead; the debounce is deleted |
+| [0020](adr/0020-four-section-dock.md) | The dock has four fixed sections and the map is one of them; amends ADR-0018 |
 
 ---
 

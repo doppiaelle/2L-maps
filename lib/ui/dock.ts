@@ -1,28 +1,44 @@
 /**
  * The dock, decided as data.
  *
- * Navigation used to be a swipe and two icons floating over the map: the stop
- * list was a bottom sheet with three detents, and History and Settings were 44 pt
- * glyphs in the top-right corner that **disappeared entirely while a route was in
- * progress**. Both choices came from the same instinct — keep the map clear — and
- * both cost more than they saved ([ADR-0018](../../docs/adr/0018-bottom-dock-navigation.md)).
+ * Navigation used to be a swipe and two icons floating over the map
+ * ([ADR-0018](../../docs/adr/0018-bottom-dock-navigation.md)). A dock replaced
+ * them. What changed since
+ * ([ADR-0020](../../docs/adr/0020-four-section-dock.md)) is that the dock no
+ * longer changes shape.
  *
- * A dock replaces them. Three sections, each opening full-screen above a map that
- * stays mounted underneath, and a close control that appears only when there is
- * something to close.
+ * **Four sections, always four, and the map is one of them.** The first version
+ * had three items plus a close control that appeared only while a section was
+ * open, on the reasoning that a permanently visible X on the bare map would be a
+ * control that does nothing. The reasoning was right about the X and wrong about
+ * the conclusion: it made the dock three items wide sometimes and four others,
+ * so every open and every close shifted every item under the user's thumb. A
+ * user moving between Route and History watched the row re-lay-out twice on the
+ * way.
  *
- * **What is available is decided here, not in the component**, because it is the
- * part with a rule in it. The old controls vanished mid-route on the theory that
- * a driver should not be distracted; the effect was that the person most likely
- * to need their route history, or to want to change which navigation app they are
- * being thrown into, was the one person who could not reach either. Removing
- * someone's way out is not the same as protecting them.
+ * Making the map a section fixes it at the cause. The X is gone — not replaced,
+ * removed — because "show me the map" is a destination like the other three and
+ * reads as one. The row never changes width, the items never move, and closing a
+ * section is the same gesture as opening one.
+ *
+ * **Map is leftmost and is where the app opens.** It is the state a user returns
+ * to most, and the left edge is where a thumb travelling across the row starts.
  */
 
-export type DockSection = 'itinerary' | 'history' | 'settings';
+export type DockSection = 'map' | 'itinerary' | 'history' | 'settings';
 
-/** `null` is the bare map — a state, not the absence of one. */
-export type ActiveSection = DockSection | null;
+/**
+ * Which section is showing.
+ *
+ * **Not nullable.** It used to be `DockSection | null`, where null meant the
+ * bare map — a state expressed as the absence of one, which every call site then
+ * had to translate. `'map'` is the same state with a name, and the translation
+ * is gone from all of them.
+ */
+export type ActiveSection = DockSection;
+
+/** Where the app opens, and where closing anything returns to. */
+export const DEFAULT_SECTION: ActiveSection = 'map';
 
 export interface DockItem {
   readonly section: DockSection;
@@ -42,6 +58,12 @@ export interface DockConditions {
 /** The order is fixed: the section a user reaches for most sits nearest the thumb
  *  it is reached with, and a dock whose items move is a dock nobody learns. */
 const SECTIONS: readonly Omit<DockItem, 'isSelected'>[] = [
+  {
+    section: 'map',
+    label: 'Map',
+    glyph: '◈',
+    accessibilityLabel: 'Show the map',
+  },
   {
     section: 'itinerary',
     label: 'Route',
@@ -75,21 +97,18 @@ export function dockItems(active: ActiveSection, _conditions: DockConditions): D
   return SECTIONS.map((item) => ({ ...item, isSelected: item.section === active }));
 }
 
-/** The close control exists only when there is something to close. A permanently
- *  visible X on the bare map would be a control that does nothing. */
-export function showsClose(active: ActiveSection): boolean {
-  return active !== null;
-}
-
 /**
  * What tapping a dock item does.
  *
- * Tapping the open section closes it, so the dock is also the way back to the
- * map. The X is the obvious route and this is the one a thumb finds by accident —
- * both land in the same place, which is what makes the gesture forgiving.
+ * Tapping the open section returns to the map, so the dock is also the way back
+ * — which is the job the close control used to do, done by a control that is
+ * always in the same place. Tapping Map while the map is showing is a no-op
+ * rather than a toggle into something else: a user pressing the section they are
+ * already in is confirming where they are, not asking to leave.
  */
 export function toggleSection(active: ActiveSection, tapped: DockSection): ActiveSection {
-  return active === tapped ? null : tapped;
+  if (tapped === DEFAULT_SECTION) return DEFAULT_SECTION;
+  return active === tapped ? DEFAULT_SECTION : tapped;
 }
 
 /**
