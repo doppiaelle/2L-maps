@@ -42,6 +42,20 @@ export interface UndoToastProps {
   onExpire: () => void;
   readonly isBackgrounded?: boolean;
   readonly durationMs?: number;
+  /**
+   * How far above the bottom edge to float, in points.
+   *
+   * **The toast had no positioning at all.** It was a plain flex child, so it
+   * pushed the map up by its own height every time it appeared — a layout jump
+   * on a screen the user is looking at — and then landed in the strip the dock
+   * occupies, painting over the navigation it was supposed to sit above.
+   *
+   * Passed rather than read from the dock's own constant, for the same reason
+   * every other measurement in this codebase is passed: a component that asks
+   * the device answers differently in a test, in split screen and on a foldable.
+   * The screen owns the measurement.
+   */
+  readonly bottomOffset?: number;
   readonly testID?: string;
 }
 
@@ -51,6 +65,7 @@ export function UndoToast({
   onExpire,
   isBackgrounded = false,
   durationMs = UNDO_WINDOW_MS,
+  bottomOffset = 0,
   testID,
 }: UndoToastProps): React.JSX.Element {
   const [window, setWindow] = useState(() => openWindow(durationMs));
@@ -88,14 +103,23 @@ export function UndoToast({
 
   return (
     <View
-      className="flex-row items-center justify-between bg-surface-raised border border-border"
+      className="flex-row items-center bg-surface-raised border border-border"
       style={{
-        marginHorizontal: layout.screenPadding,
+        // Above everything, over the bottom edge, out of the dock's way.
+        position: 'absolute',
+        left: layout.screenPadding,
+        bottom: bottomOffset,
         paddingLeft: space.space4,
         paddingRight: space.space2,
         paddingVertical: space.space2,
-        borderRadius: radius.radiusMd,
+        // Fully rounded and only as wide as its contents, so it reads as a
+        // passing remark rather than a bar the screen has grown. It is the
+        // quietest thing on screen that can still be acted on — a removal is
+        // already done, and this is only the window in which it can be taken
+        // back (docs/06 P8).
+        borderRadius: radius.radiusFull,
         minHeight: layout.touchMin,
+        gap: space.space3,
       }}
       // Announced when it appears, because the action it reports already
       // happened and the user may not have been looking at that part of the
@@ -104,7 +128,9 @@ export function UndoToast({
       accessibilityRole="alert"
       testID={testID}
     >
-      <Text className="text-body text-text-primary flex-1" numberOfLines={1}>
+      {/* No `flex-1`: the toast is as wide as what it says, not as wide as the
+          screen. */}
+      <Text className="text-body text-text-primary" numberOfLines={1}>
         {message}
       </Text>
 
@@ -127,7 +153,12 @@ export function UndoToast({
           the undo is still there. */}
       <View
         className="absolute left-0 bottom-0 h-space-1 bg-accent"
-        style={{ width: `${(1 - progress(window)) * 100}%` }}
+        style={{
+          width: `${(1 - progress(window)) * 100}%`,
+          // Follows the pill's own corner rather than cutting square across it.
+          borderBottomLeftRadius: radius.radiusFull,
+          borderBottomRightRadius: radius.radiusFull,
+        }}
         accessibilityElementsHidden
         importantForAccessibility="no"
         testID="undo-progress"

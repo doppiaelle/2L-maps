@@ -245,3 +245,40 @@ describe('Skeleton', () => {
     expect(screen.getByTestId('skeleton-block', visually)).toBeTruthy();
   });
 });
+
+/**
+ * Where the toast sits, which is not a detail.
+ *
+ * It had no positioning at all — a plain flex child in the screen's root — so it
+ * shrank the map by its own height every time a stop was removed and then landed
+ * in the strip the dock occupies. A layout jump on the surface the user spends
+ * their whole day in, and navigation painted over.
+ */
+describe('the undo toast floats', () => {
+  const noop = () => undefined;
+
+  it('is taken out of the layout, so nothing moves when it appears', () => {
+    render(<UndoToast message="Stop removed" onUndo={noop} onExpire={noop} testID="toast" />);
+    expect(screen.getByTestId('toast').props.style).toMatchObject({ position: 'absolute' });
+  });
+
+  it('sits where the caller puts it, above whatever covers the bottom edge', () => {
+    render(
+      <UndoToast
+        message="Stop removed"
+        onUndo={noop}
+        onExpire={noop}
+        bottomOffset={96}
+        testID="toast"
+      />,
+    );
+    expect(screen.getByTestId('toast').props.style).toMatchObject({ bottom: 96 });
+  });
+
+  it('is only as wide as what it says', () => {
+    // A bar spanning the screen reads as a state the app has entered. This is a
+    // passing remark about something already done.
+    render(<UndoToast message="Stop removed" onUndo={noop} onExpire={noop} testID="toast" />);
+    expect(screen.getByTestId('toast').props.style).not.toMatchObject({ right: 0 });
+  });
+});

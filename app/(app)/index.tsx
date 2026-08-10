@@ -19,12 +19,14 @@ import { AdSlot } from '@/components/primitives/AdSlot';
 import { AppMap } from '@/components/map/AppMap';
 import { Dock, DOCK_OUTER_HEIGHT } from '@/components/navigation/Dock';
 import { useLocation } from '@/features/location/location-provider';
+import { useIsBackgrounded } from '@/features/ui/use-is-backgrounded';
 import { SectionPanel } from '@/components/navigation/SectionPanel';
 import { HistorySection } from '@/features/routes/HistorySection';
 import { SettingsSection } from '@/features/settings/SettingsSection';
 import { dockItems, dockObstructionFraction, toggleSection } from '@/lib/ui/dock';
 import { UndoToast } from '@/components/feedback/UndoToast';
 import { readMapIds } from '@/lib/config/map-ids';
+import { space } from '@/lib/design/tokens';
 import { isOffline } from '@/lib/network/connectivity';
 import { addressNoticeOf } from '@/lib/places/notice';
 import { formatDistance, formatDuration } from '@/lib/format/units';
@@ -101,6 +103,7 @@ export default function PlanScreen(): React.JSX.Element {
   // already granted and asks for one only when a control is pressed
   // (docs/18_PERMISSIONS.md §4).
   const location = useLocation();
+  const isBackgrounded = useIsBackgrounded();
 
   useEffect(() => {
     // Cleared once honoured. Leaving it set would re-open the same route on
@@ -380,6 +383,14 @@ export default function PlanScreen(): React.JSX.Element {
         // against a mistake that is both rare and reversible (docs/06 P8).
         <UndoToast
           message="Stop removed"
+          // Above the dock rather than inside it. The toast used to be a plain
+          // flex child, so it pushed the content up by its own height and then
+          // painted over the navigation.
+          bottomOffset={DOCK_OUTER_HEIGHT + space.space2}
+          // The window pauses while the app is off screen. `lib/ui/undo-window`
+          // was written for this and nothing had ever passed the flag, so in
+          // production the six seconds ran down in the user's pocket.
+          isBackgrounded={isBackgrounded}
           onUndo={() => {
             undoRemove();
             setPendingRemoval(null);
