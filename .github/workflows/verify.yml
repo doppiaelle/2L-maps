@@ -107,10 +107,16 @@ jobs:
           # first version of this job trusted the exit code and was therefore
           # green by construction — it took a canary to notice, which is the
           # whole argument for keeping one.
+          # stdout is the graph and stderr is the npm download progress. Merging
+          # them puts "Download https://registry.npmjs.org/..." in front of the
+          # JSON and jq refuses the lot, which reads as a broken graph when the
+          # graph is fine.
           graph_errors() {
             local out
-            if ! out=$(deno info --json --config supabase/functions/deno.json "$1" 2>&1); then
-              printf '%s\n' "$out"
+            local status=0
+            out=$(deno info --json --quiet --config supabase/functions/deno.json "$1" 2>/tmp/deno-stderr) || status=$?
+            if [ "$status" -ne 0 ]; then
+              cat /tmp/deno-stderr
               return
             fi
             printf '%s' "$out" | jq -r '.. | objects | select(has("error")) | .error'
