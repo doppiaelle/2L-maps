@@ -1,11 +1,13 @@
 import { router } from 'expo-router';
 import { useColorScheme } from 'react-native';
 
+import { useConnectivity } from '@/features/network/connectivity-provider';
 import { AddStopView } from '@/features/places/AddStopView';
 import { useAddressBook } from '@/features/places/use-address-book';
 import { usePlaceSearch } from '@/features/places/use-place-search';
 import { useUsageQuota } from '@/features/quota/use-usage-quota';
 import { useDraftRouteStore } from '@/features/stores';
+import { isOffline } from '@/lib/network/connectivity';
 import { searchStateOf } from '@/lib/places/search';
 import type { SourcedOption } from '@/lib/places/search';
 
@@ -29,6 +31,7 @@ export default function AddStopScreen(): React.JSX.Element {
   const { allowances } = useUsageQuota();
   const search = usePlaceSearch();
   const book = useAddressBook();
+  const connectivity = useConnectivity();
 
   const state = searchStateOf({
     query: search.query,
@@ -40,7 +43,11 @@ export default function AddStopScreen(): React.JSX.Element {
     favourites: book.saved,
     results: search.results,
     isSearching: search.isSearching,
-    isOffline: false,
+    // Was hard-coded false, which made every offline state in this modal
+    // reachable from a test and from nowhere else. Search needs the network;
+    // the address book does not, which is what keeps this screen useful in a
+    // basement car park (ADR-0008).
+    isOffline: isOffline(connectivity),
     stopCount: draft.stops.length,
     maxStops: allowances.maxStopsPerRoute,
   });

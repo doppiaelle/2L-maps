@@ -3,6 +3,8 @@ import { useEffect, useMemo } from 'react';
 import { Linking, useColorScheme, useWindowDimensions } from 'react-native';
 
 import { useHandoff } from '@/features/handoff/use-handoff';
+import { useConnectivity } from '@/features/network/connectivity-provider';
+import { useDrainOnReconnect } from '@/features/network/use-drain-on-reconnect';
 import { usePendingDeepLinkContext } from '@/features/navigation/deep-link-provider';
 import { useLaunchDestination } from '@/features/navigation/use-launch-destination';
 import { useResolvedPlaces } from '@/features/places/use-resolved-places';
@@ -13,6 +15,7 @@ import { useOpenRoute } from '@/features/routes/use-open-route';
 import { useRouteSync } from '@/features/routes/use-route-sync';
 import { useDraftRouteStore, useRouteProgressStore, useUiStore } from '@/features/stores';
 import { readMapIds } from '@/lib/config/map-ids';
+import { isOffline } from '@/lib/network/connectivity';
 import { formatDistance, formatDuration } from '@/lib/format/units';
 import { buildPlanRows, placeIdsToResolve, straightLineMeters } from '@/lib/route/plan-rows';
 import { buildRouteGeometry } from '@/lib/map/route-geometry';
@@ -38,6 +41,7 @@ export default function PlanScreen(): React.JSX.Element {
   const scheme = useColorScheme();
 
   const pending = usePendingDeepLinkContext();
+  const connectivity = useConnectivity();
   const draft = useDraftRouteStore((store) => store.draft);
   const result = useDraftRouteStore((store) => store.result);
   const progress = useRouteProgressStore((store) => store.progress);
@@ -59,6 +63,10 @@ export default function PlanScreen(): React.JSX.Element {
   // finished — and never on a keystroke. The local store already holds the
   // draft; what this adds is History and the second device.
   useRouteSync();
+
+  // The signal coming back is the interesting edge: the server's copy is behind
+  // by whatever the driver did underground. Pushes first, then re-reads.
+  useDrainOnReconnect();
 
   const { open: openRoute } = useOpenRoute();
 
@@ -215,7 +223,11 @@ export default function PlanScreen(): React.JSX.Element {
       }}
       theme={scheme === 'dark' ? 'dark' : 'light'}
       mapIds={readMapIds()}
-      mapStatus="ready"
+      // The map's own offline state, which the component has always had and
+      // nothing ever put it into. Tiles cannot be cached or pre-fetched
+      // (`CLAUDE.md` §13 rule 4), so with no signal there is nothing to draw
+      // and saying so beats a grey rectangle.
+      mapStatus={isOffline(connectivity) ? 'offline' : 'ready'}
       screenHeight={height}
       testID="plan-screen"
     />

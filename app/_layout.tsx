@@ -1,4 +1,6 @@
-import { QueryClientProvider } from '@tanstack/react-query';
+import { onlineManager } from '@tanstack/react-query';
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Linking from 'expo-linking';
 import { SplashScreen, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -11,8 +13,12 @@ import { SessionProvider, useSession } from '@/features/auth/session-provider';
 import { DeepLinkProvider } from '@/features/navigation/deep-link-provider';
 import type { DeepLinkPort } from '@/features/navigation/use-pending-deep-link';
 import { useStoresHydrated } from '@/features/navigation/use-launch-destination';
+import { ConnectivityProvider } from '@/features/network/connectivity-provider';
 import { PERSISTED_STORES } from '@/features/stores';
+import { createConnectivityPort } from '@/lib/network/netinfo-adapter';
+import { isOffline, connectivityOf } from '@/lib/network/connectivity';
 import { createQueryClient } from '@/lib/query/client';
+import { createQueryPersister, queryPersistOptions } from '@/lib/query/persist';
 import {
   createSupabaseAuth,
   createSupabaseFavourites,
@@ -46,6 +52,24 @@ import {
 void SplashScreen.preventAutoHideAsync();
 
 const queryClient = createQueryClient();
+const persistOptions = queryPersistOptions(createQueryPersister({ storage: AsyncStorage }));
+const connectivity = createConnectivityPort();
+
+/**
+ * React Query's own idea of online, taken from the same port as everybody
+ * else's.
+ *
+ * Without this it uses a browser heuristic that is always true in React Native,
+ * so `networkMode: 'offlineFirst'` — which every query and mutation in this app
+ * is configured with — never actually engaged. Requests fired into a dead radio
+ * and failed one by one instead of pausing and resuming.
+ */
+onlineManager.setEventListener((setOnline) =>
+  connectivity.subscribe((snapshot) => {
+    setOnline(!isOffline(connectivityOf(snapshot)));
+  }),
+);
+
 const supabaseConfig = readSupabaseConfig();
 const auth = createSupabaseAuth(supabaseConfig);
 const routes = createSupabaseRoutes(supabaseConfig);
@@ -70,20 +94,23 @@ export default function RootLayout(): React.JSX.Element {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <QueryClientProvider client={queryClient}>
-        <SessionProvider auth={auth}>
-          {/* Inside `SessionProvider`, because the services are null until there
-              is a session: every endpoint behind them is authenticated, and a
-              query firing during the cold-start gap would cache the signed-out
-              answer and leave a paying user on the free allowances. */}
-          <ServicesProvider baseUrl={baseUrl} routes={routes} favourites={favourites}>
-            <DeepLinkProvider port={linking}>
-              <StatusBar style="auto" />
-              <RestorationGate />
-            </DeepLinkProvider>
-          </ServicesProvider>
-        </SessionProvider>
-      </QueryClientProvider>
+      <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
+        <ConnectivityProvider port={connectivity}>
+          <SessionProvider auth={auth}>
+            {/* Inside `SessionProvider`, because the services are null until
+                there is a session: every endpoint behind them is authenticated,
+                and a query firing during the cold-start gap would cache the
+                signed-out answer and leave a paying user on the free
+                allowances. */}
+            <ServicesProvider baseUrl={baseUrl} routes={routes} favourites={favourites}>
+              <DeepLinkProvider port={linking}>
+                <StatusBar style="auto" />
+                <RestorationGate />
+              </DeepLinkProvider>
+            </ServicesProvider>
+          </SessionProvider>
+        </ConnectivityProvider>
+      </PersistQueryClientProvider>
     </GestureHandlerRootView>
   );
 }

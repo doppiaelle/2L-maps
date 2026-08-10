@@ -32,7 +32,7 @@ loss and process death.
 |---|---|---|
 | Server state | React Query | Caching, staleness, retry, invalidation |
 | Global client state | Zustand, feature-scoped | Draft route, selection, sheet detent |
-| Persistence | MMKV via a Zustand persist adapter | Survives process death |
+| Persistence | AsyncStorage via a Zustand persist adapter | Survives process death |
 | Mutation queue | Dedicated store | Drains on reconnection |
 
 ---
