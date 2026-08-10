@@ -282,7 +282,18 @@ twolmaps://auth-callback
    > `types/database.generated.ts` → re-run the workflow. **Your database is already
    > migrated either way**, so you can also just carry on to the build and tidy this up
    > later.
-2. **`android-preview`** → *Run workflow* → *Run workflow*. About ten minutes.
+2. **`android-preview`** → *Run workflow* → *Run workflow*.
+
+   **First run: 15–25 minutes. After that: 5–10.** Gradle downloads its own
+   distribution and every Android dependency before compiling anything, and only the
+   second run finds them cached. A build that has been going for half an hour is
+   almost certainly working rather than stuck — Gradle prints a `EXECUTING [12m]`
+   progress line, and GitHub kills a job at six hours regardless.
+
+   The APK is built for **`arm64-v8a` only** — every Android phone sold since about
+   2017. It will not install on an x86 emulator or a 32-bit device; if you ever need
+   one, add the architectures back in `.github/workflows/android-preview.yml`.
+
    When it finishes: open the run → **Artifacts** → **`2l-maps-development-build`** → download →
    unzip → send the `.apk` to your phone → open it. Android will warn about installing from an
    unknown source; that is expected.
