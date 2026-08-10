@@ -57,6 +57,15 @@ export interface PlanViewProps {
 
   onPrimaryAction: () => void;
   onAddStop: () => void;
+  /**
+   * The advertising slot, or nothing.
+   *
+   * Passed in rather than rendered here so this component stays presentational
+   * and so **no space is reserved when there is no ad provider**. An empty
+   * fifty-point gap above the stop list is worse than no gap: it is a hole the
+   * user cannot explain, on the screen they spend the whole day in.
+   */
+  readonly adSlot?: React.ReactNode;
   /** Mid-route only, beside **Done**. */
   onSkipStop?: () => void;
 
@@ -83,6 +92,7 @@ export function PlanView({
   onClearSelection,
   onPrimaryAction,
   onAddStop,
+  adSlot,
   onSkipStop,
   theme,
   mapIds,
@@ -124,13 +134,19 @@ export function PlanView({
         prefersReducedMotion={prefersReducedMotion}
         testID="plan-sheet"
         header={
-          <RouteSummaryHeader
-            title={titleFor(state)}
-            distance={distance}
-            duration={duration}
-            {...chipFor(state)}
-            {...noteFor(state)}
-          />
+          <>
+            {/* Above the summary rather than between the list rows: the sheet
+                header is the one part of this screen that does not move under a
+                thumb (ADR-0015). `<AdSlot>` hides itself during a route. */}
+            {adSlot}
+            <RouteSummaryHeader
+              title={titleFor(state)}
+              distance={distance}
+              duration={duration}
+              {...chipFor(state)}
+              {...noteFor(state)}
+            />
+          </>
         }
         action={
           <View>
