@@ -8,6 +8,14 @@ import { AUTOCOMPLETE_MIN_CHARACTERS } from '@/types';
  * when *not* to ask are worth more than the rules about when to. All of them
  * live here, where they are tested without a network:
  *
+ * **Nothing is sent until the user asks for it**
+ * ([ADR-0019](../../docs/adr/0019-explicit-address-search.md)). Typing costs
+ * nothing; pressing Search costs one request. The debounced type-ahead this
+ * replaces sent a request per pause in typing, so a single address — "Via
+ * Giuseppe Garibaldi 14" — spent four or five of a free user's ten monthly
+ * allowance before they had chosen anything. That is not a tuning problem; it
+ * is the wrong trigger.
+ *
  * **Reuse before search.** Recents and favourites are shown first and are always
  * visible, because a reused `place_id` is free and a search is not
  * (`CLAUDE.md` §6 rule 2). The cheapest interaction is also the fastest one.
@@ -83,6 +91,16 @@ export type SearchFailure = 'offline' | 'quota-exhausted' | 'no-entitlement' | '
 
 export interface SearchInputs {
   readonly query: string;
+  /**
+   * The text the last request was actually sent for. Empty before the first.
+   *
+   * The field and the network are no longer the same thing (ADR-0019), so the
+   * state machine needs both: `query` is what the user is looking at, and this
+   * is what the results on screen are answers to. Without the distinction a
+   * half-typed address sits above results for the previous one and the screen
+   * cannot tell whether the difference is a pending search or a genuine miss.
+   */
+  readonly submittedQuery: string;
   readonly recents: readonly PlaceOption[];
   readonly favourites: readonly PlaceOption[];
   readonly results: readonly PlaceOption[];
@@ -99,6 +117,58 @@ export interface SearchInputs {
 export function shouldSearch(query: string, isOffline: boolean): boolean {
   if (isOffline) return false;
   return query.trim().length >= AUTOCOMPLETE_MIN_CHARACTERS;
+}
+
+/**
+ * Whether what is on screen still answers what is in the field.
+ *
+ * True means the user has typed something the network has not been asked about
+ * — which is the normal resting state now that asking is a deliberate act
+ * (ADR-0019), not an error and not a loading state. The screen shows the free
+ * options and an enabled Search control; it does not show "no match", because
+ * nothing has been matched against.
+ */
+export function isAwaitingSubmit(query: string, submittedQuery: string): boolean {
+  return query.trim() !== submittedQuery.trim();
+}
+
+/**
+ * Whether the current text is one the Search control may be pressed for.
+ *
+ * The control is disabled rather than absent below the minimum: a button that
+ * vanishes as the user backspaces is a button they stop believing in. Disabled
+ * with the reason stated beside it says what to do next (`CLAUDE.md` §0 rule 5).
+ */
+export function canSubmitSearch(inputs: {
+  readonly query: string;
+  readonly submittedQuery: string;
+  readonly isOffline: boolean;
+  readonly isSearching: boolean;
+}): boolean {
+  if (inputs.isSearching) return false;
+  if (!shouldSearch(inputs.query, inputs.isOffline)) return false;
+  // Pressing Search again on an unchanged query would buy the same answer
+  // twice. Retry exists for the case where the first attempt failed, and it is
+  // a different control with a different meaning.
+  return isAwaitingSubmit(inputs.query, inputs.submittedQuery);
+}
+
+/**
+ * Whether "My location" is offered at the top of the list.
+ *
+ * It is the first row while the field is empty and disappears the moment the
+ * user types, because at that point they have told us where they want to go and
+ * a suggestion about where they already are is in the way. Free in every sense:
+ * the device answers, nothing is billed, and it works with no signal.
+ *
+ * It sets the route's **origin**, not a stop. The draft has carried
+ * `originIsCurrentLocation` since the beginning and nothing ever set it; the
+ * permission timeline in [`docs/18_PERMISSIONS.md`](../../docs/18_PERMISSIONS.md)
+ * §4 names this exact moment — "first stop added → location, when in use → to
+ * set your starting point".
+ */
+export function offersCurrentLocation(query: string): boolean {
+  return query.trim().length === 0;
 }
 
 /**
@@ -156,6 +226,15 @@ export function searchStateOf(inputs: SearchInputs): SearchState {
   // The existing list stays visible beneath the skeletons: a list that empties
   // while it loads loses the user's place and flashes the layout.
   if (inputs.isSearching) return { kind: 'searching', options: local };
+
+  // Typed but not yet asked. **Before the failure and no-match checks, and that
+  // order is the point** (ADR-0019): both of those describe an answer, and the
+  // user has not asked a question yet. Reporting "no match for what you typed"
+  // against a query nobody searched for is the same lie the failure states were
+  // written to stop telling — the app blaming an address it never looked up.
+  if (isAwaitingSubmit(inputs.query, inputs.submittedQuery)) {
+    return { kind: 'browsing', options: local };
+  }
 
   // **Before `no-match`, and that order is the fix.** A failed request returns
   // no results, so testing emptiness first reports every outage as "no match for

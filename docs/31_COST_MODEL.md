@@ -213,7 +213,7 @@ in [`../CLAUDE.md`](../CLAUDE.md) §6, not a suggestion.
 
 | Line | Without mitigations | With mitigations | Mechanism |
 |---|---|---|---|
-| Address entry | $3.52/month | **$0.80/month** | Address-book reuse, session tokens, 300 ms debounce, 3-character minimum |
+| Address entry | $3.52/month | **$0.80/month** | Address-book reuse, session tokens, explicit submit ([ADR-0019](adr/0019-explicit-address-search.md)), 3-character minimum |
 | Optimization (T1) | $0.22/month | **$0.22/month** | Flat per route |
 | Shared cache saving | — | −$0.05 | Content-keyed cross-user cache |
 | Navigation | $0 | $0 | External handoff |

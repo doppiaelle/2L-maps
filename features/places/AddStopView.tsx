@@ -14,10 +14,21 @@ import { AUTOCOMPLETE_MIN_CHARACTERS } from '@/types';
  * line is either controlled or not
  * ([`docs/08_SCREEN_SPECIFICATIONS.md`](../../docs/08_SCREEN_SPECIFICATIONS.md) §8).
  *
+ * **Searching is a press, not a side effect of typing**
+ * ([ADR-0019](../../docs/adr/0019-explicit-address-search.md)). The field and
+ * the Search control sit on one row, and nothing leaves the device until the
+ * control is used or the keyboard's own search key is. What the user reads while
+ * they type comes from the address book, which is free.
+ *
  * **Recents and favourites sit above search results, always.** A reused
  * `place_id` is free and a search is not, so the cheapest interaction is also
  * the one nearest the thumb (`CLAUDE.md` §6 rule 2). The ordering is decided in
  * `lib/places/search.ts`; this renders it.
+ *
+ * **"My location" is the first row on an empty field.** It costs nothing, works
+ * with no signal, and is the answer to the most common first question — where
+ * does this route start. It sets the origin rather than adding a stop, which is
+ * the distinction the draft has always drawn (`originIsCurrentLocation`).
  *
  * **The field is focused on open.** The user came here to type, and a modal that
  * needs a tap to start has spent one of the three taps on itself.
@@ -31,6 +42,19 @@ export interface AddStopViewProps {
   readonly state: SearchState;
   readonly query: string;
   onQueryChange: (query: string) => void;
+  /** Sends the typed text. The only path to a billed request from this screen. */
+  onSubmit: () => void;
+  /** Whether the control is pressable. Decided by `canSubmitSearch`, so the
+   *  reason a search is refused lives with the other search rules and not here. */
+  readonly canSubmit: boolean;
+  /** Whether "My location" heads the list — true while the field is empty. */
+  readonly offersCurrentLocation: boolean;
+  /** Sets the route's origin to where the device is, prompting for permission
+   *  on the first use. Nothing is billed and nothing is added to the list. */
+  onUseCurrentLocation: () => void;
+  /** Said under the row once the permission has been refused, so a control that
+   *  cannot work explains itself instead of doing nothing. */
+  readonly isLocationDenied?: boolean;
   onSelect: (option: SourcedOption) => void;
   /** Adds the typed text as a manual label when nothing matched. Not a
    *  fallback — a driver who knows where they are going should not be blocked
@@ -57,6 +81,11 @@ export function AddStopView({
   state,
   query,
   onQueryChange,
+  onSubmit,
+  canSubmit,
+  offersCurrentLocation,
+  onUseCurrentLocation,
+  isLocationDenied = false,
   onSelect,
   onAddManually,
   onRetry,
@@ -109,28 +138,78 @@ export function AddStopView({
       testID={testID}
     >
       <View style={{ paddingHorizontal: layout.screenPadding }}>
-        <TextInput
-          value={query}
-          onChangeText={onQueryChange}
-          // The user came here to type. A modal that needs a tap to start has
-          // spent one of the three taps on itself.
-          autoFocus
-          autoCorrect={false}
-          returnKeyType="search"
-          placeholder="Search an address"
-          placeholderTextColor={palette.textSecondary}
-          accessibilityLabel="Search for an address"
-          accessibilityHint={`Results appear after ${AUTOCOMPLETE_MIN_CHARACTERS} characters`}
-          style={{
-            minHeight: layout.touchMin,
-            paddingHorizontal: space.space3,
-            borderRadius: radius.radiusMd,
-            backgroundColor: palette.surfaceRaised,
-            color: palette.textPrimary,
-            fontSize: 16,
-          }}
-          testID="add-stop-input"
-        />
+        <View className="flex-row items-center gap-space-2">
+          <TextInput
+            value={query}
+            onChangeText={onQueryChange}
+            // The user came here to type. A modal that needs a tap to start has
+            // spent one of the three taps on itself.
+            autoFocus
+            autoCorrect={false}
+            returnKeyType="search"
+            // The keyboard's own search key does the same thing as the button
+            // beside it. A user whose thumb is already on the keyboard should
+            // not have to travel to a control to finish what they were doing
+            // (`CLAUDE.md` §7 rule 4 — the alternative is visible, not instead
+            // of the gesture but as well as it).
+            onSubmitEditing={onSubmit}
+            // Nothing is billed by typing any more, so the keyboard can stay up
+            // through a search and a correction without costing anything.
+            blurOnSubmit={false}
+            placeholder="Type an address, then search"
+            placeholderTextColor={palette.textSecondary}
+            accessibilityLabel="Address to search for"
+            accessibilityHint={`At least ${AUTOCOMPLETE_MIN_CHARACTERS} characters, then press Search`}
+            style={{
+              flex: 1,
+              minHeight: layout.touchMin,
+              paddingHorizontal: space.space3,
+              borderRadius: radius.radiusMd,
+              backgroundColor: palette.surfaceRaised,
+              color: palette.textPrimary,
+              fontSize: 16,
+            }}
+            testID="add-stop-input"
+          />
+
+          {/* Disabled rather than hidden below the minimum: a control that
+              disappears as the user backspaces is one they stop believing in. */}
+          <Pressable
+            onPress={onSubmit}
+            disabled={!canSubmit}
+            accessibilityRole="button"
+            accessibilityLabel="Search for this address"
+            accessibilityState={{ disabled: !canSubmit }}
+            style={{
+              minHeight: layout.touchMin,
+              minWidth: layout.touchMin,
+              paddingHorizontal: space.space4,
+              borderRadius: radius.radiusMd,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: canSubmit ? palette.accent : palette.surfaceRaised,
+            }}
+            testID="add-stop-search"
+          >
+            <Text
+              className="text-body-strong"
+              style={{ color: canSubmit ? palette.accentOn : palette.textTertiary }}
+            >
+              Search
+            </Text>
+          </Pressable>
+        </View>
+
+        {/* Says what the press will cost before it is pressed. The allowance is
+            small enough on the free plan that a user deserves to know a search
+            is a spend and typing is not (ADR-0019). */}
+        {state.kind === 'browsing' && query.trim().length > 0 && (
+          <Text className="text-caption text-text-secondary mt-space-2" testID="add-stop-hint">
+            {canSubmit
+              ? 'Press Search to look this address up. Saved and recent addresses below are free.'
+              : `Type at least ${AUTOCOMPLETE_MIN_CHARACTERS} characters to search.`}
+          </Text>
+        )}
 
         {state.kind === 'offline' && (
           <View style={{ marginTop: space.space2 }}>
@@ -154,6 +233,15 @@ export function AddStopView({
           style={{ marginTop: space.space3 }}
           keyboardShouldPersistTaps="handled"
           renderItem={({ item }) => <OptionRow option={item} onSelect={onSelect} theme={theme} />}
+          ListHeaderComponent={
+            offersCurrentLocation ? (
+              <CurrentLocationRow
+                onPress={onUseCurrentLocation}
+                isDenied={isLocationDenied}
+                theme={theme}
+              />
+            ) : null
+          }
           ListFooterComponent={
             state.kind === 'searching' ? (
               <View style={{ paddingHorizontal: layout.screenPadding }} testID="search-skeletons">
@@ -171,6 +259,82 @@ export function AddStopView({
           testID="add-stop-list"
         />
       )}
+    </View>
+  );
+}
+
+/**
+ * "My location", above everything, while the field is empty.
+ *
+ * It is not an option in the list and is deliberately not rendered as one: it
+ * sets the route's **origin**, and adding it as a stop would put a place with no
+ * `place_id` into a list whose durable key is the `place_id`
+ * ([ADR-0007](../../docs/adr/0007-place-id-durable-coordinates-perishable.md)).
+ * The visual separation says so — a mint marker glyph and a line beneath it,
+ * rather than the same row shape as an address.
+ *
+ * **Refusal is a state, not a dead end.** Once the permission has been denied
+ * the row stays and says what it needs, because the alternative — silently
+ * removing it — leaves the user with no way to discover why the feature they
+ * were told about is missing (`CLAUDE.md` §0 rule 5).
+ */
+function CurrentLocationRow({
+  onPress,
+  isDenied,
+  theme,
+}: {
+  onPress: () => void;
+  isDenied: boolean;
+  theme: ThemeName;
+}): React.JSX.Element {
+  const palette = colours[theme];
+
+  return (
+    <View
+      style={{
+        borderBottomWidth: 1,
+        borderBottomColor: palette.border,
+        marginBottom: space.space2,
+      }}
+    >
+      <Pressable
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={
+          isDenied
+            ? 'Use my location as the starting point. Location access is currently off'
+            : 'Use my location as the starting point'
+        }
+        accessibilityHint="Sets where this route begins"
+        style={{
+          minHeight: layout.touchMin,
+          paddingHorizontal: layout.screenPadding,
+          paddingVertical: space.space2,
+          justifyContent: 'center',
+        }}
+        testID="add-stop-current-location"
+      >
+        <View className="flex-row items-center gap-space-2">
+          {/* Never colour alone: the glyph carries it as well as the mint
+              (`CLAUDE.md` §10 rule 4). */}
+          <Text
+            style={{ color: palette.accent }}
+            className="text-body-strong"
+            accessibilityElementsHidden
+            importantForAccessibility="no"
+          >
+            ◎
+          </Text>
+          <Text className="text-body-strong text-text-primary flex-1" numberOfLines={1}>
+            My location
+          </Text>
+        </View>
+        <Text className="text-caption text-text-secondary" numberOfLines={2}>
+          {isDenied
+            ? 'Location access is off. Turn it on in your device settings to start from here.'
+            : 'Start the route from where you are'}
+        </Text>
+      </Pressable>
     </View>
   );
 }

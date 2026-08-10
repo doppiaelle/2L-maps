@@ -199,15 +199,17 @@ Budgets, measured on a mid-range Android device and an iPhone at least three gen
 | Cold start to interactive | < 2.5 s |
 | Stop list scroll | 60 fps, no dropped frames at 25 stops |
 | Dock section transition | < 300 ms, interruptible |
-| Autocomplete keystroke → suggestions | < 400 ms perceived, debounce ≥ 300 ms |
+| Address search pressed → suggestions | < 400 ms perceived ([ADR-0019](docs/adr/0019-explicit-address-search.md)) |
 | Optimization request → result (T1) | < 3 s, with progress shown after 1 s |
 | Map marker render, 25 stops | < 16 ms per frame |
 
 Rules that keep these true:
 
-1. **Debounce every keystroke that costs money.** Autocomplete is the largest COGS line
-   ([`docs/31_COST_MODEL.md`](docs/31_COST_MODEL.md)). Minimum 300 ms, minimum 3 characters,
-   session tokens always.
+1. **Never let a keystroke cost money.** Autocomplete is the largest COGS line
+   ([`docs/31_COST_MODEL.md`](docs/31_COST_MODEL.md)), and a debounce bounds requests per
+   *pause*, not per address — which made the free allowance a function of typing rhythm. Address
+   search is submitted by a press ([ADR-0019](docs/adr/0019-explicit-address-search.md)). Minimum
+   3 characters, minimum 300 ms between two different queries, session tokens always.
 2. **Check the local address book before the network.** A reused `place_id` is free.
 3. **Lists are virtualised** above 20 items.
 4. **Markers are memoised** and clustered above 15.

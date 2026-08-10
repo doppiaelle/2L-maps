@@ -53,9 +53,20 @@ export const HANDOFF_NOMINAL_WAYPOINTS = 9;
 // ─── Cost control ────────────────────────────────────────────────────────────
 // docs/31_COST_MODEL.md · docs/24_PERFORMANCE.md
 
-/** Autocomplete is the largest single COGS line. Both of these serve cost and
- *  perceived performance at once, which is why neither is tuned for feel alone. */
-export const AUTOCOMPLETE_DEBOUNCE_MS = 300;
+/**
+ * Address search is the largest single COGS line.
+ *
+ * The minimum length is the only client-side gate left, and it is enforced
+ * server-side too: below it Google answers with noise, and we would have paid a
+ * round trip to be told what we already knew.
+ *
+ * **There is no debounce constant any more.** There was — 300 ms — and it bounded
+ * requests per *pause in typing* rather than per address, so a single street name
+ * cost four or five calls out of a monthly allowance of ten. The trigger moved to
+ * an explicit press instead ([ADR-0019](../docs/adr/0019-explicit-address-search.md)),
+ * which bounds it at one, and a debounce on a button nobody presses twice is a
+ * number with nothing to do.
+ */
 export const AUTOCOMPLETE_MIN_CHARACTERS = 3;
 
 // ─── Rendering ───────────────────────────────────────────────────────────────

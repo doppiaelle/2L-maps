@@ -137,15 +137,15 @@ flash reads as a defect and costs more perceived quality than the extra 300 ms.
 
 | Metric | Budget | Notes |
 |---|---|---|
-| Autocomplete keystroke → suggestions | **< 400 ms perceived** | Debounce ≥ 300 ms, so the request has ~100 ms |
+| Address search pressed → suggestions | **< 400 ms perceived** | Submitted, never typed-ahead ([ADR-0019](adr/0019-explicit-address-search.md)) |
 | Optimization T1 → result | **< 3 s p95** | Progress shown after 1 s |
 | Optimization T2 sync | < 8 s | Above this, it becomes an async job |
 | Route load from cache | < 200 ms | Local |
 | Coordinate re-hydration, 25 stops | < 1.5 s | Batched |
 
-**Perceived latency is what is budgeted**, not request time. Autocomplete gets 400 ms *perceived*
-because the debounce is deliberate and the local address book answers instantly — the user is
-rarely waiting on the network at all.
+**Perceived latency is what is budgeted**, not request time. Address search gets 400 ms
+*perceived* because the local address book answers instantly on every keystroke — the user is
+rarely waiting on the network at all, and when they are, they pressed a control and expect it.
 
 ### Resources
 
@@ -185,9 +185,10 @@ user is between charges for a working day.
 
 ### Network and cost
 
-9. **Debounce every keystroke that costs money.** Autocomplete is the dominant COGS line
-   ([`31_COST_MODEL.md`](31_COST_MODEL.md)); the debounce serves performance and cost
-   simultaneously.
+9. **Never let a keystroke cost money.** Address search is the dominant COGS line
+   ([`31_COST_MODEL.md`](31_COST_MODEL.md)) and is sent by an explicit press
+   ([ADR-0019](adr/0019-explicit-address-search.md)), so typing is free in both senses at
+   once — no request to wait for, and no request to pay for.
 10. **Check the local address book before the network.** A reused `place_id` is free and instant.
 11. **Batch re-hydration.** Twenty-five sequential Place Details calls would take seconds.
 12. **Cancel in-flight requests** when the user's input supersedes them.
@@ -255,7 +256,7 @@ product in that condition.
 - [ ] Sheet gestures verified smooth with the JS thread deliberately blocked.
 - [ ] Markers and rows verified memoised.
 - [ ] Polyline verified decoded once per result.
-- [ ] Autocomplete debounce verified at ≥ 300 ms.
+- [ ] Address search verified to send nothing until the control is pressed (ADR-0019).
 - [ ] Optimization p95 measured against the 3 s budget.
 - [ ] Memory measured over a 30-minute session.
 - [ ] Battery measured over an hour of simulated route driving.
@@ -278,6 +279,7 @@ product in that condition.
 | 2026-08-06 | Budgets set against 3-year-old reference devices | The target segment does not upgrade annually | Architecture |
 | 2026-08-06 | Measurement required on battery, warm | Windscreen-mounted phones are thermally throttled | Architecture |
 | 2026-08-06 | Perceived latency budgeted rather than request time | The debounce is deliberate; the address book answers instantly | Architecture |
+| 2026-08-10 | Address search submitted by a press; the debounce constant deleted | A debounce bounds requests per pause in typing, not per address, so the free allowance was a function of typing rhythm (ADR-0019) | Architecture |
 | 2026-08-06 | Draft route exempt from memory-pressure eviction | It is unsaved user work | Architecture |
 
 ## 16. Rationale
@@ -287,10 +289,10 @@ bought a phone three years ago and mounts it on a windscreen in August is the mo
 edge case — and an app tested only on a cool, new, plugged-in device will be measurably worse for
 almost everyone who actually uses it.
 
-Budgeting *perceived* latency rather than request time changes what gets optimised. Autocomplete
-has a 300 ms deliberate debounce, so a purely technical budget would look bad while the experience
-is fine; conversely, an instant response from the local address book means most interactions
-never touch the network. The right optimisation is usually to remove the request, not to speed it
+Budgeting *perceived* latency rather than request time changes what gets optimised. Address
+search reaches the network only when the user presses for it, so a purely technical budget would
+measure a request nobody is waiting on unwillingly; conversely, an instant response from the local
+address book means most interactions never touch the network at all. The right optimisation is usually to remove the request, not to speed it
 up — which is also the right cost optimisation ([`31_COST_MODEL.md`](31_COST_MODEL.md)).
 
 The 60 fps requirement at 25 stops is the hardest budget and the one that constrains the
@@ -309,6 +311,6 @@ the user's unsaved arrangement is the P3 violation that ends the relationship.
 | Budgets against current flagship devices | Easier to meet; simpler testing | Would ship an app that is slow for most of its actual users |
 | Measurement on simulators | Fast; automatable; consistent | Simulators do not throttle, do not have real GPUs, and do not reproduce network conditions |
 | No virtualisation below 50 rows | Simpler; fine on new devices | 25 stateful rows drop frames on the low-tier reference device |
-| Shorter autocomplete debounce for responsiveness | Feels snappier | Multiplies the dominant cost line, and the address book already provides instant results |
+| Sending the search as the user types | Feels snappier; the familiar pattern | Bounds requests per *pause*, not per address — one street name cost four or five of a free user's ten monthly calls (ADR-0019) |
 | Optimising the JS bundle first | Standard advice; measurable | The bottleneck here is native rendering with 25 markers, not JS parse time |
 | Performance work after launch | Ship faster; optimise with real data | The techniques listed are architectural — memoisation, virtualisation, native gestures — and retrofitting them means rewriting components |

@@ -29,6 +29,10 @@ const renderView = (
       state={state}
       query=""
       onQueryChange={noop}
+      onSubmit={noop}
+      canSubmit={false}
+      offersCurrentLocation={false}
+      onUseCurrentLocation={noop}
       onSelect={noop}
       onAddManually={noop}
       onRetry={noop}
@@ -46,11 +50,83 @@ describe('the field', () => {
     expect(screen.getByTestId('add-stop-input').props.autoFocus).toBe(true);
   });
 
-  it('says where results come from before the user wonders', () => {
+  it('says what it needs before the user wonders', () => {
     renderView({ kind: 'browsing', options: [] });
-    expect(screen.getByLabelText('Search for an address').props.accessibilityHint).toMatch(
+    expect(screen.getByLabelText('Address to search for').props.accessibilityHint).toMatch(
       /3 characters/,
     );
+  });
+});
+
+describe('searching is a press, not a side effect of typing (ADR-0019)', () => {
+  it('offers a Search control beside the field', () => {
+    renderView({ kind: 'browsing', options: [] });
+    expect(screen.getByTestId('add-stop-search')).toBeTruthy();
+  });
+
+  it('disables it rather than hiding it when the query is too short', () => {
+    // A control that disappears as the user backspaces is one they stop
+    // believing in.
+    renderView({ kind: 'browsing', options: [] }, { query: 'Vi', canSubmit: false });
+    expect(screen.getByTestId('add-stop-search').props.accessibilityState.disabled).toBe(true);
+  });
+
+  it('sends the query when the control is pressed', () => {
+    const onSubmit = jest.fn();
+    renderView({ kind: 'browsing', options: [] }, { query: 'Via Roma', canSubmit: true, onSubmit });
+
+    fireEvent.press(screen.getByTestId('add-stop-search'));
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+  });
+
+  it('sends it from the keyboard too, so the thumb need not travel', () => {
+    const onSubmit = jest.fn();
+    renderView({ kind: 'browsing', options: [] }, { query: 'Via Roma', canSubmit: true, onSubmit });
+
+    fireEvent(screen.getByTestId('add-stop-input'), 'submitEditing');
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not send anything when the text merely changes', () => {
+    // The whole point: typing is free, and it stays free.
+    const onSubmit = jest.fn();
+    renderView({ kind: 'browsing', options: [] }, { canSubmit: true, onSubmit });
+
+    fireEvent.changeText(screen.getByTestId('add-stop-input'), 'Via Giuseppe Garibaldi');
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('says a search will be spent before it is spent', () => {
+    renderView({ kind: 'browsing', options: [] }, { query: 'Via Roma', canSubmit: true });
+    expect(screen.getByTestId('add-stop-hint')).toBeTruthy();
+  });
+});
+
+describe('my location, at the top of an empty field', () => {
+  it('is the first row while nothing has been typed', () => {
+    renderView({ kind: 'browsing', options: [] }, { offersCurrentLocation: true });
+    expect(screen.getByTestId('add-stop-current-location')).toBeTruthy();
+  });
+
+  it('is gone the moment the user types something else', () => {
+    renderView({ kind: 'browsing', options: [] }, { offersCurrentLocation: false });
+    expect(screen.queryByTestId('add-stop-current-location')).toBeNull();
+  });
+
+  it('says it sets the starting point, not that it adds a stop', () => {
+    renderView({ kind: 'browsing', options: [] }, { offersCurrentLocation: true });
+    expect(screen.getByLabelText('Use my location as the starting point')).toBeTruthy();
+  });
+
+  it('stays and explains itself once the permission has been refused', () => {
+    // Silently removing it leaves the user no way to discover why a feature
+    // they were offered has gone (CLAUDE.md §0 rule 5).
+    renderView(
+      { kind: 'browsing', options: [] },
+      { offersCurrentLocation: true, isLocationDenied: true },
+    );
+    expect(screen.getByTestId('add-stop-current-location')).toBeTruthy();
+    expect(screen.getByText(/Location access is off/)).toBeTruthy();
   });
 });
 

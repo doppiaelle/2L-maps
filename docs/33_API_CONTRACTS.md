@@ -188,7 +188,7 @@ never on `message`.**
 |---|---|
 | Session token | **Mandatory.** Absent → 400 `MISSING_SESSION_TOKEN` |
 | Minimum input | 3 characters — enforced server-side as well as client-side |
-| Client debounce | ≥ 300 ms |
+| Client trigger | An explicit press, never a keystroke ([ADR-0019](adr/0019-explicit-address-search.md)) |
 | Requests per session | 12 maximum, matching Places session billing |
 | Timeout | 4 s |
 | Retry | None — the user is typing; a retry arrives after the input has changed |

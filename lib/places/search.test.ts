@@ -1,4 +1,12 @@
-import { localMatches, searchStateOf, shouldRotateSessionToken, shouldSearch } from './search';
+import {
+  canSubmitSearch,
+  isAwaitingSubmit,
+  localMatches,
+  offersCurrentLocation,
+  searchStateOf,
+  shouldRotateSessionToken,
+  shouldSearch,
+} from './search';
 import type { PlaceOption, SearchInputs } from './search';
 import { AUTOCOMPLETE_MIN_CHARACTERS, MAX_STOPS } from '@/types';
 
@@ -17,6 +25,10 @@ const option = (id: string, primary: string, secondary = 'Bergamo'): PlaceOption
 
 const inputs = (overrides: Partial<SearchInputs> = {}): SearchInputs => ({
   query: '',
+  // Defaults to the query, so a test that says nothing about submission is
+  // testing a query that has been searched for. The tests about *not* having
+  // searched yet set it explicitly (ADR-0019).
+  submittedQuery: overrides.query ?? '',
   recents: [],
   favourites: [],
   results: [],
@@ -221,5 +233,102 @@ describe('the session token', () => {
   it('is replaced when the modal opens and after a selection', () => {
     expect(shouldRotateSessionToken('opened')).toBe(true);
     expect(shouldRotateSessionToken('selected')).toBe(true);
+  });
+});
+
+/**
+ * Searching is a press, not a side effect of typing (ADR-0019).
+ *
+ * The rule these tests protect is the one that cost real money: a debounced
+ * field sent a request per pause in typing, so a single address spent four or
+ * five of a free user's ten monthly calls before they had chosen anything.
+ */
+describe('a query that has been typed but not searched for', () => {
+  it('is awaiting submission', () => {
+    expect(isAwaitingSubmit('Via Roma', '')).toBe(true);
+  });
+
+  it('is not, once the same text has been sent', () => {
+    expect(isAwaitingSubmit('Via Roma', 'Via Roma')).toBe(false);
+  });
+
+  it('ignores surrounding whitespace, which is not an edit', () => {
+    expect(isAwaitingSubmit('  Via Roma ', 'Via Roma')).toBe(false);
+  });
+
+  it('shows the free options rather than claiming no match', () => {
+    // The trap this ordering exists for. `no-match` and `failed` both describe
+    // an *answer*, and nobody has asked a question yet — reporting "no match for
+    // what you typed" against a query that was never sent is the same lie the
+    // failure states were written to stop telling.
+    const state = searchStateOf(
+      inputs({
+        query: 'Via Roma',
+        submittedQuery: '',
+        results: [],
+        recents: [option('r', 'Depot')],
+      }),
+    );
+
+    expect(state.kind).toBe('browsing');
+  });
+
+  it('still reports no match once that query really was sent', () => {
+    const state = searchStateOf(inputs({ query: 'Via Roma', submittedQuery: 'Via Roma' }));
+    expect(state.kind).toBe('no-match');
+  });
+
+  it('does not resurrect a failure that belonged to older text', () => {
+    const state = searchStateOf(
+      inputs({ query: 'Via Roma 2', submittedQuery: 'Via Roma', failure: 'unavailable' }),
+    );
+
+    expect(state.kind).toBe('browsing');
+  });
+});
+
+describe('when the Search control may be pressed', () => {
+  const submittable = {
+    query: 'Via Roma',
+    submittedQuery: '',
+    isOffline: false,
+    isSearching: false,
+  };
+
+  it('is pressable for a long-enough, unsent query', () => {
+    expect(canSubmitSearch(submittable)).toBe(true);
+  });
+
+  it('is not below the character minimum', () => {
+    expect(canSubmitSearch({ ...submittable, query: 'Vi' })).toBe(false);
+  });
+
+  it('is not while a request is in flight', () => {
+    expect(canSubmitSearch({ ...submittable, isSearching: true })).toBe(false);
+  });
+
+  it('is not offline, where the request cannot leave', () => {
+    expect(canSubmitSearch({ ...submittable, isOffline: true })).toBe(false);
+  });
+
+  it('is not for a query already sent, which would buy the same answer twice', () => {
+    expect(canSubmitSearch({ ...submittable, submittedQuery: 'Via Roma' })).toBe(false);
+  });
+
+  it('is pressable again as soon as the text changes', () => {
+    expect(
+      canSubmitSearch({ ...submittable, query: 'Via Roma 2', submittedQuery: 'Via Roma' }),
+    ).toBe(true);
+  });
+});
+
+describe('my location, offered before anything is typed', () => {
+  it('is offered on an empty field', () => {
+    expect(offersCurrentLocation('')).toBe(true);
+    expect(offersCurrentLocation('   ')).toBe(true);
+  });
+
+  it('is withdrawn the moment the user says where they want to go', () => {
+    expect(offersCurrentLocation('V')).toBe(false);
   });
 });

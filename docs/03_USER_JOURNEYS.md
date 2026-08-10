@@ -154,7 +154,7 @@ optimization before this screen.
    denied. Changeable but never blocking.
 2. **Add stops** by one of:
    - address book — recents and favourites, zero network cost, shown first;
-   - Places autocomplete — debounced, minimum three characters, session-tokened;
+   - Places address search — submitted by a press, minimum three characters, session-tokened;
    - import — see J8.
 3. The stop list appears in the Route section, in entry order, each row showing its
    ordinal.

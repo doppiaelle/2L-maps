@@ -127,7 +127,7 @@ the same proposal returns every few months and is re-argued from scratch.
 
 | Feature | Priority | Cost | Notes |
 |---|---|---|---|
-| Places autocomplete search | MUST | ◑ | **The largest single COGS line.** Session tokens mandatory, 300 ms debounce, 3-character minimum |
+| Places address search | MUST | ◑ | **The largest single COGS line.** Submitted by a press, never typed-ahead ([ADR-0019](adr/0019-explicit-address-search.md)); session tokens mandatory, 3-character minimum |
 | Address book: recents | MUST | ○ | `place_id` reuse is free — always offered before search |
 | Current location as origin | MUST | ○ | Device GPS, no upstream call |
 | Manual reorder by drag | MUST | ○ | Local only |

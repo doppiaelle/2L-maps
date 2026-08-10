@@ -2,7 +2,6 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import {
-  AUTOCOMPLETE_DEBOUNCE_MS,
   AUTOCOMPLETE_MIN_CHARACTERS,
   COORDINATE_MAX_AGE_DAYS,
   HANDOFF_NOMINAL_WAYPOINTS,
@@ -62,10 +61,21 @@ describe('domain constants agree with the documents that own them', () => {
     expect(doc).toContain(`~${HANDOFF_NOMINAL_WAYPOINTS} waypoints`);
   });
 
-  it('autocomplete debounce and minimum length match 24_PERFORMANCE', () => {
-    const doc = read('24_PERFORMANCE.md');
-    expect(doc).toContain(`Debounce ≥ ${AUTOCOMPLETE_DEBOUNCE_MS} ms`);
+  it('the address-search minimum length matches 04_FEATURES', () => {
     expect(read('04_FEATURES.md')).toContain(`${AUTOCOMPLETE_MIN_CHARACTERS}-character minimum`);
+  });
+
+  it('no document still promises a debounce interval no constant backs', () => {
+    // The 300 ms constant was deleted with ADR-0019 and the documents were
+    // updated in the same change. A document that still quotes an interval would
+    // be describing a control the code no longer has (`CLAUDE.md` §13 rule 9).
+    // Scoped to a stated number, so the decision log can still record that the
+    // debounce existed and why it went.
+    for (const name of ['24_PERFORMANCE.md', '33_API_CONTRACTS.md', '04_FEATURES.md']) {
+      expect(read(name)).not.toMatch(/\d+\s*ms\b[^.|\n]*debounce/i);
+      expect(read(name)).not.toMatch(/debounce[^.|\n]*\d+\s*ms\b/i);
+      expect(read(name)).not.toMatch(/debounce\s*≥/i);
+    }
   });
 
   it('rendering thresholds match 24_PERFORMANCE', () => {
