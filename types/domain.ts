@@ -50,10 +50,24 @@ export interface Stop {
   readonly isCompleted: boolean;
 }
 
-/** The segment between two consecutive stops. */
+/**
+ * The segment between two consecutive waypoints.
+ *
+ * **Both ends are nullable, and each null means something specific.** A route
+ * can begin somewhere that is not a stop — a saved starting place, or the
+ * device's own position, which has no `place_id` and never will — so the first
+ * leg has no stop to have come *from*. `null` says that, rather than naming a
+ * stop the driver did not start at.
+ *
+ * The second reason is rarer and worse: if the upstream returns a different
+ * number of legs than the journey has hops, every id after the discrepancy would
+ * be attributed to the wrong segment. In that case all of them are null. A leg
+ * that admits it does not know which stops it joins is recoverable; one that
+ * confidently names the wrong pair is not.
+ */
 export interface Leg {
-  readonly fromStopId: string;
-  readonly toStopId: string;
+  readonly fromStopId: string | null;
+  readonly toStopId: string | null;
   readonly distanceMeters: number;
   readonly durationSeconds: number;
   /** Encoded polyline. Decoded once, at receipt, then memoised. */

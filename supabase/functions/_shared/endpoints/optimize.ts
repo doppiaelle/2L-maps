@@ -25,7 +25,21 @@ export interface OptimizeResult {
   readonly tier: 'T1';
   readonly isDegraded: false;
   readonly orderedStopIds: readonly string[];
-  readonly legs: readonly { distanceMeters: number; durationSeconds: number; polyline: string }[];
+  /**
+   * One per hop, in travelling order, each naming the stops it runs between.
+   *
+   * **The two ids were missing and the client required them**, so every
+   * successful response was rejected as malformed and optimization failed
+   * completely ([ADR-0023](../../../docs/adr/0023-legs-name-their-stops.md)).
+   * They are nullable because a route can begin somewhere that is not a stop.
+   */
+  readonly legs: readonly {
+    fromStopId: string | null;
+    toStopId: string | null;
+    distanceMeters: number;
+    durationSeconds: number;
+    polyline: string;
+  }[];
   readonly totalDistanceMeters: number;
   readonly totalDurationSeconds: number;
   readonly unreachableStopIds: readonly string[];
@@ -142,13 +156,28 @@ export async function optimizeUpstream(
     ...(request.isRoundTrip ? [] : [last.stopId]),
   ];
 
+  /**
+   * The journey as a sequence of waypoints, so each leg can name its ends.
+   *
+   * Not the same list as `orderedStopIds`: the origin appears here whether or
+   * not it is a stop, and a round trip ends back at it. Google returns one leg
+   * per hop in this order, so `legs[i]` runs from `waypoints[i]` to
+   * `waypoints[i + 1]`.
+   */
+  const originStopId = isOriginTheFirstStop ? first.stopId : null;
+  const waypoints: (string | null)[] = [
+    originStopId,
+    ...orderedStops.map((stop) => stop.stopId),
+    request.isRoundTrip ? originStopId : last.stopId,
+  ];
+
   return {
     result: {
       status: 'complete',
       tier: 'T1',
       isDegraded: false,
       orderedStopIds,
-      legs: detail.detail.legs,
+      legs: attributeLegs(detail.detail.legs, waypoints),
       totalDistanceMeters: detail.detail.totalDistanceMeters,
       totalDurationSeconds: detail.detail.totalDurationSeconds,
       unreachableStopIds: [],
@@ -162,6 +191,33 @@ export async function optimizeUpstream(
 
 function isPresent<T>(value: T | undefined): value is T {
   return value !== undefined;
+}
+
+/**
+ * Say which stops each leg runs between.
+ *
+ * `legs[i]` joins `waypoints[i]` to `waypoints[i + 1]`, so a journey of *n*
+ * waypoints has *n − 1* legs. When it does not — a shape of response nothing in
+ * the contract describes — **every attribution is dropped rather than shifted**.
+ * A leg misaligned by one would put the Rome–Milan distance on the hop from the
+ * depot to the first delivery, and it would look entirely plausible on screen.
+ * Nulls are recoverable; a confident wrong answer is not (`CLAUDE.md` §0 rule 5).
+ *
+ * The legs themselves are always returned: the ordering is what the user asked
+ * for, and withholding a correct route because we could not label its segments
+ * would trade a real answer for a cosmetic one.
+ */
+function attributeLegs(
+  legs: readonly { distanceMeters: number; durationSeconds: number; polyline: string }[],
+  waypoints: readonly (string | null)[],
+): OptimizeResult['legs'] {
+  const isAligned = legs.length === waypoints.length - 1;
+
+  return legs.map((leg, index) => ({
+    ...leg,
+    fromStopId: isAligned ? (waypoints[index] ?? null) : null,
+    toStopId: isAligned ? (waypoints[index + 1] ?? null) : null,
+  }));
 }
 
 /**
@@ -216,7 +272,16 @@ function toApiError(failure: RoutesFailure): ApiError {
     case 'rejected':
       // Google understood us and refused: our request was wrong, and we built
       // it. Reported as ours and alerted on, never retried.
-      return new ApiError('INTERNAL', 'Something went wrong on our side');
+      //
+      // **The status is carried through.** It was being discarded, so a revoked
+      // key (403), a Routes API that was never enabled on the project (403) and
+      // a malformed waypoint (400) all logged as a bare `INTERNAL` with an empty
+      // `details` — which is the exact opposite of what the logging work was
+      // for. The number is Google's HTTP status and nothing else: no body, no
+      // key, no address.
+      return new ApiError('INTERNAL', 'Something went wrong on our side', {
+        details: { upstreamStatus: failure.status },
+      });
     case 'malformed':
       // Google answered 200 in a shape the contract does not describe. Ours to
       // fix, so it alerts rather than asking the user to try again.

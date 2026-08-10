@@ -28,7 +28,18 @@ const placeId = z.string().min(1).max(512);
  * would make the reply meaningless the moment the client re-sorted anything.
  */
 const stopInput = z.object({
-  stopId: z.string().min(1).max(64),
+  /**
+   * The client's own id for this stop.
+   *
+   * **128, not 64.** The client used to build it as `${placeId}:${timestamp}`,
+   * and a Google place id for an interpolated street address runs past 64 on its
+   * own — so `/optimize` refused those routes with a 400 the pipeline never saw
+   * and the logs never recorded. New ids are short and generated
+   * (`lib/route/route-id.ts`), but a draft persisted before that change still
+   * carries a long one, and refusing it would break the route a user already had
+   * on screen rather than the code that created it.
+   */
+  stopId: z.string().min(1).max(128),
   placeId,
   /** A stop the user has pinned in place. Carried now, honoured when pinning
    *  ships — the field is documented, so accepting it costs nothing and
@@ -181,7 +192,13 @@ export type RevenueCatWebhook = z.infer<typeof revenueCatWebhookSchema>;
 /** Parsed input, or the taxonomy code the caller should respond with. */
 export type ParseOutcome<T> =
   | { readonly ok: true; readonly value: T }
-  | { readonly ok: false; readonly code: 'INVALID_REQUEST' | 'MISSING_SESSION_TOKEN' };
+  | {
+      readonly ok: false;
+      readonly code: 'INVALID_REQUEST' | 'MISSING_SESSION_TOKEN';
+      /** The paths that failed, for the log line only — never their values, and
+       *  never sent to the client. */
+      readonly fields?: readonly string[];
+    };
 
 /**
  * Parse a request body.
@@ -198,5 +215,19 @@ export function parseRequest<T>(schema: z.ZodType<T>, body: unknown): ParseOutco
   // Autocomplete without a session token gets its own code, because it is the
   // one malformed request with a specific and expensive consequence.
   const missingSessionToken = result.error.issues.some((issue) => issue.path[0] === 'sessionToken');
-  return { ok: false, code: missingSessionToken ? 'MISSING_SESSION_TOKEN' : 'INVALID_REQUEST' };
+
+  // **Which fields, never their values.** The handler logs these so a rejection
+  // is findable in production — the two length overruns that broke `/optimize`
+  // for weeks left no trace of any kind. A path is a field name we chose;
+  // a value could be an address, and an address may not reach a log line
+  // (`CLAUDE.md` §9 rule 7).
+  const fields = [...new Set(result.error.issues.map((issue) => issue.path.join('.')))]
+    .filter((path) => path.length > 0)
+    .slice(0, 10);
+
+  return {
+    ok: false,
+    code: missingSessionToken ? 'MISSING_SESSION_TOKEN' : 'INVALID_REQUEST',
+    fields,
+  };
 }

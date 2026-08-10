@@ -9,6 +9,7 @@ import { useUsageQuota } from '@/features/quota/use-usage-quota';
 import { useDraftRouteStore } from '@/features/stores';
 import { useLocation } from '@/features/location/location-provider';
 import { isOffline } from '@/lib/network/connectivity';
+import { newStopId } from '@/lib/route/route-id';
 import { canSubmitSearch, offersCurrentLocation, searchStateOf } from '@/lib/places/search';
 import type { SourcedOption } from '@/lib/places/search';
 
@@ -66,7 +67,10 @@ export default function AddStopScreen(): React.JSX.Element {
 
   const add = (option: SourcedOption) => {
     addStopToDraft({
-      id: `${option.placeId}:${Date.now()}`,
+      // Short and generated. Embedding the place id here put it over the
+      // contract's 64-character ceiling for a long address, and it is already
+      // carried in its own field on the next line.
+      id: newStopId(),
       placeId: option.placeId,
       label: null,
       note: null,

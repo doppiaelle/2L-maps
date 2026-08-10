@@ -25,9 +25,24 @@ import type { ApiClient, ApiFailure } from './client';
  * and each copy is a place it can drift from ADR-0003.
  */
 
+/**
+ * One leg, as the server sends it.
+ *
+ * **The two ids are nullable, and requiring them was a total outage.** This
+ * schema asked for `fromStopId` and `toStopId` as plain strings; the server had
+ * never sent either. Zod refused every 200 the endpoint ever produced, the
+ * client reported `MALFORMED_RESPONSE`, and the screen said "Could not optimize"
+ * — while upstream had succeeded and the pipeline had already spent a unit of
+ * the user's monthly allowance. Optimization failed one hundred per cent of the
+ * time and left no error anywhere to find.
+ *
+ * The ids exist now, and they are nullable for the reason `Leg` documents: a
+ * route can start somewhere that is not one of its stops
+ * ([ADR-0023](../../docs/adr/0023-legs-name-their-stops.md)).
+ */
 const legSchema = z.object({
-  fromStopId: z.string(),
-  toStopId: z.string(),
+  fromStopId: z.string().nullable(),
+  toStopId: z.string().nullable(),
   distanceMeters: z.number(),
   durationSeconds: z.number(),
   polyline: z.string(),

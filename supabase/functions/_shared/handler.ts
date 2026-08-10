@@ -72,6 +72,26 @@ export function createHandler<TRequest, TResult>(definition: HandlerDefinition<T
     // (CLAUDE.md §9 rule 5).
     const parsed = parseRequest(definition.schema, body);
     if (!parsed.ok) {
+      // **Logged, and until now it was not.** This branch returns before the
+      // pipeline runs, so `request_refused` never fired for it — which made the
+      // single most likely 400 in the product completely invisible in
+      // production. Two real defects hid here for weeks: an `idempotencyKey`
+      // that overran 128 characters from three stops upwards, and a `stopId`
+      // that overran 64 whenever the address was long enough. Both looked
+      // identical from the phone ("Could not optimize") and left nothing to
+      // find at either end.
+      //
+      // The endpoint and the offending field names only. **Never the body** —
+      // it carries addresses, and an address is personal data that may not
+      // reach a log line (`CLAUDE.md` §9 rule 7).
+      console.error(
+        JSON.stringify({
+          event: 'request_rejected',
+          endpoint: definition.endpoint,
+          code: parsed.code,
+          fields: parsed.fields ?? [],
+        }),
+      );
       return errorResponse(
         parsed.code,
         parsed.code === 'MISSING_SESSION_TOKEN'

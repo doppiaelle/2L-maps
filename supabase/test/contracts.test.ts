@@ -13,6 +13,7 @@ import {
   parseRequest,
   revenueCatWebhookSchema,
 } from '../functions/_shared/schemas';
+import { errorResponse } from '../functions/_shared/http';
 
 /**
  * Contract tests for request validation and the shared cache key
@@ -92,12 +93,46 @@ describe('/optimize input', () => {
     expect(!outcome.ok && outcome.code).toBe('INVALID_REQUEST');
   });
 
-  it('never echoes the validation detail back to the caller', () => {
+  it('never echoes the validation detail back to the caller', async () => {
     // The client built the request, so the user cannot act on the specifics, and
     // echoing them describes our internals to whoever sent it.
+    //
+    // **The assertion is on the response, not on the parse outcome.** It used to
+    // be on the outcome, which made it a proxy for the property rather than the
+    // property — and the proxy blocked a fix it was never meant to block. The
+    // outcome now carries the failing field *names* so the handler can log them:
+    // a rejection that leaves no trace anywhere is how an `idempotencyKey` too
+    // long by five characters broke `/optimize` for weeks with nothing to find.
+    // What must not leak is what leaves the building, and that is this.
     const outcome = parseRequest(optimizeRequestSchema, { routeId: 'not-a-uuid' });
-    expect(JSON.stringify(outcome)).not.toContain('uuid');
-    expect(JSON.stringify(outcome)).not.toContain('routeId');
+    expect(outcome.ok).toBe(false);
+
+    const body = await errorResponse(
+      outcome.ok ? 'INTERNAL' : outcome.code,
+      'Something went wrong on our side',
+    ).text();
+
+    expect(body).not.toContain('uuid');
+    expect(body).not.toContain('routeId');
+    expect(body).not.toContain('not-a-uuid');
+  });
+
+  it('names the failing fields to the log, and only their names', () => {
+    // Field names are ours — we chose them and they appear in the contract.
+    // Their values are the user's, and an address may never reach a log line
+    // (`CLAUDE.md` §9 rule 7).
+    const outcome = parseRequest(optimizeRequestSchema, {
+      routeId: 'not-a-uuid',
+      origin: { placeId: null, isCurrentLocation: true },
+      stops: [{ stopId: 's1', placeId: 'ChIJ', label: 'Via Collatina 22, Roma' }],
+      isRoundTrip: false,
+    });
+
+    expect(outcome.ok).toBe(false);
+    if (outcome.ok) return;
+    expect(outcome.fields).toContain('routeId');
+    expect(JSON.stringify(outcome.fields)).not.toContain('Collatina');
+    expect(JSON.stringify(outcome.fields)).not.toContain('not-a-uuid');
   });
 });
 

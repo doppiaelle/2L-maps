@@ -1,4 +1,4 @@
-import { isRouteId, newRouteId } from './route-id';
+import { isRouteId, newRouteId, newStopId } from './route-id';
 
 /**
  * A new route's identifier.
@@ -54,5 +54,36 @@ describe('recognising a stored id', () => {
     for (const value of [null, undefined, 42, {}, []]) {
       expect(isRouteId(value)).toBe(false);
     }
+  });
+});
+
+/**
+ * The stop id, which had to stop carrying the place id.
+ *
+ * `${placeId}:${Date.now()}` overran `stopInput.stopId`'s 64-character ceiling
+ * whenever the address was one Google identifies with a long base64 id — an
+ * interpolated street number, which is most of what this product routes. The
+ * request was refused with a 400 before the pipeline ran, so it cost nothing,
+ * logged nothing, and reached the user as "Could not optimize".
+ */
+describe('the id a stop carries', () => {
+  it('is far inside the contract’s ceiling', () => {
+    expect(newStopId().length).toBeLessThanOrEqual(64);
+  });
+
+  it('is the same length however it is generated', () => {
+    // A variable-length id would eventually reproduce the bug by another route.
+    expect(newStopId(() => 0)).toHaveLength(newStopId(() => 0.999).length);
+  });
+
+  it('is hexadecimal, so nothing has to escape it', () => {
+    expect(newStopId()).toMatch(/^[0-9a-f]+$/);
+  });
+
+  it('distinguishes two deliveries at the same address', () => {
+    // The property the whole id exists for: two stops in one building are two
+    // stops, and they share a place id.
+    const ids = new Set(Array.from({ length: 500 }, () => newStopId()));
+    expect(ids.size).toBe(500);
   });
 });

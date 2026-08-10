@@ -4,6 +4,7 @@ import { useColorScheme } from 'react-native';
 import { ImportView } from '@/features/import/ImportView';
 import { useImport } from '@/features/import/use-import';
 import { useDraftRouteStore } from '@/features/stores';
+import { newStopId } from '@/lib/route/route-id';
 
 /**
  * Import a list — presented over Plan, dismissed back to it
@@ -43,7 +44,10 @@ export default function ImportScreen(): React.JSX.Element {
         void importState.resolve().then((places) => {
           places.forEach((place, index) => {
             addStopToDraft({
-              id: `${place.placeId}:${Date.now()}:${index}`,
+              // Short and generated: an id built from the place id ran past the
+              // contract's 64-character ceiling on long addresses, and import is where
+              // the longest ones come from.
+              id: newStopId(),
               placeId: place.placeId,
               // Left unlabelled: the resolved address is what Plan shows, and a
               // label duplicating it would be noise on every row.

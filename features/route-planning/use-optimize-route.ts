@@ -6,7 +6,7 @@ import { useLocation } from '@/features/location/location-provider';
 import { USAGE_QUOTA_QUERY_KEY } from '@/features/quota/use-usage-quota';
 import { useDraftRouteStore, useUiStore } from '@/features/stores';
 import type { RoutingFailure, RoutingOutcome } from '@/lib/providers/types';
-import type { DraftRoute } from '@/lib/route/draft';
+import { idempotencyKeyFor } from '@/lib/route/idempotency';
 
 /**
  * Optimizing the current draft.
@@ -37,14 +37,6 @@ export interface OptimizeState {
    *  rather than merely stop showing a spinner. */
   readonly failure: RoutingFailure | null;
   clearFailure: () => void;
-}
-
-/** Derived from the draft, so an edit changes it and a retry does not. Two
- *  attempts on the same stops in the same order are the same work, and the
- *  server should charge for it once. */
-export function idempotencyKeyFor(draft: DraftRoute): string {
-  const stops = draft.stops.map((stop) => stop.placeId).join(',');
-  return `${draft.routeId}:${draft.shape}:${draft.originPlaceId ?? 'here'}:${stops}`;
 }
 
 export function useOptimizeRoute(): OptimizeState {

@@ -230,12 +230,19 @@ function toWaypoint(waypoint: RoutesWaypoint) {
  * (`CLAUDE.md` §0 rule 5).
  */
 function readOptimizedOrder(payload: unknown, expected: number): readonly number[] | null {
+  // **Before the payload is read at all.** With nothing to reorder there is no
+  // order to find, and phase one asks for a field mask of exactly one field —
+  // `optimizedIntermediateWaypointIndex` — which Google has nothing to populate.
+  // The answer can legitimately be `{}` or `{"routes":[]}`, and `firstRoute`
+  // returns null for both. Checking the payload first turned the shortest
+  // possible route, two stops with a direct hop between them, into `no-route`
+  // and then into "Could not optimize" on screen.
+  if (expected === 0) return [];
+
   const route = firstRoute(payload);
   if (route === null) return null;
 
   const raw = route['optimizedIntermediateWaypointIndex'];
-  // No intermediates means no order to return, and an empty array is correct.
-  if (expected === 0) return [];
   if (!Array.isArray(raw) || raw.length !== expected) return null;
 
   const order: number[] = [];

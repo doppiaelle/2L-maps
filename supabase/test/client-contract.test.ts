@@ -1,6 +1,10 @@
 import { ApiClient } from '@/lib/api/client';
 import { createGeocodingProvider } from '@/lib/api/geocoding-adapter';
 import { createRoutingProvider } from '@/lib/api/routing-adapter';
+import type { RoutingOutcome } from '@/lib/providers/types';
+
+import { optimizeUpstream } from '../functions/_shared/endpoints/optimize';
+import type { RoutesPort } from '../functions/_shared/endpoints/optimize';
 
 import {
   autocompleteRequestSchema,
@@ -162,5 +166,160 @@ describe('/optimize', () => {
     );
 
     expectAccepted(optimizeRequestSchema, body);
+  });
+});
+
+/**
+ * And now the other direction — what the server answers, checked against what
+ * the client accepts.
+ *
+ * **This half was missing, and its absence hid a total failure.** Everything
+ * above tests the request. The response was covered the same way the request had
+ * been before this file existed: `endpoints.test.ts` asserts what the server
+ * builds, and `routing-adapter.test.ts` asserts what the client parses — from a
+ * fixture the author wrote by hand. Both passed for weeks while **`/optimize`
+ * failed one hundred per cent of the time**, because the fixture had two fields
+ * on every leg that the server has never once sent.
+ *
+ * A response the client rejects is worse than an error. It arrives as 200, so
+ * the pipeline has already recorded the usage and charged the user's monthly
+ * allowance; then Zod refuses it, `ApiClient` reports `MALFORMED_RESPONSE`, and
+ * the screen says "Could not optimize. Your stops are unchanged." There is no
+ * upstream error anywhere to find, because upstream succeeded.
+ *
+ * So the body here is **not written by hand**. It is produced by the real
+ * `optimizeUpstream`, serialised the way `pipelineResponse` serialises it, and
+ * handed to the real `createRoutingProvider` through the real `ApiClient`. Every
+ * hand-written fixture in this repository is a statement of what its author
+ * believed; only the two implementations know what they actually do.
+ */
+describe('/optimize — what comes back', () => {
+  const stop = (stopId: string, placeId: string) => ({ stopId, placeId });
+
+  const routesPort = (order: readonly number[]): RoutesPort => ({
+    optimizeOrder: () => Promise.resolve({ ok: true, order }),
+    detailFor: (request) =>
+      Promise.resolve({
+        ok: true,
+        detail: {
+          totalDistanceMeters: 484_100,
+          totalDurationSeconds: 18_720,
+          // One leg per hop, which is what Google returns: the number of
+          // waypoints minus one.
+          legs: Array.from({ length: request.intermediates.length + 1 }, (_, index) => ({
+            distanceMeters: 1_000 * (index + 1),
+            durationSeconds: 600 * (index + 1),
+            polyline: 'ab_cde',
+          })),
+        },
+      }),
+  });
+
+  /** The client's own parse of a body the server really produced. */
+  async function clientReadingServer(
+    request: Parameters<typeof optimizeUpstream>[0],
+    order: readonly number[],
+  ): Promise<RoutingOutcome> {
+    const upstream = await optimizeUpstream(request, routesPort(order));
+    // Exactly what `pipelineResponse` puts on the wire: the result, serialised,
+    // and nothing else. Passing the object directly would skip `JSON.stringify`,
+    // which is the step that erases `undefined` — the same distinction the
+    // request half of this file exists for.
+    const body = JSON.stringify(upstream.result);
+
+    const client = new ApiClient({
+      baseUrl: 'https://example.test/functions/v1',
+      getAccessToken: () => Promise.resolve('test-token'),
+      fetchImpl: (() =>
+        Promise.resolve(
+          new Response(body, { status: 200, headers: { 'content-type': 'application/json' } }),
+        )) as unknown as typeof fetch,
+    });
+
+    return createRoutingProvider({ client }).optimize({
+      routeId: '2b6e1d84-7c9a-4c1e-9f0a-1d2c3b4a5e6f',
+      originPlaceId: 'ChIJorigin',
+      originCoordinate: null,
+      stops: request.stops.map((s) => ({ id: s.stopId, placeId: s.placeId })),
+      shape: request.isRoundTrip ? 'round-trip' : 'one-way',
+      departureTime: null,
+      idempotencyKey: 'idem-0001-abcd',
+    });
+  }
+
+  it('is a result the client accepts, not a malformed response', async () => {
+    // The regression, in one line. Every field the client requires must be one
+    // the server sends.
+    const outcome = await clientReadingServer(
+      {
+        routeId: '2b6e1d84-7c9a-4c1e-9f0a-1d2c3b4a5e6f',
+        origin: { placeId: 'ChIJorigin', isCurrentLocation: false },
+        stops: [stop('s1', 'ChIJa'), stop('s2', 'ChIJb'), stop('s3', 'ChIJc')],
+        isRoundTrip: false,
+        departureTime: null,
+      },
+      [1, 0],
+    );
+
+    expect(outcome).toMatchObject({ ok: true });
+  });
+
+  it('names the stops each leg runs between, so a leg can be attributed', async () => {
+    const outcome = await clientReadingServer(
+      {
+        routeId: '2b6e1d84-7c9a-4c1e-9f0a-1d2c3b4a5e6f',
+        origin: { placeId: 'ChIJorigin', isCurrentLocation: false },
+        stops: [stop('s1', 'ChIJa'), stop('s2', 'ChIJb'), stop('s3', 'ChIJc')],
+        isRoundTrip: false,
+        departureTime: null,
+      },
+      [1, 0],
+    );
+
+    if (outcome.ok !== true || outcome.result.isDegraded) throw new Error('expected a T1 result');
+
+    // The origin is a saved place rather than a stop, so the first leg starts
+    // nowhere the route lists — `null` says so instead of naming a stop that is
+    // not where the driver began.
+    expect(outcome.result.legs.map((leg) => [leg.fromStopId, leg.toStopId])).toEqual([
+      [null, 's2'],
+      ['s2', 's1'],
+      ['s1', 's3'],
+    ]);
+  });
+
+  it('survives the two-stop route, where there is nothing to reorder', async () => {
+    // The shape in the bug report: Rome and Milan, one way, no origin chosen.
+    // One intermediate at most, and with the first stop as the origin, none —
+    // which is the case no endpoint test covered.
+    const outcome = await clientReadingServer(
+      {
+        routeId: '2b6e1d84-7c9a-4c1e-9f0a-1d2c3b4a5e6f',
+        origin: { placeId: null, isCurrentLocation: true },
+        stops: [stop('s1', 'ChIJroma'), stop('s2', 'ChIJmilano')],
+        isRoundTrip: false,
+        departureTime: null,
+      },
+      [],
+    );
+
+    expect(outcome).toMatchObject({ ok: true });
+    if (outcome.ok !== true || outcome.result.isDegraded) throw new Error('expected a T1 result');
+    expect(outcome.result.orderedStopIds).toEqual(['s1', 's2']);
+  });
+
+  it('accepts a round trip, where the origin is also the destination', async () => {
+    const outcome = await clientReadingServer(
+      {
+        routeId: '2b6e1d84-7c9a-4c1e-9f0a-1d2c3b4a5e6f',
+        origin: { placeId: 'ChIJorigin', isCurrentLocation: false },
+        stops: [stop('s1', 'ChIJa'), stop('s2', 'ChIJb')],
+        isRoundTrip: true,
+        departureTime: null,
+      },
+      [1, 0],
+    );
+
+    expect(outcome).toMatchObject({ ok: true });
   });
 });

@@ -31,7 +31,14 @@ const routesPort = (order: readonly number[]): RoutesPort & { sent: unknown[] } 
         detail: {
           totalDistanceMeters: 1000,
           totalDurationSeconds: 600,
-          legs: [{ distanceMeters: 1000, durationSeconds: 600, polyline: 'abc' }],
+          // One per hop, which is what Google returns: waypoints minus one.
+          // A fixture with a single leg regardless of the journey would make
+          // the attribution test pass by never being aligned.
+          legs: Array.from({ length: request.intermediates.length + 1 }, () => ({
+            distanceMeters: 1000,
+            durationSeconds: 600,
+            polyline: 'abc',
+          })),
         },
       };
     },
@@ -55,6 +62,94 @@ const optimizeRequest = (overrides: { isRoundTrip?: boolean } = {}) => ({
  * pressed Optimize without ever choosing a starting point got "something went
  * wrong on our side" for a completely reasonable request.
  */
+/**
+ * Which stops each leg runs between.
+ *
+ * The client requires these two fields and the server had never sent them, so
+ * Zod refused every 200 the endpoint produced and optimization failed one
+ * hundred per cent of the time (ADR-0023). The end-to-end proof is in
+ * `client-contract.test.ts`; what is checked here is that the attribution is
+ * *right* — a leg labelled with the wrong pair is worse than one labelled with
+ * none, because it looks entirely plausible on screen.
+ */
+describe('the legs', () => {
+  it('walks the journey in order, origin included', async () => {
+    const routes = routesPort([1, 0]);
+    const outcome = await optimizeUpstream(optimizeRequest(), routes);
+
+    // Origin is a saved place, so the first leg comes from nowhere the route
+    // lists. Then s2, s1 (the optimized order) and s3 last, one way.
+    expect(outcome.result.legs.map((leg) => [leg.fromStopId, leg.toStopId])).toEqual([
+      [null, 's2'],
+      ['s2', 's1'],
+      ['s1', 's3'],
+    ]);
+  });
+
+  it('closes the loop on a round trip', async () => {
+    const routes = routesPort([2, 0, 1]);
+    const outcome = await optimizeUpstream(optimizeRequest({ isRoundTrip: true }), routes);
+
+    const legs = outcome.result.legs.map((leg) => [leg.fromStopId, leg.toStopId]);
+    // Back to where it started, which is the origin and not a stop.
+    expect(legs[legs.length - 1]?.[1]).toBeNull();
+  });
+
+  it('names the first stop as the origin when the route starts from it', async () => {
+    const routes = routesPort([0]);
+    const outcome = await optimizeUpstream(
+      { ...optimizeRequest(), origin: { placeId: null, isCurrentLocation: true } },
+      routes,
+    );
+
+    expect(outcome.result.legs[0]?.fromStopId).toBe('s1');
+  });
+
+  it('drops every attribution rather than shifting it when the count disagrees', async () => {
+    // A leg misaligned by one would put the Rome-Milan distance on the hop from
+    // the depot to the first delivery, and nothing on screen would look wrong.
+    const routes: RoutesPort = {
+      optimizeOrder: async () => ({ ok: true, order: [1, 0] }),
+      detailFor: async () => ({
+        ok: true,
+        detail: {
+          totalDistanceMeters: 1000,
+          totalDurationSeconds: 600,
+          // One short. The journey has three hops.
+          legs: [
+            { distanceMeters: 1, durationSeconds: 1, polyline: 'a' },
+            { distanceMeters: 2, durationSeconds: 2, polyline: 'b' },
+          ],
+        },
+      }),
+    };
+
+    const outcome = await optimizeUpstream(optimizeRequest(), routes);
+
+    expect(outcome.result.legs).toHaveLength(2);
+    for (const leg of outcome.result.legs) {
+      expect(leg.fromStopId).toBeNull();
+      expect(leg.toStopId).toBeNull();
+    }
+  });
+
+  it('still returns the order when the legs cannot be attributed', async () => {
+    // The ordering is what the user asked for. Withholding a correct route
+    // because its segments could not be labelled would trade the answer for a
+    // caption.
+    const routes: RoutesPort = {
+      optimizeOrder: async () => ({ ok: true, order: [1, 0] }),
+      detailFor: async () => ({
+        ok: true,
+        detail: { totalDistanceMeters: 1000, totalDurationSeconds: 600, legs: [] },
+      }),
+    };
+
+    const outcome = await optimizeUpstream(optimizeRequest(), routes);
+    expect(outcome.result.orderedStopIds).toEqual(['s2', 's1', 's3']);
+  });
+});
+
 describe('the origin', () => {
   const withOrigin = (origin: Record<string, unknown>) => ({
     ...optimizeRequest(),

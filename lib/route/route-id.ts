@@ -56,3 +56,30 @@ export function isRouteId(value: unknown): value is string {
     /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
   );
 }
+
+/**
+ * The identifier one stop carries inside a draft.
+ *
+ * **It used to embed the place id, and that overran the contract.** A stop was
+ * `${placeId}:${Date.now()}` (`add-stop`) or `${placeId}:${Date.now()}:${index}`
+ * (`import`), while `stopInput.stopId` accepts at most 64 characters. Google's
+ * base64-form place ids for interpolated street addresses — "V. Collatina, 00132
+ * Roma RM" is one — run to 90 characters and beyond, so the id alone was over
+ * the limit before the timestamp was added. `/optimize` answered 400 and the
+ * screen said "Could not optimize", with nothing in the logs, because the schema
+ * rejection happens before the pipeline runs.
+ *
+ * Embedding it was never necessary. The place id travels in its own field on the
+ * same object; this only has to be **unique within one route**, which is what
+ * makes two deliveries in the same building two stops rather than one. Sixteen
+ * hex characters is far more than enough for a list capped at 25.
+ */
+export function newStopId(random: () => number = Math.random): string {
+  let id = '';
+  for (let index = 0; index < 8; index += 1) {
+    id += Math.floor(random() * 256)
+      .toString(16)
+      .padStart(2, '0');
+  }
+  return id;
+}
