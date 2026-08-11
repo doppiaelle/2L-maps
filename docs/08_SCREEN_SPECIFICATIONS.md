@@ -146,6 +146,29 @@ and stays true, which is the property the pinned-at-every-detent rule was protec
 | **Quota exhausted** | Sheet header states the limit, the reset date, and what still works. Primary action disabled with an explanation, not greyed silently |
 | **Loading a saved route** | Skeleton rows matching the eventual layout. Expired coordinates re-hydrate invisibly |
 
+**Where the round starts and ends is on the list, not in a dialog.**
+
+```
+  ROUTE · 4 STOPS
+  34 KM        1H 12M
+
+  FROM   My location                     ← tappable; opens the search
+  [ End at last stop ] [ Back to my location ]
+  2 of 4 stops can be reordered
+```
+
+Both were invisible. The origin has been a field on the draft since the first commit and no
+screen drew it, so picking "My location" produced no visible change at all. And `setRouteShape`
+had no caller, so every route was open — which pins the **last typed stop** as the destination
+and withholds it from the optimizer. The reorderable count is stated because it is the thing
+nobody could see: with neither end chosen, a four-stop round offers Google two of them
+([ADR-0027](adr/0027-the-drive-happens-elsewhere.md),
+[`15_ROUTE_OPTIMIZATION.md`](15_ROUTE_OPTIMIZATION.md) §3).
+
+A control rather than a question in front of Optimize: it costs no tap on the three-tap path,
+and `CLAUDE.md` §7 rule 8 rules out a blocking dialog before an action the driver takes in a
+cab.
+
 ### Interaction
 
 | Action | Result |

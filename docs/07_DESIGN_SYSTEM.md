@@ -181,6 +181,20 @@ an error — it is a lower-confidence result, and colouring it red would misrepr
 | `marker-pending` | `surface` fill, `text-primary` border | same | Default stop |
 | `marker-completed` | `accent` fill + checkmark | same | Completed |
 | `marker-unreachable` | `surface`, `danger` border + glyph | same | Unreachable |
+| `land` | `#F2F2EF` | `#101012` | The ground. The whole canvas below 60 km of span; the landmasses above it |
+| `water` | `#DDE6E6` | `#0C1A1D` | The ground above 60 km, under the coastline ([ADR-0028](adr/0028-a-coastline-under-the-route.md)) |
+| `road` / `road-minor` | `#FFFFFF` / `#F8F8F6` | `#33333A` / `#242428` | The invented town's streets, **below 60 km only** |
+
+**The two grounds take turns.** The invented town's grid is fixed in points, so a "block" is a
+plausible city block on a delivery round and about a hundred kilometres across a country — which
+is exactly what the wide view looked like before ADR-0028: an empty rectangle with a few squares
+on it. Streets are drawn below 60 km of canvas span, the coastline above it, and never both.
+Sixty is about the largest round a van works in a day, so the case the product is *for* keeps
+its town.
+
+**The lens.** Pinch, drag and double-tap to refit. The transform sits on the container, so
+strokes and pins grow with the picture: nothing is redrawn at a finer level of detail, because
+there is no finer level of detail to redraw it at (`lib/map/viewport.ts`).
 
 ---
 

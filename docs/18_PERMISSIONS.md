@@ -89,9 +89,19 @@ thing that needs it.
 ```
 
 **Denial is a supported state, not a failure.** Location denied means the user types a start
-address instead of tapping "current location". Notifications denied means stop progress is
-manual. Every capability in this document has a path that works without it, because a permission
-prompt on launch is the single most reliable way to lose a user before they see the product.
+address instead of tapping "My location". Every capability in this document has a path that
+works without it, because a permission prompt on launch is the single most reliable way to lose
+a user before they see the product.
+
+**Granting it has to produce something visible, and for a long time it did not.** "My location"
+sets the route's *origin*, which is a field on the draft rather than a stop — a device position
+has no `place_id` and a list keyed by one cannot hold it
+([ADR-0007](adr/0007-place-id-durable-coordinates-perishable.md)). No screen drew that field, so
+tapping the row granted the permission, closed the modal, and changed nothing the driver could
+see; it read exactly like a control that does not work. The stop list now opens with a **From**
+row naming where the round starts, and the return option beside it reads *"Back to my
+location"* when the origin is the device
+([`08_SCREEN_SPECIFICATIONS.md`](08_SCREEN_SPECIFICATIONS.md) §7).
 
 **Build-time capabilities follow a different flow.** `LSApplicationQueriesSchemes` and the
 Android `<queries>` element are declared at build time and cannot be requested later: adding a

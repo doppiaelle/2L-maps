@@ -60,6 +60,14 @@ the asymmetric TSP with an optional return to origin:
   restrictions and directional traffic;
 - **open or closed** — one way ends at the last stop; round trip returns to the origin.
 
+**Which one it is, is the driver's choice and used not to be.** `setRouteShape` had no caller
+until ADR-0027's follow-up, so every route was open — and an open route pins its **last typed
+stop** as the destination and withholds it from the optimizer. Rome, Abruzzo, Milan, Bari with
+no origin chosen offered Google **two of the four stops**: the first is consumed as the origin,
+the last is pinned because it was typed last. A control on the stop list now says where the
+round starts and offers where it ends, and states how many stops are reorderable — because that
+number is what nobody could see ([`08_SCREEN_SPECIFICATIONS.md`](08_SCREEN_SPECIFICATIONS.md) §7).
+
 Asymmetry matters more than it appears. A symmetric approximation using straight-line distance
 produces visibly wrong orders in cities with one-way systems, which is precisely where the
 product is used. This is the main reason tier T0 is a fallback rather than the default.
