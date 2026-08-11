@@ -308,6 +308,57 @@ describe('/optimize — what comes back', () => {
     expect(outcome.result.orderedStopIds).toEqual(['s1', 's2']);
   });
 
+  it('accepts a response from a server that has not been redeployed yet', async () => {
+    // **The failure this test exists for happened.** The leg ids were added to
+    // both halves in one change, but the app ships on every push to `main` and
+    // the Edge Functions deployed by hand — so a build went out with the new
+    // client against the old server, and `.nullable()` still demands the key be
+    // present. Optimization stayed broken for exactly the reason it had been
+    // broken before, after being fixed.
+    //
+    // Nothing in the product reads these ids. A field nobody consumes must never
+    // be able to fail a response (ADR-0024).
+    const legacyBody = JSON.stringify({
+      status: 'complete',
+      tier: 'T1',
+      isDegraded: false,
+      orderedStopIds: ['s2', 's1', 's3'],
+      // No `fromStopId`, no `toStopId` — the shape the server sent for weeks.
+      legs: [{ distanceMeters: 1000, durationSeconds: 600, polyline: 'ab_cde' }],
+      totalDistanceMeters: 484_100,
+      totalDurationSeconds: 18_720,
+      unreachableStopIds: [],
+    });
+
+    const client = new ApiClient({
+      baseUrl: 'https://example.test/functions/v1',
+      getAccessToken: () => Promise.resolve('test-token'),
+      fetchImpl: (() =>
+        Promise.resolve(
+          new Response(legacyBody, {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          }),
+        )) as unknown as typeof fetch,
+    });
+
+    const outcome = await createRoutingProvider({ client }).optimize({
+      routeId: '2b6e1d84-7c9a-4c1e-9f0a-1d2c3b4a5e6f',
+      originPlaceId: 'ChIJorigin',
+      originCoordinate: null,
+      stops: [{ id: 's1', placeId: 'ChIJa' }],
+      shape: 'one-way',
+      departureTime: null,
+      idempotencyKey: 'idem-0001-abcd',
+    });
+
+    expect(outcome).toMatchObject({ ok: true });
+    if (outcome.ok !== true || outcome.result.isDegraded) throw new Error('expected a T1 result');
+    // Absent and null both mean the same thing, and the domain has one way of
+    // saying it.
+    expect(outcome.result.legs[0]?.fromStopId).toBeNull();
+  });
+
   it('accepts a round trip, where the origin is also the destination', async () => {
     const outcome = await clientReadingServer(
       {

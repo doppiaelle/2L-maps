@@ -10,10 +10,29 @@ name: deploy-functions
 # because a 404 from a URL that is supposed to exist is indistinguishable from
 # an empty answer at the point where a user is looking.
 #
-# Manual, like `migrate`, and for a weaker version of the same reason: a deploy
-# replaces the code that spends money on Google's APIs.
+# **It used to be manual only, and that made the client and the server drift.**
+# The reasoning was that a deploy replaces code which spends money on Google's
+# APIs, so a human should press it. What actually happened is that `android-preview`
+# ships a new app on every push to `main` while the functions waited for
+# somebody to remember — so a change to both halves of a contract went out as
+# half a change. Optimization was fixed on both sides and stayed broken, because
+# only the client half was running (ADR-0024).
+#
+# Now it deploys automatically when `supabase/functions/**` changes on `main`,
+# which is the same trigger the app already has and for the same reason: the two
+# halves have to move together or they are not one system.
+#
+# `workflow_dispatch` stays, for a redeploy after a secret changes — a secret is
+# not a file in this repository, so nothing here can notice it.
 
 on:
+  push:
+    branches: [main]
+    paths:
+      # Migrations are deliberately absent: a schema change is not reversible by
+      # pushing again, and `migrate` stays a decision somebody makes.
+      - 'supabase/functions/**'
+      - '.github/workflows/deploy-functions.yml'
   workflow_dispatch:
     inputs:
       environment:
@@ -23,14 +42,16 @@ on:
         options: [staging, production]
 
 concurrency:
-  group: deploy-functions-${{ inputs.environment }}
+  group: deploy-functions-${{ inputs.environment || 'production' }}
   cancel-in-progress: false
 
 jobs:
   deploy:
     name: deploy Edge Functions
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment }}
+    # A push has no input to read, and there is one project. Naming it here
+    # rather than defaulting the input keeps the manual path explicit.
+    environment: ${{ inputs.environment || 'production' }}
     steps:
       - uses: actions/checkout@v4
 

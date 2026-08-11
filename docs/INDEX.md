@@ -135,6 +135,7 @@ owning your area (see §Areas below) → [`29`](29_DEFINITION_OF_DONE.md).
 | [0021](adr/0021-drawn-route-preview.md) | The route preview is drawn by us, not rendered by Google; the client keeps no Google credential. **Carries a known terms exposure — read it before touching the map** |
 | [0022](adr/0022-one-route-section.md) | One Route section with the map as its second face; amends ADR-0018 and ADR-0020 |
 | [0023](adr/0023-legs-name-their-stops.md) | A leg names the stops it runs between, both ends nullable; `MAJOR` |
+| [0024](adr/0024-deploy-the-functions-with-the-app.md) | The Edge Functions deploy on push like the app, and a response schema requires only what the caller would break without |
 
 ---
 

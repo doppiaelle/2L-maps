@@ -39,10 +39,19 @@ import type { ApiClient, ApiFailure } from './client';
  * The ids exist now, and they are nullable for the reason `Leg` documents: a
  * route can start somewhere that is not one of its stops
  * ([ADR-0023](../../docs/adr/0023-legs-name-their-stops.md)).
+ *
+ * **They are also optional, and that is not belt-and-braces — it is the actual
+ * fix.** `.nullable()` still demands the key be present, so making the server
+ * send it and the client require it left the two halves able to disagree again:
+ * the app builds and ships on every push to `main`, the Edge Functions deploy by
+ * hand, and for one build the new client met the old server and rejected every
+ * response exactly as before. Nothing in the product reads these ids. A field
+ * nobody consumes must never be able to fail a response
+ * ([ADR-0024](../../docs/adr/0024-deploy-the-functions-with-the-app.md)).
  */
 const legSchema = z.object({
-  fromStopId: z.string().nullable(),
-  toStopId: z.string().nullable(),
+  fromStopId: z.string().nullish(),
+  toStopId: z.string().nullish(),
   distanceMeters: z.number(),
   durationSeconds: z.number(),
   polyline: z.string(),
@@ -145,7 +154,13 @@ function toOutcome(response: OptimizeResponse): RoutingOutcome {
     return { ok: true, result };
   }
 
-  const legs: readonly Leg[] = response.legs;
+  // Normalised at the boundary: absent and null both mean "this leg does not
+  // know which stops it joins", and the domain has one way of saying that.
+  const legs: readonly Leg[] = response.legs.map((leg) => ({
+    ...leg,
+    fromStopId: leg.fromStopId ?? null,
+    toStopId: leg.toStopId ?? null,
+  }));
   return {
     ok: true,
     result: {
