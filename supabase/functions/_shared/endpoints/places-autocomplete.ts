@@ -32,7 +32,15 @@ export interface AutocompletePort {
     },
   ) => Promise<
     | { readonly ok: true; readonly value: readonly { readonly placeId: string }[] }
-    | { readonly ok: false }
+    | {
+        readonly ok: false;
+        /** Why. Optional so a test double may omit it, logged whenever it is
+         *  there — see `autocompleteUpstream` for what its absence cost. */
+        readonly failure?: {
+          readonly kind: string;
+          readonly status?: number;
+        };
+      }
   >;
 }
 
@@ -65,7 +73,25 @@ export async function autocompleteUpstream(
   });
 
   if (!outcome.ok) {
-    throw new ApiError('UPSTREAM_UNAVAILABLE', 'Could not reach the address service');
+    // **Why it failed, findable.** This line threw away the only fact that
+    // distinguishes the four ways address search can stop working — a refused
+    // request, an expired key, a timeout, an unreadable body — and all four
+    // reach the phone as the same sentence, "Search is not responding". When
+    // search went down for everybody, there was nothing at either end to say
+    // which one it was (`CLAUDE.md` §0 rule 5).
+    //
+    // The kind and the status only. Not the input: that is an address, and an
+    // address may not reach a log line (§9 rule 7).
+    console.error(
+      JSON.stringify({
+        event: 'autocomplete_failed',
+        reason: outcome.failure?.kind ?? 'unknown',
+        upstreamStatus: outcome.failure?.status ?? null,
+      }),
+    );
+    throw new ApiError('UPSTREAM_UNAVAILABLE', 'Could not reach the address service', {
+      details: { upstreamStatus: outcome.failure?.status ?? null },
+    });
   }
 
   await ensurePlaceIds(

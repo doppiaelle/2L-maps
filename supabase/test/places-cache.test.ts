@@ -264,4 +264,42 @@ describe('/places-autocomplete records the ids it hands out', () => {
     expect(writes[0]?.sql).toContain('places_cache');
     expect(writes[0]?.params[0]).toEqual(['a', 'b']);
   });
+
+  it('says why upstream refused, and never says what was typed', async () => {
+    // All four ways address search can stop working reached the phone as one
+    // sentence — "Search is not responding" — and this line was where the
+    // difference between them was thrown away. When search went down for
+    // everybody there was nothing at either end to say which one it was
+    // (`CLAUDE.md` §0 rule 5).
+    const { database } = fakeDatabase();
+    const places = {
+      suggest: async () => ({ ok: false as const, failure: { kind: 'rejected', status: 400 } }),
+    };
+    const logged: string[] = [];
+    const spy = jest.spyOn(console, 'error').mockImplementation((line: unknown) => {
+      logged.push(String(line));
+    });
+
+    await expect(
+      autocompleteUpstream(
+        { input: 'via privata dei tulipani', sessionToken: 'token' },
+        {
+          database,
+          places,
+        },
+      ),
+    ).rejects.toMatchObject({ code: 'UPSTREAM_UNAVAILABLE' });
+
+    spy.mockRestore();
+
+    expect(logged).toHaveLength(1);
+    expect(JSON.parse(logged[0] ?? '{}')).toEqual({
+      event: 'autocomplete_failed',
+      reason: 'rejected',
+      upstreamStatus: 400,
+    });
+    // The input is an address, and an address may not reach a log line
+    // (`CLAUDE.md` §9 rule 7).
+    expect(logged[0]).not.toContain('tulipani');
+  });
 });

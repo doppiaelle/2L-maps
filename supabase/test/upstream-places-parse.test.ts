@@ -1,5 +1,6 @@
 import { createParseAdapter, PARSE_MAX_TOKENS } from '../functions/_shared/upstream/parse';
 import {
+  ADDRESS_PRIMARY_TYPES,
   createPlacesAdapter,
   FIELD_MASK_AUTOCOMPLETE,
   FIELD_MASK_DETAILS,
@@ -54,7 +55,21 @@ describe('autocomplete is where the money goes', () => {
     const places = createPlacesAdapter({ apiKey: 'k', fetchImpl });
 
     await places.suggest('via roma', 'token');
-    expect(sent[0]?.body).toMatchObject({ includedPrimaryTypes: ['address'] });
+    expect(sent[0]?.body).toMatchObject({ includedPrimaryTypes: ADDRESS_PRIMARY_TYPES });
+  });
+
+  it('filters on address-level types only, and stays inside the ceiling of five', async () => {
+    // Not the `address` collection: that belongs to the legacy Autocomplete,
+    // whose parameter was `types`. `includedPrimaryTypes` takes the types
+    // themselves, and a value Places will not accept is a 400 on the whole
+    // request rather than a filter it ignores — which is how address search
+    // went down.
+    expect(ADDRESS_PRIMARY_TYPES.length).toBeLessThanOrEqual(5);
+    for (const type of ADDRESS_PRIMARY_TYPES) {
+      // A locality or a business here would put a town centre back at the top
+      // of the list, which is the thing the filter exists to prevent.
+      expect(type).not.toMatch(/^(locality|establishment|geocode|\()/);
+    }
   });
 
   it('buys the suggestion text and the id, and nothing else', async () => {
@@ -68,6 +83,49 @@ describe('autocomplete is where the money goes', () => {
     expect(mask).not.toContain('photos');
     expect(mask).not.toContain('regularOpeningHours');
     expect(mask).not.toContain('reviews');
+  });
+
+  it('asks again without the filter when Places refuses the request', async () => {
+    // The regression this exists for: `includedPrimaryTypes` only improves the
+    // ranking, and a value Places will not accept turned it into a 400 on the
+    // whole request. Address search stopped answering for everybody. A field
+    // that only improves an answer must never be able to prevent one.
+    const sequence: { status: number; body: unknown }[] = [
+      { status: 400, body: {} },
+      { status: 200, body: { suggestions: [{ placePrediction: { placeId: 'ChIJ-2' } }] } },
+    ];
+    const { fetchImpl, sent } = recorder(() => sequence.shift() ?? { status: 500, body: {} });
+    const places = createPlacesAdapter({ apiKey: 'k', fetchImpl });
+
+    const outcome = await places.suggest('via roma', 'token');
+
+    expect(outcome).toEqual({
+      ok: true,
+      value: [{ placeId: 'ChIJ-2', primaryText: '', secondaryText: '' }],
+    });
+    expect(sent).toHaveLength(2);
+    expect(sent[0]?.body).toMatchObject({ includedPrimaryTypes: ADDRESS_PRIMARY_TYPES });
+    expect(sent[1]).toBeDefined();
+    expect(Object.keys(sent[1]?.body as Record<string, unknown>)).not.toContain(
+      'includedPrimaryTypes',
+    );
+    // Same session, so the retry is not a second billable session.
+    expect(sent[1]?.body).toMatchObject({ sessionToken: 'token' });
+  });
+
+  it('does not ask again when the failure is not the request', async () => {
+    // A 5xx or a timeout is not the filter's fault, and retrying would double
+    // the cost of a bad minute upstream.
+    const { fetchImpl, sent } = recorder(() => ({ status: 503, body: {} }));
+    const places = createPlacesAdapter({ apiKey: 'k', fetchImpl });
+
+    const outcome = await places.suggest('via roma', 'token');
+
+    expect(outcome).toEqual({
+      ok: false,
+      failure: { kind: 'unreachable', retryable: true },
+    });
+    expect(sent).toHaveLength(1);
   });
 
   it('treats no suggestions as a valid answer, not a fault', async () => {

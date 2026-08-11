@@ -195,6 +195,8 @@ never on `message`.**
 | Cache | **None.** Session semantics and staleness |
 | Rate limit | 60 per minute per user |
 | Quota | 1,200 sessions per calendar month per user |
+| Upstream filter | `includedPrimaryTypes` = `street_address, route, street_number, premise, subpremise`. **Advisory** — dropped and retried once if Places refuses the request ([ADR-0025](adr/0025-a-preference-may-not-fail-a-request.md)) |
+| `UPSTREAM_UNAVAILABLE` | Carries `details.upstreamStatus`: the status Google answered with, or `null` when it never answered |
 
 ### `POST /geocode`
 

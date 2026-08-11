@@ -136,6 +136,7 @@ owning your area (see §Areas below) → [`29`](29_DEFINITION_OF_DONE.md).
 | [0022](adr/0022-one-route-section.md) | One Route section with the map as its second face; amends ADR-0018 and ADR-0020 |
 | [0023](adr/0023-legs-name-their-stops.md) | A leg names the stops it runs between, both ends nullable; `MAJOR` |
 | [0024](adr/0024-deploy-the-functions-with-the-app.md) | The Edge Functions deploy on push like the app, and a response schema requires only what the caller would break without |
+| [0025](adr/0025-a-preference-may-not-fail-a-request.md) | A request field that only improves an answer is advisory and is dropped rather than allowed to fail the call; extends ADR-0024 to the request direction |
 
 ---
 

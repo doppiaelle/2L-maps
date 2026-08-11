@@ -31,6 +31,35 @@ export const FIELD_MASK_AUTOCOMPLETE =
 /** What a stop needs to be drawn and handed off. */
 export const FIELD_MASK_DETAILS = 'id,formattedAddress,location';
 
+/**
+ * **Addresses, not places.**
+ *
+ * Unrestricted, Places ranks localities and businesses alongside street
+ * addresses, and for the short input a driver actually types — "via roma" — the
+ * town wins. A stop that resolves to "Bergamo" sends a van to a town centre.
+ *
+ * **Named types rather than the `address` collection.** `address` is a type
+ * *collection* from the legacy Autocomplete, where the parameter was `types`.
+ * Autocomplete (New) takes `includedPrimaryTypes` and its collections are
+ * `geocode`, `establishment`, `(regions)` and `(cities)` — `address` is not
+ * among them, and a value Places will not accept is a 400 on the whole request
+ * rather than a filter it ignores. These five are the address-level types
+ * themselves, which is what was meant in the first place, and the ceiling is
+ * five so this is exactly full.
+ *
+ * It is still a preference and it is still treated as one: `suggest` drops it
+ * and asks again if Places refuses. That matters more than this list being
+ * right, because the list being wrong is precisely what took address search
+ * down — and no external value can be verified from inside a test.
+ */
+export const ADDRESS_PRIMARY_TYPES: readonly string[] = [
+  'street_address',
+  'route',
+  'street_number',
+  'premise',
+  'subpremise',
+];
+
 export interface PlaceSuggestionResult {
   readonly placeId: string;
   readonly primaryText: string;
@@ -118,39 +147,58 @@ export function createPlacesAdapter(options: PlacesAdapterOptions) {
       sessionToken: string,
       opts: { readonly locale?: string; readonly bias?: { lat: number; lng: number } } = {},
     ): Promise<Outcome<readonly PlaceSuggestionResult[]>> => {
-      const outcome = await call(
-        AUTOCOMPLETE_ENDPOINT,
-        {
-          method: 'POST',
-          body: {
-            input,
-            sessionToken,
-            // **Addresses, not places.** Unrestricted, Places ranks localities
-            // and businesses alongside street addresses, and for the short input
-            // a driver actually types — "via roma" — the town wins. Every
-            // suggestion was a city or a region, which is useless to a product
-            // whose entire job is delivering to a door.
-            //
-            // `address` is the collection of precise street addresses. It
-            // excludes businesses by name, which is the deliberate trade: this
-            // routes vans to addresses, and a stop that resolves to "Bergamo"
-            // sends a driver to a town centre.
-            includedPrimaryTypes: ['address'],
-            ...(opts.locale === undefined ? {} : { languageCode: opts.locale }),
-            ...(opts.bias === undefined
-              ? {}
-              : {
-                  locationBias: {
-                    circle: {
-                      center: { latitude: opts.bias.lat, longitude: opts.bias.lng },
-                      radius: 50_000,
-                    },
-                  },
-                }),
+      const body = {
+        input,
+        sessionToken,
+        ...(opts.locale === undefined ? {} : { languageCode: opts.locale }),
+        ...(opts.bias === undefined
+          ? {}
+          : {
+              locationBias: {
+                circle: {
+                  center: { latitude: opts.bias.lat, longitude: opts.bias.lng },
+                  radius: 50_000,
+                },
+              },
+            }),
+      };
+
+      const ask = (filtered: boolean) =>
+        call(
+          AUTOCOMPLETE_ENDPOINT,
+          {
+            method: 'POST',
+            body: filtered ? { ...body, includedPrimaryTypes: ADDRESS_PRIMARY_TYPES } : body,
           },
-        },
-        FIELD_MASK_AUTOCOMPLETE,
-      );
+          FIELD_MASK_AUTOCOMPLETE,
+        );
+
+      let outcome = await ask(true);
+
+      // **The filter must never be able to break search**, and it did.
+      //
+      // `includedPrimaryTypes` improves the *ranking* — nothing in the product
+      // reads it, nothing depends on it, and a suggestion list without it is
+      // worse but usable. Yet Places validates it, and a value it does not
+      // accept is a 400 on the whole request: address search stopped answering
+      // at all, for everybody, the moment this went out. That is the same
+      // failure as requiring a response field nobody reads
+      // ([ADR-0024](../../../docs/adr/0024-deploy-the-functions-with-the-app.md)),
+      // mirrored onto the request — so it gets the same rule. **A field that
+      // only improves an answer must never be able to prevent one.**
+      //
+      // Retried on `rejected` only. A timeout or an outage is not the filter's
+      // fault, and asking again would double the cost of a bad minute. The same
+      // session token goes back out, so this stays one billable session.
+      if (!outcome.ok && outcome.failure.kind === 'rejected') {
+        console.error(
+          JSON.stringify({
+            event: 'autocomplete_filter_rejected',
+            status: outcome.failure.status,
+          }),
+        );
+        outcome = await ask(false);
+      }
 
       if (!outcome.ok) return outcome;
       const suggestions = readSuggestions(outcome.value);
