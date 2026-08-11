@@ -24,6 +24,16 @@ name: deploy-functions
 #
 # `workflow_dispatch` stays, for a redeploy after a secret changes — a secret is
 # not a file in this repository, so nothing here can notice it.
+#
+# **The credentials live on a GitHub Environment, not on the repository**, which
+# is what made the first automatic run fail: a push has no `inputs.environment`
+# to read, the job defaulted to `production`, and `production` does not hold
+# them. `supabase link --project-ref ""` is what that looks like from the log,
+# which is a cryptic way of saying "a secret is missing" — hence the check
+# before it now.
+#
+# Set the `DEPLOY_ENVIRONMENT` repository variable to override the default
+# without editing this file.
 
 on:
   push:
@@ -42,16 +52,17 @@ on:
         options: [staging, production]
 
 concurrency:
-  group: deploy-functions-${{ inputs.environment || 'production' }}
+  group: deploy-functions-${{ inputs.environment || vars.DEPLOY_ENVIRONMENT || 'staging' }}
   cancel-in-progress: false
 
 jobs:
   deploy:
     name: deploy Edge Functions
     runs-on: ubuntu-latest
-    # A push has no input to read, and there is one project. Naming it here
-    # rather than defaulting the input keeps the manual path explicit.
-    environment: ${{ inputs.environment || 'production' }}
+    # A push has no input to read. `staging` is the environment the manual runs
+    # have actually been using — the one that holds the secrets — and the
+    # repository variable is the way to change that without editing this file.
+    environment: ${{ inputs.environment || vars.DEPLOY_ENVIRONMENT || 'staging' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -60,6 +71,25 @@ jobs:
       - uses: supabase/setup-cli@v1
         with:
           version: 2.113.0
+
+      # **Before anything is attempted.** Without this the CLI is handed an empty
+      # `--project-ref` and answers "Access token not provided", which sends the
+      # reader looking for a login problem rather than a missing secret. The
+      # values are never printed — only whether they are there.
+      - name: Check the credentials are present
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+        run: |
+          missing=""
+          [ -n "$SUPABASE_ACCESS_TOKEN" ] || missing="$missing SUPABASE_ACCESS_TOKEN"
+          [ -n "$SUPABASE_PROJECT_REF" ] || missing="$missing SUPABASE_PROJECT_REF"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing secret(s):$missing"
+            echo "::error::This job read them from the GitHub Environment '${{ inputs.environment || vars.DEPLOY_ENVIRONMENT || 'staging' }}'."
+            echo "::error::Add them there, or set the DEPLOY_ENVIRONMENT repository variable to the environment that has them."
+            exit 1
+          fi
 
       - name: Link the project
         env:

@@ -56,6 +56,17 @@ server was sending. A test for a version of the server that no longer exists is
 worth keeping: it is what documents that the client does not depend on the two
 being in step.
 
+**The credentials live on a GitHub Environment, and the push path had to be
+told which one.** The first automatic run failed on this: a push has no
+`inputs.environment`, the job defaulted to `production`, and the secrets are on
+`staging` — so `supabase link` was handed an empty `--project-ref` and answered
+"Access token not provided", which reads like a login problem and is not one.
+The default is now `staging`, overridable with a `DEPLOY_ENVIRONMENT` repository
+variable, and the job **checks the secrets are present before it uses them** and
+names the environment it looked in. A workflow that fails cryptically on a
+missing secret is the same silent failure `CLAUDE.md` §0 rule 5 forbids in the
+product, one layer out.
+
 **Secrets remain manual and remain invisible to CI.** `GOOGLE_SERVER_API_KEY`,
 `ANTHROPIC_API_KEY` and `OPENROUTER_API_KEY` are set in the Supabase dashboard.
 Nothing in this repository can tell whether they are present or valid, which is
