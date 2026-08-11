@@ -30,6 +30,7 @@ import { colours, space } from '@/lib/design/tokens';
 import { addressNoticeOf } from '@/lib/places/notice';
 import { formatDistance, formatDuration } from '@/lib/format/units';
 import { buildPlanRows, placeIdsToResolve, straightLineMeters } from '@/lib/route/plan-rows';
+import { legSummary } from '@/lib/map/leg-selection';
 import { buildRouteGeometry, connectorsThrough, planRoute } from '@/lib/map/route-geometry';
 import { PREPARING_DELAY_MS, routeViewAfter, showsCanvas, showsMap } from '@/lib/route/route-view';
 import type { RouteView } from '@/lib/route/route-view';
@@ -87,6 +88,9 @@ export default function PlanScreen(): React.JSX.Element {
   // What the last handoff attempt produced, for the five outcomes that used to
   // produce nothing at all.
   const [handoffNotice, setHandoffNotice] = useState<ReturnType<typeof handoffNoticeOf>>(null);
+  // Which hop the driver tapped on the canvas. Null is most of the time and is
+  // the whole route.
+  const [selectedLegIndex, setSelectedLegIndex] = useState<number | null>(null);
 
   const destination = useLaunchDestination({
     isStoreHydrated: true,
@@ -224,6 +228,13 @@ export default function PlanScreen(): React.JSX.Element {
   // without a second tap: the user pressed Optimize and this is the answer.
   const hasResult = result !== null;
   useEffect(() => {
+    // A hop belongs to the result it was measured on. Carrying the index across
+    // a new optimization would highlight a different segment and show it the old
+    // numbers.
+    setSelectedLegIndex(null);
+  }, [result]);
+
+  useEffect(() => {
     if (hasResult)
       setRouteView((current) =>
         routeViewAfter({ kind: 'result-arrived' }, { current, hasResult: true }),
@@ -325,6 +336,10 @@ export default function PlanScreen(): React.JSX.Element {
                       : connectorsThrough(positionedStops)
                   }
                   phase={isMapShowing ? 'ready' : 'preparing'}
+                  // Tapping a hop shows what Google measured for it — data the
+                  // field mask already buys and nothing was showing (ADR-0027).
+                  selectedLegIndex={selectedLegIndex}
+                  onSelectLeg={setSelectedLegIndex}
                   selectedStopId={selectedStopId}
                   undrawableStopIds={undrawableStopIds}
                   // The route's own id. Stable across renders and across
@@ -335,6 +350,11 @@ export default function PlanScreen(): React.JSX.Element {
                   testID="plan-route-canvas"
                 />
               )
+            }
+            selectedLeg={
+              geometry === null || selectedLegIndex === null
+                ? null
+                : legSummary(selectedLegIndex, geometry.legs)
             }
             onDismissMap={() => {
               // The result goes; the stops stay. "Back to the list" with an

@@ -335,6 +335,16 @@ export interface RouteGeometry {
   /** Decoded once at receipt and memoised; decoding per render is a top cause of
    *  map jank (docs/24_PERFORMANCE.md). */
   readonly decodedPolyline: readonly LatLng[];
+  /**
+   * The same points, kept per leg rather than joined into one line.
+   *
+   * `legPaths[i]` is `legs[i]`, so a tap on a hop can be answered with the
+   * distance and duration Google already gave us for it — data the field mask
+   * already buys and nothing was showing
+   * ([ADR-0027](../../docs/adr/0027-the-drive-happens-elsewhere.md)). Produced
+   * by the same single decode as `decodedPolyline`, not a second one.
+   */
+  readonly legPaths: readonly (readonly LatLng[])[];
   /** A T0 result has an order but no road geometry, so the map draws straight
    *  connectors in a visually distinct style rather than a fake road-following
    *  line (docs/15_ROUTE_OPTIMIZATION.md). */

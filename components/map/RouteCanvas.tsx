@@ -1,5 +1,6 @@
 import { memo, useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
+import type { GestureResponderEvent } from 'react-native';
 import Svg, { Circle, G, Line, Path, Rect } from 'react-native-svg';
 
 import { MapAttribution } from './MapAttribution';
@@ -11,6 +12,7 @@ import { sceneryFor } from '@/lib/map/scenery';
 import type { Scenery } from '@/lib/map/scenery';
 import type { Point } from '@/lib/map/projection';
 import { simplify } from '@/lib/map/simplify';
+import { legAt } from '@/lib/map/leg-selection';
 import { MARKER_SIZE, MARKER_SIZE_SELECTED, markerStyle } from '@/lib/map/style';
 import type { DrawnRoute } from '@/lib/map/route-geometry';
 import type { StopProgressState } from '@/lib/route/progress';
@@ -80,6 +82,16 @@ export interface RouteCanvasProps {
    * route is being worked out rather than describing one.
    */
   readonly phase?: 'ready' | 'preparing';
+  /**
+   * Which hop is being inspected, and how to say one was tapped.
+   *
+   * Every optimization already returns a distance and a duration **per leg** —
+   * the field mask buys them and nothing was showing them. Tapping one costs no
+   * request ([ADR-0027](../../docs/adr/0027-the-drive-happens-elsewhere.md)).
+   * Omitted together, the route draws as one line and nothing is tappable.
+   */
+  readonly selectedLegIndex?: number | null;
+  onSelectLeg?: (index: number | null) => void;
   readonly testID?: string;
 }
 
@@ -109,9 +121,12 @@ export const RouteCanvas = memo(function RouteCanvas({
   undrawableStopIds = [],
   scenerySeed = '',
   phase = 'ready',
+  selectedLegIndex = null,
+  onSelectLeg,
   testID,
 }: RouteCanvasProps): React.JSX.Element {
   const isPreparing = phase === 'preparing';
+  const isInspectable = onSelectLeg !== undefined && !isPreparing;
   const palette = colours[theme];
   const map = mapColours[theme];
   const [size, setSize] = useState({ width: 0, height: 0 });
@@ -142,9 +157,16 @@ export const RouteCanvas = memo(function RouteCanvas({
       // Simplified after projection, never before: a tolerance in degrees means
       // a different amount of detail at every latitude and every zoom.
       const projected = simplify(route.path.map(projection.project));
+      // Each leg simplified on its own, so a tap is tested against the same
+      // vertices that are drawn. Testing against the unsimplified geometry
+      // would answer about a line nobody can see.
+      const legs = route.legPaths
+        .map((leg) => simplify(leg.map(projection.project)))
+        .map((points) => ({ points, d: pathThrough(points) }));
       return {
         pins,
         road: pathThrough(projected),
+        legs,
         segments: [],
         // The town is generated around the *simplified* line, so the scenery and
         // the route agree about where the route is.
@@ -158,6 +180,9 @@ export const RouteCanvas = memo(function RouteCanvas({
       return {
         pins,
         road: null,
+        // A T0 result has no per-leg geometry to inspect, and the waiting face
+        // has no result at all. Nothing to tap in either case.
+        legs: [],
         scenery: sceneryFor({ path: through, size, seed: scenerySeed }),
         heading: through,
         // Separate paths rather than one dashed line through every stop. A
@@ -170,13 +195,15 @@ export const RouteCanvas = memo(function RouteCanvas({
       };
     }
 
-    return { pins, road: null, segments: [], scenery: EMPTY_SCENERY, heading: [] };
+    return { pins, road: null, legs: [], segments: [], scenery: EMPTY_SCENERY, heading: [] };
   }, [stops, route, size, scenerySeed]);
 
   // Only a *result* can be degraded. While preparing, the connectors are the
   // stops in the order they were typed and claim nothing about distance or
   // traffic — calling that "straight-line estimate" would announce a degraded
   // answer for a route that has not been computed at all.
+  const selectedLeg = selectedLegIndex === null ? null : (drawn.legs[selectedLegIndex] ?? null);
+
   const isDegraded = !isPreparing && route.kind === 'connectors';
   const summary = isPreparing
     ? `Working out the fastest order for ${stops.length} ${stops.length === 1 ? 'stop' : 'stops'}`
@@ -209,7 +236,37 @@ export const RouteCanvas = memo(function RouteCanvas({
       testID={testID}
     >
       {size.width > 0 && size.height > 0 && (
-        <Svg width={size.width} height={size.height} testID="route-canvas-svg">
+        <Svg
+          width={size.width}
+          height={size.height}
+          testID="route-canvas-svg"
+          {...(isInspectable
+            ? {
+                /**
+                 * One handler for the whole canvas, rather than a touch target
+                 * per hop.
+                 *
+                 * The corridors overlap wherever the route doubles back — a run
+                 * through a town centre and out again passes the same junction
+                 * twice — and per-path handlers would answer with whichever leg
+                 * happened to be drawn last, not the one nearest the finger.
+                 * `legAt` answers *nearest*, and is tested for exactly that case.
+                 *
+                 * A tap on empty canvas clears the selection, which is the way
+                 * back to the whole route without leaving the map.
+                 */
+                onPress: (event: GestureResponderEvent) => {
+                  const { locationX, locationY } = event.nativeEvent;
+                  onSelectLeg?.(
+                    legAt(
+                      { x: locationX, y: locationY },
+                      drawn.legs.map((leg) => leg.points),
+                    ),
+                  );
+                },
+              }
+            : {})}
+        >
           {/* The ground. A rectangle rather than the container's background so
               the whole drawing is one surface the SVG owns — and so a future
               snapshot exports what is on screen rather than a transparent hole. */}
@@ -276,8 +333,27 @@ export const RouteCanvas = memo(function RouteCanvas({
                 strokeWidth={stroke.route}
                 strokeLinecap="round"
                 strokeLinejoin="round"
+                // Dimmed, not hidden, while one hop is being inspected: the rest
+                // of the day is still the context that makes the selected hop
+                // mean anything.
+                opacity={selectedLegIndex === null ? 1 : DIMMED_ROUTE_OPACITY}
                 fill="none"
               />
+
+              {/* The hop being inspected, drawn over the dimmed rest of the
+                  route at the casing's width so it reads as the same line
+                  brought forward rather than a different one laid on top. */}
+              {selectedLeg !== null && (
+                <Path
+                  testID="route-leg-selected"
+                  d={selectedLeg.d}
+                  stroke={palette.accent}
+                  strokeWidth={stroke.routeCasing}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  fill="none"
+                />
+              )}
             </>
           )}
 
@@ -387,6 +463,16 @@ const DEGRADED_DASH = '10,8';
  * (`CLAUDE.md` §10 rule 6).
  */
 const PREPARING_OPACITY = 0.35;
+
+/**
+ * How far the rest of the route recedes while one hop is being inspected.
+ *
+ * Dimmed rather than hidden. The other hops are the context that makes the
+ * selected one mean anything — "eleven minutes" is a different fact on a
+ * two-stop route and on a twenty-stop one — and a canvas that emptied itself
+ * around the tap would lose the shape of the day.
+ */
+const DIMMED_ROUTE_OPACITY = 0.3;
 
 /**
  * One stop.

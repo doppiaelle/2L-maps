@@ -37,7 +37,15 @@ export interface RouteSegment {
  * A single `null` would collapse the three and the defect would never surface.
  */
 export type DrawnRoute =
-  | { readonly kind: 'road'; readonly path: readonly LatLng[] }
+  | {
+      readonly kind: 'road';
+      readonly path: readonly LatLng[];
+      /** The same line, kept per hop, so a tap can be answered with the distance
+       *  and duration Google measured for that segment
+       *  ([ADR-0027](../../docs/adr/0027-the-drive-happens-elsewhere.md)).
+       *  `legPaths[i]` belongs to `RouteGeometry.legs[i]`. */
+      readonly legPaths: readonly (readonly LatLng[])[];
+    }
   | { readonly kind: 'connectors'; readonly segments: readonly RouteSegment[] }
   | {
       readonly kind: 'none';
@@ -61,12 +69,18 @@ export function buildRouteGeometry(result: OptimizationResult): RouteGeometry {
     // A T0 result has no legs and no polyline — it is an ordering, nothing more.
     // Returning empty arrays rather than a partially shaped object keeps the
     // caller from having to ask which fields a degraded result populates.
-    return { legs: [], decodedPolyline: [], isDegraded: true };
+    return { legs: [], decodedPolyline: [], legPaths: [], isDegraded: true };
   }
+
+  // Decoded once, kept twice. The joined line is what gets drawn; the per-leg
+  // paths are what a tap is answered from, and re-decoding for the second use
+  // would double the most expensive thing this function does.
+  const legPaths = result.legs.map((leg) => decodePolyline(leg.polyline));
 
   return {
     legs: result.legs,
-    decodedPolyline: joinLegPaths(result.legs.map((leg) => decodePolyline(leg.polyline))),
+    decodedPolyline: joinLegPaths(legPaths),
+    legPaths,
     isDegraded: false,
   };
 }
@@ -127,7 +141,7 @@ export function planRoute(
   // degraded one.
   if (geometry.decodedPolyline.length < 2) return { kind: 'none', reason: 'undecodable' };
 
-  return { kind: 'road', path: geometry.decodedPolyline };
+  return { kind: 'road', path: geometry.decodedPolyline, legPaths: geometry.legPaths };
 }
 
 /**

@@ -28,6 +28,10 @@ const stop = (stopId: string, position: number, coordinate = at(45.6 + position 
 const road: DrawnRoute = {
   kind: 'road',
   path: [at(45.6, 9.6), at(45.65, 9.62), at(45.7, 9.65)],
+  legPaths: [
+    [at(45.6, 9.6), at(45.65, 9.62)],
+    [at(45.65, 9.62), at(45.7, 9.65)],
+  ],
 };
 
 const connectors: DrawnRoute = {
@@ -242,5 +246,84 @@ describe('the wait for an answer', () => {
     // drawing is about it (ADR-0021).
     laidOut(preparing([stop('a', 1), stop('b', 2)]));
     expect(screen.getByTestId('route-canvas-attribution', visually)).toBeTruthy();
+  });
+});
+
+describe('inspecting a hop', () => {
+  const stops = [stop('a', 1), stop('b', 2), stop('c', 3)];
+
+  /** The canvas measures itself to 390 × 400, so a tap has to be expressed in
+   *  those coordinates rather than in degrees. */
+  const tapAt = (x: number, y: number) => {
+    fireEvent(screen.getByTestId('route-canvas-svg', visually), 'press', {
+      nativeEvent: { locationX: x, locationY: y },
+    });
+  };
+
+  it('answers a tap on the line with the leg under it', () => {
+    // Every optimization already returns a distance and a duration per leg; the
+    // field mask buys them and nothing was showing them (ADR-0027).
+    const selections: (number | null)[] = [];
+    laidOut(canvas(road, stops, { onSelectLeg: (index: number | null) => selections.push(index) }));
+
+    // The first stop's own pin: the start of leg 0.
+    const pin = screen.getAllByTestId('route-canvas-pin', visually)[0];
+    tapAt(Number(pin?.props.cx ?? 0), Number(pin?.props.cy ?? 0));
+
+    expect(selections).toEqual([0]);
+  });
+
+  it('answers a tap on empty canvas with nothing selected', () => {
+    // The way back to the whole route without leaving the map. A selection with
+    // no exit is a trap.
+    const selections: (number | null)[] = [];
+    laidOut(canvas(road, stops, { onSelectLeg: (index: number | null) => selections.push(index) }));
+
+    tapAt(5, 395);
+    expect(selections).toEqual([null]);
+  });
+
+  it('brings the selected hop forward and lets the rest recede', () => {
+    // Dimmed rather than hidden: "eleven minutes" is a different fact on a
+    // two-stop route than on a twenty-stop one, so the rest of the day stays as
+    // the context that gives it meaning.
+    laidOut(canvas(road, stops, { onSelectLeg: () => undefined, selectedLegIndex: 0 }));
+
+    expect(screen.getByTestId('route-leg-selected', visually)).toBeTruthy();
+    expect(Number(screen.getByTestId('route-line', visually).props.opacity)).toBeLessThan(1);
+  });
+
+  it('draws the whole route at full strength when nothing is selected', () => {
+    laidOut(canvas(road, stops, { onSelectLeg: () => undefined }));
+
+    expect(screen.queryByTestId('route-leg-selected', visually)).toBeNull();
+    expect(Number(screen.getByTestId('route-line', visually).props.opacity)).toBe(1);
+  });
+
+  it('is not tappable while the answer is still being computed', () => {
+    // There are no legs yet, so there is nothing a tap could be about.
+    const selections: (number | null)[] = [];
+    laidOut(
+      canvas(connectors, stops, {
+        phase: 'preparing',
+        onSelectLeg: (index: number | null) => selections.push(index),
+      }),
+    );
+
+    tapAt(100, 100);
+    expect(selections).toEqual([]);
+  });
+
+  it('is not tappable on a degraded result, which has no per-leg geometry', () => {
+    const selections: (number | null)[] = [];
+    laidOut(
+      canvas(connectors, stops, { onSelectLeg: (index: number | null) => selections.push(index) }),
+    );
+
+    tapAt(100, 100);
+    // The handler is attached — a T0 route is still a route — but there is
+    // nothing within reach of the tap, so it reports no selection rather than
+    // guessing at a hop it does not have.
+    expect(selections).toEqual([null]);
   });
 });

@@ -62,6 +62,16 @@ export interface PlanViewProps {
    *  mean. */
   onDismissMap?: () => void;
   /**
+   * What the hop the driver just tapped measures, or nothing tapped.
+   *
+   * Two numbers, both of them Google's own answer for that segment and both
+   * already bought by the existing field mask
+   * ([ADR-0027](../../docs/adr/0027-the-drive-happens-elsewhere.md)). No share
+   * of the total and no comparison — those would be arithmetic presented as
+   * measurement.
+   */
+  readonly selectedLeg?: { readonly value: string; readonly spoken: string } | null;
+  /**
    * Points to keep clear at the bottom, in map mode.
    *
    * The drawn route runs the whole height with the dock floating over it, so the
@@ -138,6 +148,7 @@ export function PlanView({
   view = 'list',
   mapSlot,
   onDismissMap,
+  selectedLeg = null,
   bottomInset = 0,
   theme,
   testID,
@@ -239,6 +250,41 @@ export function PlanView({
               >
                 <MenuGlyph />
               </Pressable>
+            )}
+
+            {view === 'map' && selectedLeg !== null && (
+              // Over the canvas rather than in the header: it describes a hop
+              // the finger is still on, and the eye should not have to travel
+              // to the top of the screen to read the answer to its own tap.
+              <View
+                style={{
+                  position: 'absolute',
+                  left: layout.screenPadding,
+                  right: layout.screenPadding,
+                  top: space.space3,
+                  alignItems: 'center',
+                }}
+                pointerEvents="none"
+                testID="plan-selected-leg"
+              >
+                <View
+                  className="bg-surface border border-border"
+                  style={{
+                    paddingHorizontal: space.space4,
+                    paddingVertical: space.space2,
+                    borderRadius: radius.radiusFull,
+                  }}
+                >
+                  <Text
+                    className="text-metric-md text-text-primary"
+                    style={{ fontVariant: ['tabular-nums'] }}
+                    accessibilityLabel={selectedLeg.spoken}
+                    accessibilityLiveRegion="polite"
+                  >
+                    {selectedLeg.value}
+                  </Text>
+                </View>
+              </View>
             )}
 
             {view === 'preparing' && (

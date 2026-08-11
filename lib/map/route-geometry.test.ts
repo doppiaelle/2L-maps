@@ -76,7 +76,7 @@ describe('building the geometry once', () => {
       totalDistanceMeters: 1200,
     });
 
-    expect(geometry).toEqual({ legs: [], decodedPolyline: [], isDegraded: true });
+    expect(geometry).toEqual({ legs: [], decodedPolyline: [], legPaths: [], isDegraded: true });
   });
 });
 
@@ -88,6 +88,7 @@ describe('what gets drawn', () => {
       {
         legs: [],
         decodedPolyline: [at(45.7, 9.7), at(45.705, 9.705), at(45.71, 9.71)],
+        legPaths: [],
         isDegraded: false,
       },
       stops,
@@ -100,7 +101,10 @@ describe('what gets drawn', () => {
   it('never draws a degraded route as a road line', () => {
     // The whole point. A smooth curve would claim road routing that did not
     // happen (docs/15_ROUTE_OPTIMIZATION.md).
-    const drawn = planRoute({ legs: [], decodedPolyline: [], isDegraded: true }, stops);
+    const drawn = planRoute(
+      { legs: [], decodedPolyline: [], legPaths: [], isDegraded: true },
+      stops,
+    );
 
     expect(drawn.kind).toBe('connectors');
     if (drawn.kind === 'connectors') {
@@ -112,7 +116,7 @@ describe('what gets drawn', () => {
   it('runs a degraded connector past a stop whose coordinate expired', () => {
     // The stop is still reported by the marker plan; it just cannot anchor a
     // line (ADR-0007). Breaking the line into two would imply two routes.
-    const drawn = planRoute({ legs: [], decodedPolyline: [], isDegraded: true }, [
+    const drawn = planRoute({ legs: [], decodedPolyline: [], legPaths: [], isDegraded: true }, [
       stop('a', at(45.7, 9.7)),
       stop('b', null),
       stop('c', at(45.72, 9.72)),
@@ -128,7 +132,10 @@ describe('what gets drawn', () => {
   it('draws nothing, and says why, when a road route will not decode', () => {
     // Markers only, logged as a defect (docs/09_COMPONENT_LIBRARY.md) — and
     // deliberately not connectors, which would relabel a road route as degraded.
-    const drawn = planRoute({ legs: [], decodedPolyline: [], isDegraded: false }, stops);
+    const drawn = planRoute(
+      { legs: [], decodedPolyline: [], legPaths: [], isDegraded: false },
+      stops,
+    );
 
     expect(drawn).toEqual({ kind: 'none', reason: 'undecodable' });
   });
@@ -138,7 +145,7 @@ describe('what gets drawn', () => {
   });
 
   it('has nothing to connect with one placeable stop', () => {
-    const drawn = planRoute({ legs: [], decodedPolyline: [], isDegraded: true }, [
+    const drawn = planRoute({ legs: [], decodedPolyline: [], legPaths: [], isDegraded: true }, [
       stop('a', at(45.7, 9.7)),
       stop('b', null),
     ]);
@@ -155,6 +162,7 @@ describe('what the camera has to fit', () => {
       {
         legs: [],
         decodedPolyline: [at(45.7, 9.7), at(45.9, 9.9), at(45.71, 9.71)],
+        legPaths: [],
         isDegraded: false,
       },
       stops,
