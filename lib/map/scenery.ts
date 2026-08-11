@@ -63,6 +63,23 @@ export interface Scenery {
  * where our invention is least grounded. Beyond this, nothing is drawn at all —
  * a uniform grid to the canvas edge would read as a real map of a real place.
  */
+/**
+ * The widest view the invented town is drawn in, as metres across the canvas
+ * diagonal.
+ *
+ * **The grid is fixed in pixels, so it was silently lying about scale.** A
+ * seventy-eight-point cell is a plausible city block on a delivery round and
+ * about a hundred kilometres on a Rome-to-Milan canvas — which is what the
+ * product owner saw: an empty background with a few squares scattered across
+ * Italy. Streets are drawn where streets are a believable amount of detail, and
+ * nowhere else; above this the coastline takes over
+ * ([ADR-0028](../../docs/adr/0028-a-coastline-under-the-route.md)).
+ *
+ * Sixty kilometres is about the largest round a van driver works in a day, so
+ * the case this product is *for* keeps its town.
+ */
+export const SCENERY_MAX_SPAN_METRES = 60_000;
+
 export const FALLOFF = 0.42;
 
 /**
@@ -92,16 +109,31 @@ export interface SceneryInputs {
   readonly size: { readonly width: number; readonly height: number };
   /** Anything stable and route-specific. The same seed must draw the same town. */
   readonly seed: string;
+  /**
+   * How much ground one point of the canvas covers (`metresPerPoint`).
+   *
+   * Without it the town is drawn at every scale and means something at only one
+   * of them. Omitted, the check is skipped — which is what the pure tests of the
+   * grid itself want, and what no caller should do.
+   */
+  readonly metresPerPoint?: number;
 }
 
-export function sceneryFor({ path, size, seed }: SceneryInputs): Scenery {
+export function sceneryFor({ path, size, seed, metresPerPoint }: SceneryInputs): Scenery {
   if (size.width <= 0 || size.height <= 0 || path.length < 2) {
+    return { roads: [], blocks: [] };
+  }
+
+  const diagonal = Math.hypot(size.width, size.height);
+
+  // Nothing at all above the threshold. Drawing a fainter town would be the same
+  // false claim in a quieter voice.
+  if (metresPerPoint !== undefined && diagonal * metresPerPoint > SCENERY_MAX_SPAN_METRES) {
     return { roads: [], blocks: [] };
   }
 
   const random = seededRandom(seed);
   const angle = dominantBearing(path);
-  const diagonal = Math.hypot(size.width, size.height);
   const falloff = diagonal * FALLOFF;
 
   // The grid is built in a frame rotated onto the route's own direction, so the

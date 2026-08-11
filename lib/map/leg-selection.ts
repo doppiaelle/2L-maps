@@ -1,6 +1,9 @@
 import { formatDistance, formatDuration } from '@/lib/format/units';
 
+import { toCanvas } from './viewport';
+
 import type { Point } from './projection';
+import type { Viewport } from './viewport';
 
 /**
  * Which hop the driver just tapped, and what it says.
@@ -55,6 +58,24 @@ export function legAt(
   });
 
   return best === null ? null : (best as LegHit).index;
+}
+
+/**
+ * The same question, asked from where the finger actually landed.
+ *
+ * The gesture reports a point on the **container**, which is not transformed;
+ * the legs are in canvas coordinates, which are. Doing the inversion here rather
+ * than in the component is what makes the direction testable — get it backwards
+ * and the wrong hop is selected, which looks entirely plausible on screen and
+ * would otherwise only be findable on a device with a zoomed map.
+ */
+export function legAtScreenPoint(
+  screenPoint: Point,
+  viewport: Viewport,
+  legPaths: readonly (readonly Point[])[],
+  radius = LEG_TOUCH_RADIUS,
+): number | null {
+  return legAt(toCanvas(screenPoint, viewport), legPaths, radius);
 }
 
 export interface LegSummary {

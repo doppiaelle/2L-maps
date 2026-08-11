@@ -252,37 +252,17 @@ describe('the wait for an answer', () => {
 describe('inspecting a hop', () => {
   const stops = [stop('a', 1), stop('b', 2), stop('c', 3)];
 
-  /** The canvas measures itself to 390 × 400, so a tap has to be expressed in
-   *  those coordinates rather than in degrees. */
-  const tapAt = (x: number, y: number) => {
-    fireEvent(screen.getByTestId('route-canvas-svg', visually), 'press', {
-      nativeEvent: { locationX: x, locationY: y },
-    });
-  };
-
-  it('answers a tap on the line with the leg under it', () => {
-    // Every optimization already returns a distance and a duration per leg; the
-    // field mask buys them and nothing was showing them (ADR-0027).
-    const selections: (number | null)[] = [];
-    laidOut(canvas(road, stops, { onSelectLeg: (index: number | null) => selections.push(index) }));
-
-    // The first stop's own pin: the start of leg 0.
-    const pin = screen.getAllByTestId('route-canvas-pin', visually)[0];
-    tapAt(Number(pin?.props.cx ?? 0), Number(pin?.props.cy ?? 0));
-
-    expect(selections).toEqual([0]);
-  });
-
-  it('answers a tap on empty canvas with nothing selected', () => {
-    // The way back to the whole route without leaving the map. A selection with
-    // no exit is a trap.
-    const selections: (number | null)[] = [];
-    laidOut(canvas(road, stops, { onSelectLeg: (index: number | null) => selections.push(index) }));
-
-    tapAt(5, 395);
-    expect(selections).toEqual([null]);
-  });
-
+  /**
+   * **Which leg a tap means is not asserted here**, and deliberately. The
+   * gesture double in `jest.setup.ts` recognises nothing — a double that
+   * satisfied the real detector would be most of the library — so a simulated
+   * tap through it would be asserting the double.
+   *
+   * The decision is pure and is proven where it lives: `legAtScreenPoint` in
+   * `lib/map/leg-selection.test.ts`, including the case that only appears once
+   * the map is zoomed, and `lib/map/viewport.test.ts` for the inverse being
+   * exact. What is left for the canvas is what it *draws* about a selection.
+   */
   it('brings the selected hop forward and lets the rest recede', () => {
     // Dimmed rather than hidden: "eleven minutes" is a different fact on a
     // two-stop route than on a twenty-stop one, so the rest of the day stays as
@@ -300,30 +280,16 @@ describe('inspecting a hop', () => {
     expect(Number(screen.getByTestId('route-line', visually).props.opacity)).toBe(1);
   });
 
-  it('is not tappable while the answer is still being computed', () => {
-    // There are no legs yet, so there is nothing a tap could be about.
-    const selections: (number | null)[] = [];
-    laidOut(
-      canvas(connectors, stops, {
-        phase: 'preparing',
-        onSelectLeg: (index: number | null) => selections.push(index),
-      }),
-    );
-
-    tapAt(100, 100);
-    expect(selections).toEqual([]);
+  it('highlights nothing for an index the route does not have', () => {
+    // A stale index outliving the result it was measured on would otherwise
+    // throw or highlight an arbitrary hop.
+    laidOut(canvas(road, stops, { onSelectLeg: () => undefined, selectedLegIndex: 99 }));
+    expect(screen.queryByTestId('route-leg-selected', visually)).toBeNull();
   });
 
-  it('is not tappable on a degraded result, which has no per-leg geometry', () => {
-    const selections: (number | null)[] = [];
-    laidOut(
-      canvas(connectors, stops, { onSelectLeg: (index: number | null) => selections.push(index) }),
-    );
-
-    tapAt(100, 100);
-    // The handler is attached — a T0 route is still a route — but there is
-    // nothing within reach of the tap, so it reports no selection rather than
-    // guessing at a hop it does not have.
-    expect(selections).toEqual([null]);
+  it('offers nothing to inspect while the answer is still being computed', () => {
+    // There are no legs yet, so there is nothing a tap could be about.
+    laidOut(canvas(connectors, stops, { phase: 'preparing', onSelectLeg: () => undefined }));
+    expect(screen.queryByTestId('route-leg-selected', visually)).toBeNull();
   });
 });

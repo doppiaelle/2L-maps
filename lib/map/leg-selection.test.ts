@@ -1,4 +1,11 @@
-import { distanceToPolyline, legAt, LEG_TOUCH_RADIUS, legSummary } from './leg-selection';
+import {
+  distanceToPolyline,
+  legAt,
+  LEG_TOUCH_RADIUS,
+  legAtScreenPoint,
+  legSummary,
+} from './leg-selection';
+import { FITTED } from './viewport';
 import type { Point } from './projection';
 
 /**
@@ -62,6 +69,30 @@ describe('which leg was tapped', () => {
 
   it('answers none for a route with no legs at all', () => {
     expect(legAt(p(0, 0), [])).toBeNull();
+  });
+});
+
+describe('a tap on a map that has been zoomed', () => {
+  it('answers about the hop the finger is actually on', () => {
+    // Doubled and slid: the leg drawn along canvas y = 0 appears on screen at
+    // y = -40 + 0, so a finger at screen (100, -40) is on it. Without the
+    // inversion this would measure the screen point against canvas geometry and
+    // answer about a hop that is nowhere near.
+    const zoomed = { scale: 2, translateX: 0, translateY: -40 };
+    expect(legAtScreenPoint({ x: 100, y: -40 }, zoomed, elbow)).toBe(0);
+  });
+
+  it('shrinks the corridor with the drawing, not against it', () => {
+    // The 44 pt corridor is in canvas units, so at 2x it covers twice as much
+    // screen. A tap 30 screen-points off the line is 15 canvas-points off, and
+    // still a hit — which is what the finger sees.
+    const zoomed = { scale: 2, translateX: 0, translateY: 0 };
+    expect(legAtScreenPoint({ x: 50, y: 30 }, zoomed, elbow)).toBe(0);
+    expect(legAtScreenPoint({ x: 50, y: 30 }, FITTED, elbow)).toBeNull();
+  });
+
+  it('is the plain question at the fitted view', () => {
+    expect(legAtScreenPoint({ x: 50, y: 4 }, FITTED, elbow)).toBe(legAt({ x: 50, y: 4 }, elbow));
   });
 });
 

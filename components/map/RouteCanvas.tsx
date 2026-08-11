@@ -1,6 +1,7 @@
 import { memo, useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
-import type { GestureResponderEvent } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, { runOnJS, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import Svg, { Circle, G, Line, Path, Rect } from 'react-native-svg';
 
 import { MapAttribution } from './MapAttribution';
@@ -12,7 +13,8 @@ import { sceneryFor } from '@/lib/map/scenery';
 import type { Scenery } from '@/lib/map/scenery';
 import type { Point } from '@/lib/map/projection';
 import { simplify } from '@/lib/map/simplify';
-import { legAt } from '@/lib/map/leg-selection';
+import { legAtScreenPoint } from '@/lib/map/leg-selection';
+import { clampViewport, FITTED, MAX_SCALE, MIN_SCALE } from '@/lib/map/viewport';
 import { MARKER_SIZE, MARKER_SIZE_SELECTED, markerStyle } from '@/lib/map/style';
 import type { DrawnRoute } from '@/lib/map/route-geometry';
 import type { StopProgressState } from '@/lib/route/progress';
@@ -204,6 +206,114 @@ export const RouteCanvas = memo(function RouteCanvas({
   // answer for a route that has not been computed at all.
   const selectedLeg = selectedLegIndex === null ? null : (drawn.legs[selectedLegIndex] ?? null);
 
+  /**
+   * The lens over the drawing.
+   *
+   * **Shared values, not React state.** A pinch that re-rendered on every frame
+   * would put the whole canvas through reconciliation during a gesture, which is
+   * the one thing `CLAUDE.md` §6 rule 5 forbids. These live on the UI thread and
+   * the transform follows them there; JavaScript hears about it once, when a
+   * finger lifts, so the tap handler has a viewport to invert with.
+   */
+  const zoom = useSharedValue(FITTED.scale);
+  const offsetX = useSharedValue(FITTED.translateX);
+  const offsetY = useSharedValue(FITTED.translateY);
+  const [viewport, setViewport] = useState(FITTED);
+
+  const lens = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: offsetX.value },
+      { translateY: offsetY.value },
+      { scale: zoom.value },
+    ],
+  }));
+
+  /**
+   * A tap, answered in canvas coordinates.
+   *
+   * The gesture reports where the finger landed on the **container**, which is
+   * not transformed; the legs it might have hit are in canvas coordinates, which
+   * are. `toCanvas` is the exact inverse of what the lens does, and getting the
+   * direction backwards would select a hop the finger was nowhere near — while
+   * looking entirely plausible on screen.
+   */
+  const selectLegAt = (x: number, y: number) => {
+    if (!isInspectable) return;
+    onSelectLeg?.(
+      legAtScreenPoint(
+        { x, y },
+        viewport,
+        drawn.legs.map((leg) => leg.points),
+      ),
+    );
+  };
+
+  const gestures = useMemo(() => {
+    const settle = () => {
+      // The clamp is applied on the UI thread as the gesture runs; this is the
+      // same answer, handed to JavaScript so a tap can be inverted with it.
+      setViewport(
+        clampViewport(
+          { scale: zoom.value, translateX: offsetX.value, translateY: offsetY.value },
+          size,
+        ),
+      );
+    };
+
+    const pinch = Gesture.Pinch()
+      .onChange((event) => {
+        'worklet';
+        const next = Math.min(Math.max(zoom.value * event.scaleChange, MIN_SCALE), MAX_SCALE);
+        // The canvas point under the fingers, held still across the change —
+        // the user pinched on a stop because that is the part they want larger.
+        const anchorX = (event.focalX - offsetX.value) / zoom.value;
+        const anchorY = (event.focalY - offsetY.value) / zoom.value;
+
+        zoom.value = next;
+        offsetX.value = event.focalX - anchorX * next;
+        offsetY.value = event.focalY - anchorY * next;
+      })
+      .onEnd(() => {
+        'worklet';
+        runOnJS(settle)();
+      });
+
+    const drag = Gesture.Pan()
+      .onChange((event) => {
+        'worklet';
+        // Nothing to drag at the fitted view: the drawing is exactly the window.
+        if (zoom.value <= MIN_SCALE) return;
+        offsetX.value += event.changeX;
+        offsetY.value += event.changeY;
+      })
+      .onEnd(() => {
+        'worklet';
+        runOnJS(settle)();
+      });
+
+    const reset = Gesture.Tap()
+      .numberOfTaps(2)
+      .onEnd(() => {
+        'worklet';
+        zoom.value = FITTED.scale;
+        offsetX.value = FITTED.translateX;
+        offsetY.value = FITTED.translateY;
+        runOnJS(setViewport)(FITTED);
+      });
+
+    const inspect = Gesture.Tap().onEnd((event) => {
+      'worklet';
+      runOnJS(selectLegAt)(event.x, event.y);
+    });
+
+    // The double tap is given first refusal, so a second tap arriving inside the
+    // window is a reset rather than two selections.
+    return Gesture.Exclusive(Gesture.Simultaneous(pinch, drag), reset, inspect);
+    // `selectLegAt` is stable enough for this: it is recreated with `drawn`, and
+    // a gesture rebuilt mid-pinch would drop the pinch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [size, zoom, offsetX, offsetY, drawn.legs, viewport, isInspectable]);
+
   const isDegraded = !isPreparing && route.kind === 'connectors';
   const summary = isPreparing
     ? `Working out the fastest order for ${stops.length} ${stops.length === 1 ? 'stop' : 'stops'}`
@@ -236,43 +346,20 @@ export const RouteCanvas = memo(function RouteCanvas({
       testID={testID}
     >
       {size.width > 0 && size.height > 0 && (
-        <Svg
-          width={size.width}
-          height={size.height}
-          testID="route-canvas-svg"
-          {...(isInspectable
-            ? {
-                /**
-                 * One handler for the whole canvas, rather than a touch target
-                 * per hop.
-                 *
-                 * The corridors overlap wherever the route doubles back — a run
-                 * through a town centre and out again passes the same junction
-                 * twice — and per-path handlers would answer with whichever leg
-                 * happened to be drawn last, not the one nearest the finger.
-                 * `legAt` answers *nearest*, and is tested for exactly that case.
-                 *
-                 * A tap on empty canvas clears the selection, which is the way
-                 * back to the whole route without leaving the map.
-                 */
-                onPress: (event: GestureResponderEvent) => {
-                  const { locationX, locationY } = event.nativeEvent;
-                  onSelectLeg?.(
-                    legAt(
-                      { x: locationX, y: locationY },
-                      drawn.legs.map((leg) => leg.points),
-                    ),
-                  );
-                },
-              }
-            : {})}
-        >
-          {/* The ground. A rectangle rather than the container's background so
+        <GestureDetector gesture={gestures}>
+          {/* The transform sits on the container rather than on each shape: the
+              whole picture grows, strokes and pins with it, which is the
+              paper-map-under-a-lens model. An SVG that kept its stroke widths
+              while the geometry grew would imply a map that knows more when you
+              look closer, and this one does not (`lib/map/viewport.ts`). */}
+          <Animated.View style={[{ width: size.width, height: size.height }, lens]}>
+            <Svg width={size.width} height={size.height} testID="route-canvas-svg">
+              {/* The ground. A rectangle rather than the container's background so
               the whole drawing is one surface the SVG owns — and so a future
               snapshot exports what is on screen rather than a transparent hole. */}
-          <Rect x={0} y={0} width={size.width} height={size.height} fill={map.land} />
+              <Rect x={0} y={0} width={size.width} height={size.height} fill={map.land} />
 
-          {/* The invented town, underneath everything. Blocks first, then the
+              {/* The invented town, underneath everything. Blocks first, then the
               minor streets, then the through-roads — the order a real map is
               printed in, and the order that keeps the route on top of all of it.
 
@@ -280,120 +367,122 @@ export const RouteCanvas = memo(function RouteCanvas({
               (`lib/map/scenery.ts`). Drawing real ones would mean putting
               Google-derived stops on somebody else's map, which ADR-0012 rejects
               by name and `CLAUDE.md` §13 rule 5 forbids widening. */}
-          {drawn.scenery.blocks.map((block) => (
-            <Rect
-              key={block.id}
-              testID="scenery-block"
-              x={block.x}
-              y={block.y}
-              width={block.width}
-              height={block.height}
-              rx={2}
-              fill={map.park}
-              opacity={block.opacity}
-            />
-          ))}
-
-          {drawn.scenery.roads.map((road) => (
-            <Line
-              key={road.id}
-              testID="scenery-road"
-              x1={road.from.x}
-              y1={road.from.y}
-              x2={road.to.x}
-              y2={road.to.y}
-              stroke={road.isArterial ? map.road : map.roadMinor}
-              strokeWidth={road.isArterial ? stroke.sceneryArterial : stroke.sceneryMinor}
-              strokeLinecap="round"
-              opacity={road.opacity}
-            />
-          ))}
-
-          {drawn.road !== null && (
-            <>
-              {map.routeCasing !== null && (
-                // Drawn first, so it sits underneath. SVG has no outline on a
-                // path; a wider line beneath it is what produces the border, and
-                // in light theme mint on paper-white is this system's weakest
-                // pairing without it.
-                <Path
-                  testID="route-casing"
-                  d={drawn.road}
-                  stroke={map.routeCasing}
-                  strokeWidth={stroke.routeCasing}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  fill="none"
+              {drawn.scenery.blocks.map((block) => (
+                <Rect
+                  key={block.id}
+                  testID="scenery-block"
+                  x={block.x}
+                  y={block.y}
+                  width={block.width}
+                  height={block.height}
+                  rx={2}
+                  fill={map.park}
+                  opacity={block.opacity}
                 />
-              )}
-              <Path
-                testID="route-line"
-                d={drawn.road}
-                stroke={palette.accent}
-                strokeWidth={stroke.route}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                // Dimmed, not hidden, while one hop is being inspected: the rest
-                // of the day is still the context that makes the selected hop
-                // mean anything.
-                opacity={selectedLegIndex === null ? 1 : DIMMED_ROUTE_OPACITY}
-                fill="none"
-              />
+              ))}
 
-              {/* The hop being inspected, drawn over the dimmed rest of the
+              {drawn.scenery.roads.map((road) => (
+                <Line
+                  key={road.id}
+                  testID="scenery-road"
+                  x1={road.from.x}
+                  y1={road.from.y}
+                  x2={road.to.x}
+                  y2={road.to.y}
+                  stroke={road.isArterial ? map.road : map.roadMinor}
+                  strokeWidth={road.isArterial ? stroke.sceneryArterial : stroke.sceneryMinor}
+                  strokeLinecap="round"
+                  opacity={road.opacity}
+                />
+              ))}
+
+              {drawn.road !== null && (
+                <>
+                  {map.routeCasing !== null && (
+                    // Drawn first, so it sits underneath. SVG has no outline on a
+                    // path; a wider line beneath it is what produces the border, and
+                    // in light theme mint on paper-white is this system's weakest
+                    // pairing without it.
+                    <Path
+                      testID="route-casing"
+                      d={drawn.road}
+                      stroke={map.routeCasing}
+                      strokeWidth={stroke.routeCasing}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      fill="none"
+                    />
+                  )}
+                  <Path
+                    testID="route-line"
+                    d={drawn.road}
+                    stroke={palette.accent}
+                    strokeWidth={stroke.route}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    // Dimmed, not hidden, while one hop is being inspected: the rest
+                    // of the day is still the context that makes the selected hop
+                    // mean anything.
+                    opacity={selectedLegIndex === null ? 1 : DIMMED_ROUTE_OPACITY}
+                    fill="none"
+                  />
+
+                  {/* The hop being inspected, drawn over the dimmed rest of the
                   route at the casing's width so it reads as the same line
                   brought forward rather than a different one laid on top. */}
-              {selectedLeg !== null && (
+                  {selectedLeg !== null && (
+                    <Path
+                      testID="route-leg-selected"
+                      d={selectedLeg.d}
+                      stroke={palette.accent}
+                      strokeWidth={stroke.routeCasing}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      fill="none"
+                    />
+                  )}
+                </>
+              )}
+
+              {drawn.segments.map((segment) => (
                 <Path
-                  testID="route-leg-selected"
-                  d={selectedLeg.d}
-                  stroke={palette.accent}
-                  strokeWidth={stroke.routeCasing}
+                  key={segment.id}
+                  testID={isPreparing ? 'route-pending-connector' : 'route-connector'}
+                  d={segment.d}
+                  // Warning yellow says "degraded result" and is reserved for one.
+                  // While preparing there is no result to describe, so the line is
+                  // the quietest thing on the canvas — a placeholder holding the
+                  // space the mint route is about to take.
+                  stroke={isPreparing ? palette.textTertiary : palette.warning}
+                  strokeWidth={stroke.routeDegraded}
+                  strokeDasharray={DEGRADED_DASH}
                   strokeLinecap="round"
-                  strokeLinejoin="round"
+                  opacity={isPreparing ? PREPARING_OPACITY : 1}
                   fill="none"
                 />
-              )}
-            </>
-          )}
+              ))}
 
-          {drawn.segments.map((segment) => (
-            <Path
-              key={segment.id}
-              testID={isPreparing ? 'route-pending-connector' : 'route-connector'}
-              d={segment.d}
-              // Warning yellow says "degraded result" and is reserved for one.
-              // While preparing there is no result to describe, so the line is
-              // the quietest thing on the canvas — a placeholder holding the
-              // space the mint route is about to take.
-              stroke={isPreparing ? palette.textTertiary : palette.warning}
-              strokeWidth={stroke.routeDegraded}
-              strokeDasharray={DEGRADED_DASH}
-              strokeLinecap="round"
-              opacity={isPreparing ? PREPARING_OPACITY : 1}
-              fill="none"
-            />
-          ))}
-
-          {/* Where the driver sets off, and which way. The one piece of chrome
+              {/* Where the driver sets off, and which way. The one piece of chrome
               on the canvas that is about them rather than about the route.
               Absent while preparing: which stop comes first is precisely the
               question being asked. */}
-          {drawn.heading.length >= 2 && !isPreparing && (
-            <OriginMarker points={drawn.heading} colour={palette.accent} theme={theme} />
-          )}
+              {drawn.heading.length >= 2 && !isPreparing && (
+                <OriginMarker points={drawn.heading} colour={palette.accent} theme={theme} />
+              )}
 
-          {drawn.pins.map((pin) => (
-            <Pin
-              key={pin.stopId}
-              point={pin.point}
-              state={pin.state}
-              isSelected={!isPreparing && pin.stopId === selectedStopId}
-              theme={theme}
-              opacity={isPreparing ? PREPARING_OPACITY : 1}
-            />
-          ))}
-        </Svg>
+              {drawn.pins.map((pin) => (
+                <Pin
+                  key={pin.stopId}
+                  point={pin.point}
+                  state={pin.state}
+                  isSelected={!isPreparing && pin.stopId === selectedStopId}
+                  theme={theme}
+                  opacity={isPreparing ? PREPARING_OPACITY : 1}
+                />
+              ))}
+            </Svg>
+          </Animated.View>
+        </GestureDetector>
       )}
 
       {/* The pin numbers, as real text rather than SVG glyphs: `Text` gets

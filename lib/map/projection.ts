@@ -139,3 +139,21 @@ export function pathThrough(points: readonly Point[]): string {
 function round(value: number): number {
   return Math.round(value * 100) / 100;
 }
+
+/**
+ * Roughly how many metres one point of the canvas covers.
+ *
+ * `Projection.scale` is points per degree of **latitude**, and a degree of
+ * latitude is about 111.32 km everywhere — which is why the conversion uses that
+ * axis and not longitude, whose degree shrinks with the cosine.
+ *
+ * "Roughly" is the honest word and it is enough for what reads it: deciding
+ * whether a drawing is at the scale of a town or of a country. Nothing measures
+ * a distance with this — `haversineMeters` does that, and it is exact.
+ */
+export const METRES_PER_DEGREE_LATITUDE = 111_320;
+
+export function metresPerPoint(scale: number): number {
+  if (!Number.isFinite(scale) || scale <= 0) return Number.POSITIVE_INFINITY;
+  return METRES_PER_DEGREE_LATITUDE / scale;
+}

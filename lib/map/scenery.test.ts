@@ -4,6 +4,7 @@ import {
   FALLOFF,
   MAX_BLOCKS,
   MAX_ROADS,
+  SCENERY_MAX_SPAN_METRES,
   sceneryFor,
   seededRandom,
 } from './scenery';
@@ -235,5 +236,57 @@ describe('distance to the route', () => {
       { x: 10, y: 10 },
     ];
     expect(distanceToPath({ x: 13, y: 14 }, path)).toBeCloseTo(5);
+  });
+});
+
+describe('it only draws streets where streets are believable', () => {
+  const diagonal = Math.hypot(canvas.width, canvas.height);
+  const spanOf = (metres: number) => metres / diagonal;
+
+  it('draws a town on a round a van could actually work in a day', () => {
+    // Thirty kilometres across: a seventy-eight-point cell is a plausible block,
+    // and this is the case the product is for.
+    const scenery = sceneryFor({
+      path: diagonalPath,
+      size: canvas,
+      seed: 'town',
+      metresPerPoint: spanOf(30_000),
+    });
+
+    expect(scenery.roads.length).toBeGreaterThan(0);
+  });
+
+  it('draws nothing across a country', () => {
+    // The reported defect. A fixed pixel grid makes each "block" about a hundred
+    // kilometres on a Rome-to-Milan canvas, which is why it read as an empty
+    // background with a few squares scattered over Italy.
+    const scenery = sceneryFor({
+      path: diagonalPath,
+      size: canvas,
+      seed: 'country',
+      metresPerPoint: spanOf(900_000),
+    });
+
+    expect(scenery).toEqual({ roads: [], blocks: [] });
+  });
+
+  it('stops abruptly rather than fading into a quieter lie', () => {
+    // A fainter town at the wrong scale is the same false claim in a quieter
+    // voice. Either the detail is believable or it is not drawn.
+    const justInside = sceneryFor({
+      path: diagonalPath,
+      size: canvas,
+      seed: 's',
+      metresPerPoint: spanOf(SCENERY_MAX_SPAN_METRES - 1),
+    });
+    const justOutside = sceneryFor({
+      path: diagonalPath,
+      size: canvas,
+      seed: 's',
+      metresPerPoint: spanOf(SCENERY_MAX_SPAN_METRES + 1),
+    });
+
+    expect(justInside.roads.length).toBeGreaterThan(0);
+    expect(justOutside.roads).toHaveLength(0);
   });
 });
