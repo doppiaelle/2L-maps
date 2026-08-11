@@ -63,6 +63,21 @@ asked to accept, and what it does is hand the day to another app. "Start"
 described navigation, which this product has never done
 ([ADR-0004](0004-external-navigation-handoff.md)).
 
+## Amended by ADR-0027 — a third face, and a different control
+
+The section has three faces rather than two: **list**, **preparing**, **map**. The middle one
+is the seconds between pressing Optimize and the answer arriving, which were previously spent
+on the stop list under a button reading "Optimizing" — a label, not a state. It appears after a
+second, so a cached optimization goes straight from list to route and the user sees nothing in
+between, which is the correct experience for work that did not have to be done again.
+
+The control that leaves the map is now **three parallel lines** rather than a cross. A cross
+says "close this and lose it"; what happens is that the stop list comes back with every stop on
+it. The same glyph marks Route in the dock, and that is the point — both mean *the list*.
+
+What did **not** change: the map is still not a destination, the dock is still three fixed
+items, and the map still appears because an optimization produced it.
+
 ## Consequences
 
 **Back to three taps.** Route opens by default, so the tap ADR-0018 spent on

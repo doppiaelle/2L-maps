@@ -88,6 +88,22 @@ in more places: the preview draws only what `isCoordinateFresh` still allows, an
 a stop whose coordinate has expired is named on the canvas rather than silently
 omitted.
 
+## Amended by ADR-0027 — what the canvas gained
+
+Two things, neither of which reopens the decision above and both of which use data already in
+hand.
+
+**A waiting face.** The canvas is drawn at the same size from the same stops while an
+optimization is in flight, so nothing moves when the result lands. It claims nothing while it
+waits: neutral connectors rather than the degraded style, no ordinals, no navigator triangle —
+which stop comes first is the question being asked.
+
+**Inspectable legs.** `routes.legs` has always carried a distance, a duration and a polyline
+per hop and the canvas drew them as one line. Tapping one now shows what Google measured for
+it. **This widens no exposure**: the same Google-derived geometry, on the same canvas we draw,
+attributed the same way, with no tile fetched and no coordinate kept beyond thirty days. The
+risk this ADR records is unchanged in kind and in size.
+
 ## Consequences
 
 **The client holds no Google credential at all.** `CLAUDE.md` §9 rule 1 carved

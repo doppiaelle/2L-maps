@@ -194,7 +194,7 @@ the same proposal returns every few months and is re-argued from scratch.
 | Offline mutation queue | MUST | ○ | — |
 | Offline explicit states | MUST | ○ | Never a blank screen or an endless spinner |
 | Duplicate a route | SHOULD | ○ | — |
-| Time saved on completion | SHOULD | ○ | Computed difference, never estimated |
+| ~~Time saved on completion~~ | — | ✗ | **Withdrawn.** It had to be a computed difference and never an estimate; measuring it costs a third Routes request per optimization, declined ([ADR-0027](adr/0027-the-drive-happens-elsewhere.md)) |
 
 ---
 

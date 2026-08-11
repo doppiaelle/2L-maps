@@ -228,7 +228,7 @@ Tabular numerals prevent layout shift as an ETA updates.
 | Stops added | **Optimize** |
 | Optimizing | Progress state, after 1 s |
 | Optimized | **Start** |
-| In progress | **Done** and **Skip**, side by side |
+| Over the canvas | **Confirm** as a pill: floating on a drawing rather than closing a column, so it takes the width of its own label and a soft shadow. Still 56 pt tall ([ADR-0027](adr/0027-the-drive-happens-elsewhere.md)) |
 | Blocked | Disabled **with a visible reason** — never silently greyed |
 
 Minimum height 56 pt; full width within `screen-padding`; `radius-lg`.

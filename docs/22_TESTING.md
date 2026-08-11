@@ -131,7 +131,8 @@ encode the rules that cost money or break compliance when wrong.
 | Quota arithmetic | At limit, over limit, month boundary |
 | T0 heuristic | Determinism, time budget, 2-opt improvement |
 | Polyline decoding | Valid, malformed, empty |
-| Time saved | Positive, zero, **negative** |
+| History row | Expired addresses, a round trip's single endpoint, a degraded route with no duration |
+| Leg selection | Nearest rather than topmost where a route doubles back; the 44 pt corridor |
 | Formatting | Italian decimal comma, 24-hour, distance rounding |
 
 The boundaries matter more than the middles. Defects live at 8/9 and 25/26 stops, not at 15.

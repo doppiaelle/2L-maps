@@ -180,7 +180,12 @@ create table routes (
   eta               timestamptz,
   polyline          text,
 
-  -- for the "time saved" summary
+  -- Reserved. Held the duration of the user's own entry order, which is what
+  -- would make a time-saved figure a measurement rather than an estimate.
+  -- Nothing writes it: measuring it honestly costs a third computeRoutes
+  -- request per optimization, and the product owner declined that trade
+  -- (ADR-0027). The column stays so reversing the decision is one upstream call
+  -- rather than a migration.
   baseline_duration_s integer,
 
   created_at        timestamptz not null default now(),
@@ -194,9 +199,22 @@ create index routes_user_status_idx on routes (user_id, status, updated_at desc)
 ```
 
 `is_degraded` is stored, not derived, so a T0 result stays labelled in history forever
-([`15_ROUTE_OPTIMIZATION.md`](15_ROUTE_OPTIMIZATION.md)). `baseline_duration_s` holds the
-duration of the user's original entry order, which is what makes the time-saved figure a real
-measurement rather than an estimate.
+([`15_ROUTE_OPTIMIZATION.md`](15_ROUTE_OPTIMIZATION.md)).
+
+`baseline_duration_s` is **reserved and unused**. It was to hold the duration of the user's
+original entry order, which is what would make a time-saved figure a real measurement rather
+than an estimate — and the specification forbade an estimate. Obtaining it honestly costs a
+third `computeRoutes` request per optimization, over the entry order at the same routing
+preference or the two numbers are not comparable, and the product owner declined that trade
+([ADR-0027](adr/0027-the-drive-happens-elsewhere.md), [`31_COST_MODEL.md`](31_COST_MODEL.md)).
+The column stays rather than being dropped: reversing the decision is then one upstream call,
+where dropping it would make reversal a `MAJOR` change to a stored shape.
+
+`stop_state` still carries `completed` and `skipped` for the same reason. Nothing writes them
+after ADR-0027 — the drive happens inside a navigation app and nobody is here to mark a stop —
+but routes driven before it still hold them, and the client parses the full enum and narrows on
+read. A migration that removed the values would fail to parse the first old route anyone
+opened.
 
 Soft deletion via `deleted_at` supports the offline mutation queue: a delete performed offline
 must be reconcilable, and a hard delete cannot be.
@@ -215,7 +233,7 @@ create table stops (
   label          text,
   note           text,
 
-  entry_order    integer not null,      -- as the user added them; baseline for time saved
+  entry_order    integer not null,      -- as the user added them; what "already the fastest order" is measured against
   optimized_order integer,              -- null until optimized
   is_pinned      boolean not null default false,
 

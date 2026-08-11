@@ -236,13 +236,34 @@ route shows what was actually measured: **total duration and total distance**.
 
 ### History
 
-Rows in the third reference's rhythm: ordinal-style badge, route name, `date · stops · distance`
-meta line, generous spacing, no dividers, final row fading. Tapping a row replaces Plan with
-that route.
+Rows in the third reference's rhythm: generous spacing, no dividers, final row fading. Tapping
+a row loads that route into Route, ready to optimize.
+
+**A row answers four questions, in the order a driver asks them.**
+
+```
+  Tue 11 Aug · 12 stops                        [ In progress ]
+  12 stops · one way
+  Corso Francia 12 → Via Meucci 3
+  34 km · 1 h 12 min
+```
+
+*When* · *how big* · *where from and to* · *how far*. The third line is why this was rebuilt:
+a name most routes do not have, a distance and a duration are identical across a week of
+rounds, and a driver looking for last Tuesday had to open routes until they found it.
+
+The endpoints come off `places_cache` on the same query, through the foreign key `stops` already
+has to it — **no upstream call and no unit of quota**
+([`33_API_CONTRACTS.md`](33_API_CONTRACTS.md)). They are null after the thirty-day purge, and
+the row then shows what it still knows rather than a placeholder that fills the space and says
+nothing.
+
+The chip appears only for `in_progress` and `completed`. `optimized` is the ordinary state of a
+row in History, and a chip on every row is a chip that means nothing.
 
 | State | Appearance |
 |---|---|
-| Empty | "Your completed routes appear here" |
+| Empty | "No saved routes yet" — a route is saved as soon as it is optimized, so there is nothing to file and nothing to remember |
 | Loading | Skeleton rows |
 | Offline | Full list — history is local |
 | Sync conflict | Affected row flagged with a resolution action |

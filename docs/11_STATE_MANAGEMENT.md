@@ -163,14 +163,20 @@ Small, feature-scoped stores. No single global store.
 | Store | Holds | Persisted |
 |---|---|---|
 | `draftRouteStore` | Stops, order, origin, round-trip flag, last result | **Yes** |
-| `routeProgressStore` | Current index, completed, skipped, active route id | **Yes** |
+| `routeProgressStore` | That a route was handed to a navigation app, and when | **Yes** |
 | `preferencesStore` | Navigation provider, theme override, units | **Yes** |
 | `mutationQueueStore` | Pending offline operations | **Yes** |
 | `uiStore` | Open dock section, selected stop, camera | No |
 
-Stores expose **actions, not setters**. `markStopCompleted(id)` rather than
-`setCompletedStops(array)` — the store owns its invariants, so no caller can leave it in an
-impossible state.
+Stores expose **actions, not setters**. `beginAndHandOff(routeId, handOff)` rather than
+`setProgress(object)` — the store owns its invariants, so no caller can leave it in an
+impossible state, and in this case cannot get the write/launch ordering wrong either.
+
+`routeProgressStore` used to hold a mark per stop, because the driver returned to the app
+between every one of them to press Done or Skip. They do not: the navigation app drives the
+whole multi-stop route ([ADR-0027](adr/0027-the-drive-happens-elsewhere.md)). What is left is
+the one fact this product can still honestly assert — that the route was handed over, at this
+instant — which is also the one it cannot reconstruct from anything else.
 
 ### Route progress — the critical store
 

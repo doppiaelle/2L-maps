@@ -126,7 +126,8 @@ had drifted far enough that eleven correctly-designed things were unreachable fr
 **Complete and wired:** the launch sequence and both guards, deep links including
 `twolmaps://route/{id}`, the map, the sheet, the plan state machine, add-stop search with its
 debounce and session token, the address book behind it, optimization, the handoff and the
-provider picker, mid-route Done and Skip, the summary, Settings, **route persistence and
+provider picker, ~~mid-route Done and Skip, the summary~~ (both removed in wave 12b —
+[ADR-0027](adr/0027-the-drive-happens-elsewhere.md)), Settings, **route persistence and
 History**, **import**, and **offline detection** with a persisted query cache.
 
 **Closed in wave 8, and worth recording because none of it was visible from the wave table:**
@@ -613,9 +614,10 @@ only shows up on somebody's working day.
 is a billed batch for data already held, and the same address twice in a day — a morning delivery
 and an afternoon collection — is one lookup.
 
-**A stop's state comes from progress, never from its stored flag.** `isCompleted` is what the
-server last saw; the progress store is what happened since, including the marks made with no
-signal at all.
+~~**A stop's state comes from progress, never from its stored flag.**~~ True while a driver
+could mark one. Neither the flag nor the progress map survives
+[ADR-0027](adr/0027-the-drive-happens-elsewhere.md): a stop's only state beyond `pending` is
+`unreachable`, and that comes from the optimizer.
 
 **The draft shows a straight-line distance and no duration.** A number is more useful than a
 blank, and `<RouteSummaryHeader>` labels it as an estimate — but a straight-line *time* would be
@@ -679,10 +681,12 @@ three taps now run end to end: add a stop, optimize, start.
 Maps is in the foreground, and state that was going to be written on return is state that is
 simply lost ([`16_INTERNAL_NAVIGATION.md`](16_INTERNAL_NAVIGATION.md)).
 
-**Nothing is marked completed at the handoff.** Departing is not arriving. The stop is marked
-when the driver taps Done, which is the only moment anyone knows they got there — marking on
-departure would show a route finished by a driver still in the van. This was written the wrong
-way round first, and the ordering rule in `markAndHandOff` is what made it obvious.
+**Nothing is marked completed at the handoff.** Departing is not arriving, and the reasoning
+outlived the mechanism: there is now no Done button to mark a stop with, and a route is never
+recorded as finished at all
+([ADR-0027](adr/0027-the-drive-happens-elsewhere.md)) — only as handed over, at an instant. The
+ordering rule survives intact in `beginAndHandOff`, which is what made the original mistake
+obvious and is what still prevents it.
 
 **The picker states the cost of each provider before the choice, in numbers.** Twelve stops in
 Waze is twelve handoffs, and a user should learn that here rather than on the road. Waze's real

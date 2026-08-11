@@ -99,12 +99,18 @@ re-hydrated before a Waze handoff can be built.
             │                        │
             ▼                        ▼
   ┌───────────────────────────────────────────┐
-  │  return to app → one screen, two actions  │
-  │        [ Done ]        [ Skip ]           │
+  │  return to app → the same optimized route  │
+  │  they left. [ Confirm ] hands it over again│
   └─────────┬─────────────────────────────────┘
             │
             ▼
-   next stop, or next chunk, or route complete
+   the next chunk, or the next day's route
+
+  There is no Done and no Skip. The navigation app drives the whole
+  sequence — it announces each stop, re-routes around traffic and
+  carries on — so the driver has no reason to reopen this one between
+  stops and, in a moving van, no safe moment to
+  (ADR-0027).
 ```
 
 ### Chunking
@@ -143,18 +149,20 @@ Trigger: the user taps **Start** on an optimized route.
 Terminal: external app opened · no provider available, web fallback used · URL construction
 failed (a defect; alert and fall back to the web link).
 
-**Flow B — return and advance.**
-Trigger: the app returns to the foreground with a route in progress.
-1. Restore progress from the persisted store.
-2. Show the current stop with exactly two actions: **Done** and **Skip**.
-3. **Done** marks the stop completed and advances. **Skip** moves it to the end of the route
-   without disturbing the order of the rest.
-4. If the next stop is inside the current chunk, offer handoff again; if the chunk is
-   exhausted, build the next chunk.
-Terminal: advanced · route complete · user leaves the app again.
+**Flow B — return.**
+Trigger: the app returns to the foreground with a route underway.
+1. Restore the departure from the persisted store, so the route is still `in_progress` and
+   still the current one.
+2. Show **the same optimized route they left** — same map, same order, same numbers.
+3. **Confirm** hands it over again, which is what a driver who closed Google Maps at lunch
+   needs in the afternoon, and what builds the next chunk on a route that has one.
+Terminal: handed over again · user leaves the app again · user starts the next route, which
+closes this one ([ADR-0027](adr/0027-the-drive-happens-elsewhere.md)).
 
-**This flow runs dozens of times a day.** It must be reachable in zero navigation steps — the
-app returns directly to it, never to a home screen the user must navigate from.
+**This flow used to run dozens of times a day and ran zero times.** It was specified as a
+return between every stop to press Done or Skip, and there was no such return: Google Maps
+takes up to nine waypoints and drives them itself. Every state behind those two buttons was
+therefore unreachable, including the one that moved a route into History.
 
 **Flow C — process death.**
 Trigger: the app is killed while the user is in the external navigation app.
@@ -192,7 +200,7 @@ silently truncate.
 | 3 | Stop coordinates expired and Waze is preferred | Re-hydrate from `place_id` before constructing the URL — Waze needs coordinates |
 | 4 | URL exceeds 2,048 characters | Chunk size reduced until it fits. Recomputed per chunk, since address lengths vary |
 | 5 | User returns without moving | Stop remains current; no arrival is inferred. Manual progression only in the MVP |
-| 6 | User marks a stop Done out of order | Allowed. Real routes deviate; the app does not argue with the driver |
+| 6 | User presses Confirm again on a route already underway | Allowed, and it re-records the departure. A driver who closed the navigation app at lunch is setting off again, and the afternoon is the current departure |
 | 7 | Every remaining stop is skipped | Route completes; skipped stops are recorded distinctly from completed ones |
 | 8 | App killed during navigation | Progress restored to the exact stop ([`11_STATE_MANAGEMENT.md`](11_STATE_MANAGEMENT.md)) |
 | 9 | User edits the route mid-drive | Remaining stops re-optimized from the current position; completed stops excluded |
@@ -236,7 +244,8 @@ silently truncate.
 - [ ] Process death mid-route tested on Android. iOS **blocked** (ADR-0014).
 - [ ] Waze handoff tested with expired coordinates.
 - [ ] Web fallback tested with no navigation app installed.
-- [ ] Return-to-app lands directly on the Done/Skip decision.
+- [ ] Return-to-app lands directly on the route the driver left, with Confirm still offered.
+- [ ] The departure is written **before** the launch, verified by killing the process during it.
 - [ ] No capability claimed that the matrix in §4 does not support.
 
 ## 12. Roadmap

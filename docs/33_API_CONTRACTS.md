@@ -333,6 +333,30 @@ change, or a purchase made on another device, and when they do this response win
 
 ---
 
+### `places_cache`, read directly by the client
+
+Not an Edge Function and not an exception to [ADR-0006](adr/0006-mandatory-backend-proxy.md).
+The proxy exists so no Google **credential** reaches the client; this is our own table, over
+PostgREST, under a policy that already permits it
+(`places_cache_select_authenticated ... using (true)` — the row carries no ownership because a
+`place_id` is public Google data).
+
+| Reader | What for | Cost |
+|---|---|---|
+| Address book | The street name beside a saved `place_id` (`favourites-adapter.ts`) | None |
+| History rows | The first and last stop of a saved route, so a row says which day it was (`routes-adapter.ts`) | None |
+
+Both go through the foreign key the owning table already has, so they are embeds on a query
+that was happening anyway — **no upstream call and no unit of quota**. That is the distinction
+that keeps the pipeline's cache-after-quota ordering intact: `/place-details` *buys* a place
+and is metered for it; reading a row we already hold, for display, is not a purchase.
+
+`formatted_address` is null after the thirty-day purge, and every reader treats null as the
+ordinary state of an old row rather than a failure
+([ADR-0007](adr/0007-place-id-durable-coordinates-perishable.md)).
+
+---
+
 ## 8. External contracts — Google
 
 > **Verification status: unverified against primary sources.** `developers.google.com` was
@@ -369,6 +393,23 @@ change, or a purchase made on another device, and when they do this response win
 **Phase 2 request shape (accuracy):** same waypoints in the phase-1 order,
 `routingPreference: "TRAFFIC_AWARE_OPTIMAL"`, `optimizeWaypointOrder` absent.
 Field mask: `routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline,routes.legs`.
+
+**Live traffic is already bought, and no third call buys more of it.** Phase 2 runs at
+`TRAFFIC_AWARE_OPTIMAL` and `departureTime` is optional and defaults to now (see the request
+shape above), so the durations the user sees are for departing now, in current conditions.
+Phase 1 stays at `TRAFFIC_AWARE` because the combination above is incompatible — that is not a
+cost choice and cannot be changed by widening anything.
+
+**The per-leg numbers are in the mask already.** `routes.legs` carries a distance, a duration
+and a polyline for every hop, and the canvas shows them when a leg is tapped
+([ADR-0027](adr/0027-the-drive-happens-elsewhere.md)). No request, no field, no SKU change.
+
+**What a third call would buy, and why there isn't one.** A true time-saved figure needs the
+duration of the user's *entry* order, computed the same way as phase 2 or the two numbers are
+not comparable. That is a third `computeRoutes` request — about +50% on the cost of an
+optimization ([`31_COST_MODEL.md`](31_COST_MODEL.md)) — and the product owner declined it.
+`baseline_duration_s` stays reserved in the schema so the decision is reversible without a
+migration.
 
 ### Route Optimization API — `optimizeTours`
 
