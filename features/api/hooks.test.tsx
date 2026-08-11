@@ -285,6 +285,30 @@ describe('re-resolving a saved route’s addresses', () => {
     expect(screen.getByTestId('unresolved').props.children).toBe('');
   });
 
+  it('reports a failure even when the throw is not one we recognise', async () => {
+    // The screenshot this was found in: two rows saying "Address needs
+    // refreshing", no notice, no reason, no retry. `failure` was reported only
+    // for a `ResolveFailed`, so any other throw — a response shape nobody
+    // expected, a `TypeError` inside the adapter — left `failure` null while
+    // `data` stayed undefined and `isLoading` went false. Indistinguishable
+    // from a route whose addresses simply have no coordinates yet, and the one
+    // state this product may not have: a failure that looks like an answer
+    // (`CLAUDE.md` §0 rule 5).
+    renderWithServices(
+      () =>
+        Promise.resolve(
+          // A 200 whose body is not the contract. The adapter rejects it, and
+          // what it throws is not a `ResolveFailed`.
+          jsonResponse({ resolved: [{ placeId: 'p1' }], unresolved: 'not an array' }),
+        ),
+      <PlacesProbe ids={['p1']} />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('failure').props.children).toBe('upstream-unavailable');
+    });
+  });
+
   it('reports no failure when the batch succeeded', async () => {
     renderWithServices(
       () =>

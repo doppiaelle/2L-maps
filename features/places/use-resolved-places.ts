@@ -106,7 +106,27 @@ export function useResolvedPlaces(placeIds: readonly PlaceId[]): ResolvedPlaces 
     },
   });
 
-  const failure = query.error instanceof ResolveFailed ? query.error.failure : null;
+  /**
+   * Why the last attempt failed — for **every** way it can fail.
+   *
+   * `instanceof ResolveFailed` alone was a hole with a screenshot attached. Any
+   * other throw — a schema rejection inside the adapter, a `TypeError` on a
+   * response shape nobody expected — left `failure` null while `data` stayed
+   * undefined and `isLoading` went false, and the screen rendered two rows
+   * saying "Address needs refreshing" with no notice, no reason and no retry.
+   * The one state this product may not have is one that looks like an answer
+   * (`CLAUDE.md` §0 rule 5).
+   *
+   * An unrecognised throw is reported as `upstream-unavailable`: it is ours, it
+   * is not the user's connection, and retrying is honest because we do not know
+   * that it will fail again.
+   */
+  const failure: GeocodingFailure | null =
+    query.error === null
+      ? null
+      : query.error instanceof ResolveFailed
+        ? query.error.failure
+        : { kind: 'upstream-unavailable' };
 
   const retry = () => {
     void query.refetch();
