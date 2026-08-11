@@ -1,3 +1,5 @@
+import { logGoogleRefusal, readGoogleError } from './google-error.ts';
+
 /**
  * The Google Routes API adapter — tier T1.
  *
@@ -72,7 +74,15 @@ export type RoutesFailure =
   | { readonly kind: 'unreachable'; readonly retryable: true }
   | { readonly kind: 'timeout'; readonly retryable: true }
   /** Google understood us and refused. Our defect — never retried, always alerted. */
-  | { readonly kind: 'rejected'; readonly retryable: false; readonly status: number }
+  | {
+      readonly kind: 'rejected';
+      readonly retryable: false;
+      readonly status: number;
+      /** Google's own enum. `INVALID_ARGUMENT` is a request we built wrong;
+       *  `PERMISSION_DENIED` is a key or an API that is not enabled. Same
+       *  status code, opposite fixes. */
+      readonly googleStatus?: string;
+    }
   /** A 200 whose body does not match what the contract describes. */
   | { readonly kind: 'malformed'; readonly retryable: false }
   /** Every waypoint resolved but no route connects them — an island, a closed
@@ -97,7 +107,13 @@ export function createRoutesAdapter(options: RoutesAdapterOptions) {
   const { apiKey, fetchImpl } = options;
   const timeoutMs = options.timeoutMs ?? DEFAULT_UPSTREAM_TIMEOUT_MS;
 
-  const call = async (body: unknown, fieldMask: string): Promise<CallOutcome> => {
+  const call = async (
+    body: unknown,
+    fieldMask: string,
+    /** Coordinates this request carried. A latitude and longitude locate a
+     *  person, and Google's message can quote the request back. */
+    redact: readonly string[] = [],
+  ): Promise<CallOutcome> => {
     const timeout = new AbortController();
     const timer = setTimeout(() => timeout.abort(), timeoutMs);
 
@@ -129,12 +145,26 @@ export function createRoutesAdapter(options: RoutesAdapterOptions) {
     if (!response.ok) {
       // A 4xx here is our request being wrong, and we built it — retrying burns
       // quota and hides the bug (docs/33_API_CONTRACTS.md §9).
+      //
+      // **Which is why the body is read.** "Our request is wrong" is not a
+      // diagnosis, and optimization has now failed for three different reasons
+      // that all looked like this one. Google names the offending field; the
+      // coordinates in it are stripped first (`google-error.ts`).
+      const body: unknown = await response.json().catch(() => null);
+      const error = readGoogleError(body, redact);
+      logGoogleRefusal(ROUTES_ENDPOINT, response.status, error);
+
       return {
         ok: false,
         failure:
           response.status >= 500
             ? { kind: 'unreachable', retryable: true }
-            : { kind: 'rejected', retryable: false, status: response.status },
+            : {
+                kind: 'rejected',
+                retryable: false,
+                status: response.status,
+                ...(error === null ? {} : { googleStatus: error.status }),
+              },
       };
     }
 
@@ -156,6 +186,7 @@ export function createRoutesAdapter(options: RoutesAdapterOptions) {
           ...(request.departureTime === null ? {} : { departureTime: request.departureTime }),
         },
         FIELD_MASK_ORDER,
+        coordinatesIn(request),
       );
 
       if (!outcome.ok) return outcome;
@@ -179,6 +210,7 @@ export function createRoutesAdapter(options: RoutesAdapterOptions) {
           ...(request.departureTime === null ? {} : { departureTime: request.departureTime }),
         },
         FIELD_MASK_DETAIL,
+        coordinatesIn(request),
       );
 
       if (!outcome.ok) return outcome;
@@ -214,6 +246,20 @@ function toWaypoints(request: RoutesRequest) {
 
 /** Google's two waypoint shapes, from ours. Its `location.latLng` nesting is the
  *  one place the upstream's vocabulary is allowed to appear. */
+/**
+ * Every coordinate this request carries, as the strings a message would quote.
+ *
+ * Place ids are omitted deliberately: an id is a public identifier that names a
+ * building and not a person ([ADR-0007](../../../docs/adr/0007-place-id-durable-coordinates-perishable.md)),
+ * and it is the single most useful thing to have in a log when Google refuses
+ * one. A coordinate is the opposite on both counts.
+ */
+function coordinatesIn(request: RoutesRequest): readonly string[] {
+  return [request.origin, request.destination, ...request.intermediates].flatMap((waypoint) =>
+    waypoint.kind === 'coordinate' ? [String(waypoint.latitude), String(waypoint.longitude)] : [],
+  );
+}
+
 function toWaypoint(waypoint: RoutesWaypoint) {
   if (waypoint.kind === 'place') return { placeId: waypoint.placeId };
   return {

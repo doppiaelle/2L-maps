@@ -1,6 +1,5 @@
 import { createParseAdapter, PARSE_MAX_TOKENS } from '../functions/_shared/upstream/parse';
 import {
-  ADDRESS_PRIMARY_TYPES,
   createPlacesAdapter,
   FIELD_MASK_AUTOCOMPLETE,
   FIELD_MASK_DETAILS,
@@ -46,30 +45,19 @@ describe('autocomplete is where the money goes', () => {
     expect(sent[0]?.body).toMatchObject({ sessionToken: 'session-xyz' });
   });
 
-  it('asks for street addresses rather than places in general', async () => {
-    // Unrestricted, Places ranks localities and businesses alongside addresses,
-    // and for the short input a driver types — "via roma" — the town wins. Every
-    // suggestion came back a city, which is useless to a product that delivers
-    // to a door.
+  it('sends no type filter, so the ranking is Google’s own', async () => {
+    // The product's promise is parity with Google Maps: a driver who types
+    // "Roma" is looking for Rome. Two attempts at narrowing this were written
+    // from memory of an API this environment cannot reach, and the second took
+    // address search down for everybody (ADR-0026).
     const { fetchImpl, sent } = recorder(() => ({ status: 200, body: { suggestions: [] } }));
     const places = createPlacesAdapter({ apiKey: 'k', fetchImpl });
 
-    await places.suggest('via roma', 'token');
-    expect(sent[0]?.body).toMatchObject({ includedPrimaryTypes: ADDRESS_PRIMARY_TYPES });
-  });
-
-  it('filters on address-level types only, and stays inside the ceiling of five', async () => {
-    // Not the `address` collection: that belongs to the legacy Autocomplete,
-    // whose parameter was `types`. `includedPrimaryTypes` takes the types
-    // themselves, and a value Places will not accept is a 400 on the whole
-    // request rather than a filter it ignores — which is how address search
-    // went down.
-    expect(ADDRESS_PRIMARY_TYPES.length).toBeLessThanOrEqual(5);
-    for (const type of ADDRESS_PRIMARY_TYPES) {
-      // A locality or a business here would put a town centre back at the top
-      // of the list, which is the thing the filter exists to prevent.
-      expect(type).not.toMatch(/^(locality|establishment|geocode|\()/);
-    }
+    await places.suggest('roma', 'token');
+    const body = sent[0]?.body as Record<string, unknown>;
+    expect(Object.keys(body)).not.toContain('includedPrimaryTypes');
+    expect(Object.keys(body)).not.toContain('includedTypes');
+    expect(Object.keys(body)).not.toContain('types');
   });
 
   it('buys the suggestion text and the id, and nothing else', async () => {
@@ -83,49 +71,6 @@ describe('autocomplete is where the money goes', () => {
     expect(mask).not.toContain('photos');
     expect(mask).not.toContain('regularOpeningHours');
     expect(mask).not.toContain('reviews');
-  });
-
-  it('asks again without the filter when Places refuses the request', async () => {
-    // The regression this exists for: `includedPrimaryTypes` only improves the
-    // ranking, and a value Places will not accept turned it into a 400 on the
-    // whole request. Address search stopped answering for everybody. A field
-    // that only improves an answer must never be able to prevent one.
-    const sequence: { status: number; body: unknown }[] = [
-      { status: 400, body: {} },
-      { status: 200, body: { suggestions: [{ placePrediction: { placeId: 'ChIJ-2' } }] } },
-    ];
-    const { fetchImpl, sent } = recorder(() => sequence.shift() ?? { status: 500, body: {} });
-    const places = createPlacesAdapter({ apiKey: 'k', fetchImpl });
-
-    const outcome = await places.suggest('via roma', 'token');
-
-    expect(outcome).toEqual({
-      ok: true,
-      value: [{ placeId: 'ChIJ-2', primaryText: '', secondaryText: '' }],
-    });
-    expect(sent).toHaveLength(2);
-    expect(sent[0]?.body).toMatchObject({ includedPrimaryTypes: ADDRESS_PRIMARY_TYPES });
-    expect(sent[1]).toBeDefined();
-    expect(Object.keys(sent[1]?.body as Record<string, unknown>)).not.toContain(
-      'includedPrimaryTypes',
-    );
-    // Same session, so the retry is not a second billable session.
-    expect(sent[1]?.body).toMatchObject({ sessionToken: 'token' });
-  });
-
-  it('does not ask again when the failure is not the request', async () => {
-    // A 5xx or a timeout is not the filter's fault, and retrying would double
-    // the cost of a bad minute upstream.
-    const { fetchImpl, sent } = recorder(() => ({ status: 503, body: {} }));
-    const places = createPlacesAdapter({ apiKey: 'k', fetchImpl });
-
-    const outcome = await places.suggest('via roma', 'token');
-
-    expect(outcome).toEqual({
-      ok: false,
-      failure: { kind: 'unreachable', retryable: true },
-    });
-    expect(sent).toHaveLength(1);
   });
 
   it('treats no suggestions as a valid answer, not a fault', async () => {
@@ -162,6 +107,72 @@ describe('autocomplete is where the money goes', () => {
       primaryText: 'Via Roma 12',
       secondaryText: 'Bergamo, BG, Italia',
     });
+  });
+});
+
+describe('when Google refuses, it says why and we keep it', () => {
+  const refusal = (message: string) => ({
+    status: 400,
+    body: { error: { code: 400, status: 'INVALID_ARGUMENT', message } },
+  });
+
+  it('logs the field Google named, not only the status code', async () => {
+    // The whole reason this exists. `includedPrimaryTypes: ['address']` was
+    // written from memory of a reference page this environment cannot open;
+    // Places refused every request carrying it and the only evidence anywhere
+    // was the number 400. Google had said exactly which field and which value
+    // (ADR-0026).
+    const { fetchImpl } = recorder(() =>
+      refusal(`Invalid value at 'included_primary_types[0]' (TYPE_ENUM), "address"`),
+    );
+    const places = createPlacesAdapter({ apiKey: 'k', fetchImpl });
+    const logged: string[] = [];
+    const spy = jest.spyOn(console, 'error').mockImplementation((line: unknown) => {
+      logged.push(String(line));
+    });
+
+    const outcome = await places.suggest('via roma', 'token');
+    spy.mockRestore();
+
+    const line = JSON.parse(logged[0] ?? '{}') as Record<string, unknown>;
+    expect(line['event']).toBe('google_refused');
+    expect(line['googleStatus']).toBe('INVALID_ARGUMENT');
+    expect(String(line['message'])).toContain('included_primary_types[0]');
+    // And the caller learns it too, so a 404 on one address is distinguishable
+    // from a key that is not authorised for the API at all.
+    expect(outcome).toMatchObject({
+      ok: false,
+      failure: { kind: 'rejected', status: 400, googleStatus: 'INVALID_ARGUMENT' },
+    });
+  });
+
+  it('never logs what the user typed', async () => {
+    // Google quotes the request back, and the request is an address
+    // (`CLAUDE.md` §9 rule 7).
+    const { fetchImpl } = recorder(() => refusal('invalid input "Via dei Tulipani 4"'));
+    const places = createPlacesAdapter({ apiKey: 'k', fetchImpl });
+    const logged: string[] = [];
+    const spy = jest.spyOn(console, 'error').mockImplementation((line: unknown) => {
+      logged.push(String(line));
+    });
+
+    await places.suggest('Via dei Tulipani 4', 'token');
+    spy.mockRestore();
+
+    expect(logged[0]).not.toContain('Tulipani');
+    expect(logged[0]).toContain('invalid input');
+  });
+
+  it('does not turn an unreadable refusal into a crash', async () => {
+    // A 502 from a load balancer is HTML, not an error envelope.
+    const { fetchImpl } = recorder(() => ({ status: 503, body: null }));
+    const places = createPlacesAdapter({ apiKey: 'k', fetchImpl });
+    const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    const outcome = await places.suggest('via roma', 'token');
+    spy.mockRestore();
+
+    expect(outcome).toEqual({ ok: false, failure: { kind: 'unreachable', retryable: true } });
   });
 });
 

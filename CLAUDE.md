@@ -413,6 +413,14 @@ Concrete failure modes this project is exposed to, and the rule that prevents ea
    document; the document is the source.
 10. **Never merge a red build.** A skipped or disabled test is a decision requiring an issue
     and an owner.
+11. **Never write a field of an external API from memory.** `developers.google.com` is not
+    reachable from the environment this code is written in, and no test here can tell whether
+    Google accepts a value — a fixture states what its author believed. A value written from
+    recall took address search down for every user
+    ([ADR-0026](docs/adr/0026-google-tells-us-what-is-wrong.md)). Either send it and read the
+    refusal, or do not send it. **And never reduce an upstream refusal to its status code:**
+    the body names the field and the value, and it is the only current description of these
+    APIs available from here.
 
 ---
 

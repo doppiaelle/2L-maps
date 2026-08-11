@@ -20,6 +20,8 @@
  * long.
  */
 
+import { logGoogleRefusal, readGoogleError } from './google-error.ts';
+
 const AUTOCOMPLETE_ENDPOINT = 'https://places.googleapis.com/v1/places:autocomplete';
 const DETAILS_ENDPOINT = 'https://places.googleapis.com/v1/places';
 const GEOCODE_ENDPOINT = 'https://geocode.googleapis.com/v1/geocode/address';
@@ -30,35 +32,6 @@ export const FIELD_MASK_AUTOCOMPLETE =
 
 /** What a stop needs to be drawn and handed off. */
 export const FIELD_MASK_DETAILS = 'id,formattedAddress,location';
-
-/**
- * **Addresses, not places.**
- *
- * Unrestricted, Places ranks localities and businesses alongside street
- * addresses, and for the short input a driver actually types — "via roma" — the
- * town wins. A stop that resolves to "Bergamo" sends a van to a town centre.
- *
- * **Named types rather than the `address` collection.** `address` is a type
- * *collection* from the legacy Autocomplete, where the parameter was `types`.
- * Autocomplete (New) takes `includedPrimaryTypes` and its collections are
- * `geocode`, `establishment`, `(regions)` and `(cities)` — `address` is not
- * among them, and a value Places will not accept is a 400 on the whole request
- * rather than a filter it ignores. These five are the address-level types
- * themselves, which is what was meant in the first place, and the ceiling is
- * five so this is exactly full.
- *
- * It is still a preference and it is still treated as one: `suggest` drops it
- * and asks again if Places refuses. That matters more than this list being
- * right, because the list being wrong is precisely what took address search
- * down — and no external value can be verified from inside a test.
- */
-export const ADDRESS_PRIMARY_TYPES: readonly string[] = [
-  'street_address',
-  'route',
-  'street_number',
-  'premise',
-  'subpremise',
-];
 
 export interface PlaceSuggestionResult {
   readonly placeId: string;
@@ -76,7 +49,17 @@ export interface ResolvedPlaceResult {
 export type PlacesFailure =
   | { readonly kind: 'unreachable'; readonly retryable: true }
   | { readonly kind: 'timeout'; readonly retryable: true }
-  | { readonly kind: 'rejected'; readonly retryable: false; readonly status: number }
+  | {
+      readonly kind: 'rejected';
+      readonly retryable: false;
+      readonly status: number;
+      /** Google's own enum — `INVALID_ARGUMENT`, `NOT_FOUND`,
+       *  `PERMISSION_DENIED`. Absent when the body could not be read. It is the
+       *  difference between "an address Google has never heard of" and "our key
+       *  is not authorised for this API", which look identical as a 404 and a
+       *  403 and need opposite responses from us. */
+      readonly googleStatus?: string;
+    }
   | { readonly kind: 'malformed'; readonly retryable: false };
 
 export interface PlacesAdapterOptions {
@@ -97,6 +80,9 @@ export function createPlacesAdapter(options: PlacesAdapterOptions) {
     url: string,
     init: { method: 'GET' | 'POST'; body?: unknown },
     fieldMask: string,
+    /** What this request contained that the user typed. Removed from Google's
+     *  message before it is logged — see `google-error.ts`. */
+    redact: readonly string[] = [],
   ): Promise<Outcome<unknown>> => {
     const timeout = new AbortController();
     const timer = setTimeout(() => timeout.abort(), timeoutMs);
@@ -125,12 +111,24 @@ export function createPlacesAdapter(options: PlacesAdapterOptions) {
     }
 
     if (!response.ok) {
+      // **Google's own message, not just its number.** A 400 says we are wrong
+      // about something; the body says which field and which value, which is the
+      // only description of this API available from here (`google-error.ts`).
+      const body: unknown = await response.json().catch(() => null);
+      const error = readGoogleError(body, redact);
+      logGoogleRefusal(url, response.status, error);
+
       return {
         ok: false,
         failure:
           response.status >= 500
             ? { kind: 'unreachable', retryable: true }
-            : { kind: 'rejected', retryable: false, status: response.status },
+            : {
+                kind: 'rejected',
+                retryable: false,
+                status: response.status,
+                ...(error === null ? {} : { googleStatus: error.status }),
+              },
       };
     }
 
@@ -163,42 +161,22 @@ export function createPlacesAdapter(options: PlacesAdapterOptions) {
             }),
       };
 
-      const ask = (filtered: boolean) =>
-        call(
-          AUTOCOMPLETE_ENDPOINT,
-          {
-            method: 'POST',
-            body: filtered ? { ...body, includedPrimaryTypes: ADDRESS_PRIMARY_TYPES } : body,
-          },
-          FIELD_MASK_AUTOCOMPLETE,
-        );
-
-      let outcome = await ask(true);
-
-      // **The filter must never be able to break search**, and it did.
+      // **No type filter, and that is the requirement rather than a retreat.**
+      // The product's promise is that searching here finds what searching Google
+      // Maps finds — a driver who types "Roma" is looking for Rome, and a filter
+      // that returns only street-level results answers a question nobody asked.
+      // Ranking is Google's, unmodified, which is the only way to be identical
+      // to it ([ADR-0026](../../../docs/adr/0026-google-tells-us-what-is-wrong.md)).
       //
-      // `includedPrimaryTypes` improves the *ranking* — nothing in the product
-      // reads it, nothing depends on it, and a suggestion list without it is
-      // worse but usable. Yet Places validates it, and a value it does not
-      // accept is a 400 on the whole request: address search stopped answering
-      // at all, for everybody, the moment this went out. That is the same
-      // failure as requiring a response field nobody reads
-      // ([ADR-0024](../../../docs/adr/0024-deploy-the-functions-with-the-app.md)),
-      // mirrored onto the request — so it gets the same rule. **A field that
-      // only improves an answer must never be able to prevent one.**
-      //
-      // Retried on `rejected` only. A timeout or an outage is not the filter's
-      // fault, and asking again would double the cost of a bad minute. The same
-      // session token goes back out, so this stays one billable session.
-      if (!outcome.ok && outcome.failure.kind === 'rejected') {
-        console.error(
-          JSON.stringify({
-            event: 'autocomplete_filter_rejected',
-            status: outcome.failure.status,
-          }),
-        );
-        outcome = await ask(false);
-      }
+      // Two attempts at narrowing this have now been made from memory of an API
+      // that cannot be read from here, and the second took address search down
+      // completely. There is no third.
+      const outcome = await call(
+        AUTOCOMPLETE_ENDPOINT,
+        { method: 'POST', body },
+        FIELD_MASK_AUTOCOMPLETE,
+        [input],
+      );
 
       if (!outcome.ok) return outcome;
       const suggestions = readSuggestions(outcome.value);
@@ -291,6 +269,9 @@ export function createPlacesAdapter(options: PlacesAdapterOptions) {
             `${GEOCODE_ENDPOINT}/${encodeURIComponent(address)}?regionCode=${encodeURIComponent(region)}`,
             { method: 'GET' },
             FIELD_MASK_DETAILS,
+            // The address is in the URL, so it is in any message that quotes the
+            // request back. This is the call where redaction is not theoretical.
+            [address],
           );
           if (!outcome.ok) return { index, address, place: null, failure: outcome.failure };
           return { index, address, place: readGeocodeResult(outcome.value), failure: null };
