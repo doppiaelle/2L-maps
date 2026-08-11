@@ -37,6 +37,8 @@ const summary = (overrides: Partial<SavedRouteSummary> = {}): SavedRouteSummary 
   name: null,
   status: 'completed' as RouteStatus,
   stopCount: 12,
+  isRoundTrip: false,
+  stops: [],
   isDegraded: false,
   distanceMeters: 42_000,
   durationSeconds: 3_600,
@@ -194,6 +196,55 @@ describe('what History shows', () => {
     renderHistory({ isLoading: true });
     expect(screen.getByTestId('history-loading')).toBeTruthy();
     expect(screen.queryByTestId('history-list')).toBeNull();
+  });
+
+  it('says where the day started and where it ended', () => {
+    // The reported problem: a title, a distance and a duration are identical
+    // across a week of rounds, so a driver looking for last Tuesday had to open
+    // routes until they found it (ADR-0027).
+    renderHistory({
+      routes: [
+        summary({
+          stops: [
+            {
+              placeId: 'ChIJa',
+              entryOrder: 0,
+              optimizedOrder: 0,
+              address: 'Corso Francia 12, 10138 Torino TO, Italia',
+            },
+            {
+              placeId: 'ChIJb',
+              entryOrder: 1,
+              optimizedOrder: 1,
+              address: 'Via Meucci 3, 10098 Rivoli TO, Italia',
+            },
+          ],
+        }),
+      ],
+    });
+
+    expect(screen.getByText('Corso Francia 12 → Via Meucci 3')).toBeTruthy();
+    expect(screen.getByText('12 stops · one way')).toBeTruthy();
+  });
+
+  it('still reads without a journey once the addresses have expired', () => {
+    // Thirty days, and the purge nulls the address while keeping the place id
+    // (ADR-0007). The row shows what it still knows rather than a placeholder.
+    renderHistory({ routes: [summary({ stops: [] })] });
+
+    expect(screen.getByText(/4 Aug · 12 stops/)).toBeTruthy();
+    expect(screen.queryByText(/→/)).toBeNull();
+  });
+
+  it('marks the route the driver set off on', () => {
+    renderHistory({ routes: [summary({ status: 'in_progress' })] });
+    expect(screen.getByText('In progress', { includeHiddenElements: true })).toBeTruthy();
+  });
+
+  it('leaves an ordinary saved route unmarked, so a chip means something', () => {
+    renderHistory({ routes: [summary({ status: 'optimized' })] });
+    expect(screen.queryByText('In progress', { includeHiddenElements: true })).toBeNull();
+    expect(screen.queryByText('Done', { includeHiddenElements: true })).toBeNull();
   });
 });
 

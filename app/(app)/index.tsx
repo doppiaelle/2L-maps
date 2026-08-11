@@ -35,6 +35,7 @@ import { buildRouteGeometry, connectorsThrough, planRoute } from '@/lib/map/rout
 import { PREPARING_DELAY_MS, routeViewAfter, showsCanvas, showsMap } from '@/lib/route/route-view';
 import type { RouteView } from '@/lib/route/route-view';
 import { handoffNoticeOf } from '@/lib/handoff/outcome-notice';
+import { saveNoticeOf } from '@/lib/route/save-notice';
 import { newRouteId } from '@/lib/route/route-id';
 import { actionIntentOf, planStateOf } from '@/lib/route/plan-state';
 import { unreachableIn } from '@/lib/route/progress';
@@ -98,10 +99,19 @@ export default function PlanScreen(): React.JSX.Element {
     pendingDeepLink: pending.target,
   });
 
-  // Writes on meaningful events — optimized, started, each stop marked,
-  // finished — and never on a keystroke. The local store already holds the
-  // draft; what this adds is History and the second device.
-  useRouteSync();
+  /**
+   * Writes on meaningful events — optimized and handed over — never on a
+   * keystroke. The local store already holds the draft; what this adds is
+   * History and the second device.
+   *
+   * **The return value used to be discarded**, `failure` included, which is the
+   * field the hook documents as existing "so a screen can say so rather than
+   * letting the route silently exist on one device only". A route that failed to
+   * save looked exactly like one that saved — on screen, in the store, and
+   * simply not in History (ADR-0027).
+   */
+  const routeSync = useRouteSync();
+  const saveNotice = saveNoticeOf(routeSync.failure);
 
   // The signal coming back is the interesting edge: the server's copy is behind
   // by whatever the driver did underground. Pushes first, then re-reads.
@@ -477,6 +487,30 @@ export default function PlanScreen(): React.JSX.Element {
         theme={theme}
         testID="plan-dock"
       />
+
+      {saveNotice !== null && handoffNotice === null && (
+        // Below the handoff notice in priority: if both are true the driver is
+        // about to leave the app, and "your route did not reach History" is not
+        // what they need to read while setting off. It stays until dismissed —
+        // the whole failure of the old behaviour was silence.
+        <NoticeToast
+          title={saveNotice.title}
+          detail={saveNotice.detail}
+          kind={saveNotice.kind}
+          bottomOffset={DOCK_OUTER_HEIGHT + insets.bottom + space.space2}
+          theme={theme}
+          {...(saveNotice.canRetry
+            ? { action: { label: 'Try again', onPress: routeSync.sync } }
+            : {})}
+          onDismiss={() => {
+            // Dismissing hides the message, not the problem. There is nothing to
+            // clear: `failure` is whatever the last write produced, and the next
+            // one replaces it — including with null.
+            routeSync.sync();
+          }}
+          testID="plan-save-notice"
+        />
+      )}
 
       {handoffNotice !== null && (
         // No timer on this one. A route split into three parts, or a navigation

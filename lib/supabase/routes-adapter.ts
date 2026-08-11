@@ -121,11 +121,37 @@ const stopRowSchema = z.object({
 
 const loadedRouteRowSchema = routeRowSchema.extend({ updated_at: z.string() });
 
+/**
+ * A History row, with just enough of its stops to say which day it was.
+ *
+ * **It used to be a count and nothing else** — `stops(count)` — on the reasoning
+ * that loading every stop of every route would make opening History cost more
+ * than opening a route. That was right about the cost and wrong about the row: a
+ * date, a number and a distance are identical across a week of rounds, and a
+ * driver looking for last Tuesday had to open routes until they found it.
+ *
+ * Three small columns per stop is a different proposition from the whole row,
+ * and the address comes with them for free through the foreign key
+ * `stops.place_id` already has to `places_cache` — **our own cache, read
+ * directly, no upstream call and no unit of quota**, exactly as the address book
+ * reads it (`favourites-adapter.ts`). `places_cache` is null after the
+ * thirty-day purge, which is why the embed is optional all the way down
+ * ([ADR-0007](../../docs/adr/0007-place-id-durable-coordinates-perishable.md)).
+ */
+const summaryStopSchema = z.object({
+  place_id: z.string(),
+  entry_order: z.number().int(),
+  optimized_order: z.number().int().nullable(),
+  places_cache: z.object({ formatted_address: z.string().nullable() }).nullable(),
+});
+
 const summaryRowSchema = routeRowSchema.extend({
   updated_at: z.string(),
-  // PostgREST returns an aggregate relationship as an array of one object.
-  stops: z.array(z.object({ count: z.number().int() })).optional(),
+  stops: z.array(summaryStopSchema).optional(),
 });
+
+const SUMMARY_STOP_COLUMNS =
+  'stops(place_id,entry_order,optimized_order,places_cache(formatted_address))';
 
 const ROUTE_COLUMNS =
   'id,user_id,name,status,is_round_trip,origin_place_id,origin_is_current_location,optimized_at,optimization_tier,is_degraded,total_distance_m,total_duration_s';
@@ -193,7 +219,7 @@ export function createRoutesProvider(port: RoutesPort): RoutesProvider {
 
     list: async (limit) => {
       const { data, error } = await port.select('routes', {
-        columns: `${ROUTE_COLUMNS},updated_at,stops(count)`,
+        columns: `${ROUTE_COLUMNS},updated_at,${SUMMARY_STOP_COLUMNS}`,
         // Soft-deleted routes are gone from the user's point of view. The row
         // survives so a delete performed offline stays reconcilable
         // (docs/12_DATABASE.md).
@@ -209,16 +235,28 @@ export function createRoutesProvider(port: RoutesPort): RoutesProvider {
       // than as "you have never saved a route".
       if (!parsed.success) return null;
 
-      return parsed.data.map((row): SavedRouteSummary => ({
-        routeId: row.id,
-        name: row.name,
-        status: row.status,
-        stopCount: row.stops?.[0]?.count ?? 0,
-        isDegraded: row.is_degraded,
-        distanceMeters: row.total_distance_m,
-        durationSeconds: row.total_duration_s,
-        updatedAt: row.updated_at,
-      }));
+      return parsed.data.map((row): SavedRouteSummary => {
+        const stops = row.stops ?? [];
+        return {
+          routeId: row.id,
+          name: row.name,
+          status: row.status,
+          stopCount: stops.length,
+          isRoundTrip: row.is_round_trip,
+          stops: stops.map((stop) => ({
+            placeId: stop.place_id,
+            entryOrder: stop.entry_order,
+            optimizedOrder: stop.optimized_order,
+            // Null once the purge has taken it, which is the ordinary state of
+            // an old route rather than a failure.
+            address: stop.places_cache?.formatted_address ?? null,
+          })),
+          isDegraded: row.is_degraded,
+          distanceMeters: row.total_distance_m,
+          durationSeconds: row.total_duration_s,
+          updatedAt: row.updated_at,
+        };
+      });
     },
 
     load: async (routeId) => {

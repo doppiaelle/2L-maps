@@ -27,6 +27,15 @@ export interface NoticeToastProps {
    *  and none of these are errors — they are outcomes. */
   readonly kind: 'success' | 'warning';
   onDismiss: () => void;
+  /**
+   * Something to do about it, where there is something.
+   *
+   * Every error path needs a user-visible outcome **and a next action**
+   * (`CLAUDE.md` §0 rule 5), and for several of these the action is simply
+   * "try that again". Omitted where retrying repeats the same refusal: a button
+   * that fails again teaches the user that buttons in this app do not work.
+   */
+  readonly action?: { readonly label: string; onPress: () => void };
   /** Points above the bottom edge, so it clears the dock. Passed rather than
    *  measured, like every other layout number here. */
   readonly bottomOffset?: number;
@@ -39,6 +48,7 @@ export function NoticeToast({
   detail,
   kind,
   onDismiss,
+  action,
   bottomOffset = 0,
   theme,
   testID,
@@ -73,19 +83,39 @@ export function NoticeToast({
       <Text className="text-body-strong text-text-primary">{title}</Text>
       {detail !== null && <Text className="text-caption text-text-secondary">{detail}</Text>}
 
-      <Pressable
-        onPress={onDismiss}
-        accessibilityRole="button"
-        accessibilityLabel={`Dismiss: ${title}`}
-        style={{
-          minHeight: layout.touchMin,
-          justifyContent: 'center',
-          alignSelf: 'flex-start',
-        }}
-        testID="notice-dismiss"
-      >
-        <Text className="text-body-strong text-accent">Got it</Text>
-      </Pressable>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.space5 }}>
+        {action !== undefined && (
+          // First, and in the accent: it is the thing to do, and dismissing is
+          // what you choose instead of it.
+          <Pressable
+            onPress={action.onPress}
+            accessibilityRole="button"
+            accessibilityLabel={action.label}
+            style={{ minHeight: layout.touchMin, justifyContent: 'center' }}
+            testID="notice-action"
+          >
+            <Text className="text-body-strong text-accent">{action.label}</Text>
+          </Pressable>
+        )}
+
+        <Pressable
+          onPress={onDismiss}
+          accessibilityRole="button"
+          accessibilityLabel={`Dismiss: ${title}`}
+          style={{ minHeight: layout.touchMin, justifyContent: 'center' }}
+          testID="notice-dismiss"
+        >
+          <Text
+            className={
+              action === undefined
+                ? 'text-body-strong text-accent'
+                : 'text-body-strong text-text-secondary'
+            }
+          >
+            Got it
+          </Text>
+        </Pressable>
+      </View>
     </View>
   );
 }

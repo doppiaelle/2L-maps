@@ -290,14 +290,44 @@ export function progressFromRows(route: RouteRow, updatedAt: string): RouteProgr
 
 // ─── History ─────────────────────────────────────────────────────────────────
 
-/** One row of History. Deliberately not a `DraftRoute`: the list needs a name, a
- *  date and a count, and loading every stop of every route to show them would
- *  make opening History cost more than opening a route. */
+/**
+ * A stop as History needs it: where it sits in the route, and what it is called
+ * if we still know.
+ *
+ * **The address is on loan.** It comes from `places_cache`, which the purge job
+ * nulls at thirty days ([ADR-0007](../../docs/adr/0007-place-id-durable-coordinates-perishable.md)),
+ * so `null` is the ordinary state of an old route rather than a failure. The
+ * `place_id` beside it is durable and is what would buy the text back.
+ */
+export interface SavedRouteStop {
+  readonly placeId: string;
+  readonly entryOrder: number;
+  readonly optimizedOrder: number | null;
+  readonly address: string | null;
+}
+
+/**
+ * One row of History.
+ *
+ * Deliberately not a `DraftRoute`. It used to carry only a count, on the
+ * reasoning that loading every stop of every route would make opening History
+ * cost more than opening a route — which was right about the cost and wrong
+ * about the row: a name, a date and a number told the driver nothing about
+ * *which* day it was.
+ *
+ * It now carries the stops, but only three columns of each, and the address
+ * arrives on the same query through the foreign key `stops.place_id` already has
+ * to `places_cache`. **No upstream call and no quota**: this is our own cache,
+ * read directly, exactly as the address book reads it
+ * (`lib/supabase/favourites-adapter.ts`).
+ */
 export interface SavedRouteSummary {
   readonly routeId: string;
   readonly name: string | null;
   readonly status: RouteStatus;
   readonly stopCount: number;
+  readonly isRoundTrip: boolean;
+  readonly stops: readonly SavedRouteStop[];
   readonly isDegraded: boolean;
   readonly distanceMeters: number | null;
   readonly durationSeconds: number | null;

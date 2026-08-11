@@ -42,7 +42,7 @@ const portWith = (
   }> = {},
 ) => {
   const calls: Call[] = [];
-  const selects: { table: string; query: unknown }[] = [];
+  const selects: { table: string; query: { columns: string } & Record<string, unknown> }[] = [];
   const updates: Record<string, unknown>[] = [];
 
   const port: RoutesPort = {
@@ -143,7 +143,20 @@ describe('listing', () => {
     total_distance_m: 42_000,
     total_duration_s: 3_600,
     updated_at: '2026-08-04T09:30:00.000Z',
-    stops: [{ count: 12 }],
+    stops: [
+      {
+        place_id: 'ChIJa',
+        entry_order: 0,
+        optimized_order: 0,
+        places_cache: { formatted_address: 'Corso Francia 12, 10138 Torino TO, Italia' },
+      },
+      {
+        place_id: 'ChIJb',
+        entry_order: 1,
+        optimized_order: 1,
+        places_cache: { formatted_address: 'Via Meucci 3, 10098 Rivoli TO, Italia' },
+      },
+    ],
     ...overrides,
   });
 
@@ -163,13 +176,47 @@ describe('listing', () => {
     expect(selects[0]?.query).toMatchObject({ order: { column: 'updated_at', ascending: false } });
   });
 
-  it('reads the stop count without reading the stops', async () => {
-    // Loading every stop of every route to show a count would make opening
-    // History cost more than opening a route.
-    const { port } = portWith({ selectData: [summaryRow()] });
+  it('reads three columns per stop, not the whole row', async () => {
+    // Loading every stop of every route in full would make opening History cost
+    // more than opening a route — the reason this used to be a bare count. Three
+    // small columns is a different proposition, and it is what turns a row that
+    // could be any Tuesday into one that names its own day.
+    const { port, selects } = portWith({ selectData: [summaryRow()] });
+    await createRoutesProvider(port).list(20);
+
+    const columns = String(selects[0]?.query.columns);
+    expect(columns).toContain('stops(place_id,entry_order,optimized_order');
+    expect(columns).not.toContain('label');
+    expect(columns).not.toContain('leg_distance_m');
+  });
+
+  it('takes the endpoints’ addresses off our own cache, buying nothing', async () => {
+    // Through the foreign key `stops.place_id` already has to `places_cache`, on
+    // the same query. No upstream call and no unit of quota — the address book
+    // reads it the same way.
+    const { port, selects } = portWith({ selectData: [summaryRow()] });
     const summaries = await createRoutesProvider(port).list(20);
 
-    expect(summaries?.[0]?.stopCount).toBe(12);
+    expect(String(selects[0]?.query.columns)).toContain('places_cache(formatted_address)');
+    expect(summaries?.[0]?.stops[0]?.address).toBe('Corso Francia 12, 10138 Torino TO, Italia');
+    expect(summaries?.[0]?.stopCount).toBe(2);
+    expect(selects).toHaveLength(1);
+  });
+
+  it('accepts a route whose addresses the purge has taken', async () => {
+    // `places_cache` is nulled at thirty days and the embed comes back null with
+    // it (ADR-0007). That is the ordinary state of an old route, and refusing to
+    // parse it would empty a driver's History on its thirty-first day.
+    const { port } = portWith({
+      selectData: [
+        summaryRow({
+          stops: [{ place_id: 'ChIJa', entry_order: 0, optimized_order: null, places_cache: null }],
+        }),
+      ],
+    });
+
+    const summaries = await createRoutesProvider(port).list(20);
+    expect(summaries?.[0]?.stops[0]?.address).toBeNull();
   });
 
   it('reports an unreadable answer as unreadable, not as an empty history', async () => {

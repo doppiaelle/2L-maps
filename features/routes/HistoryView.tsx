@@ -5,8 +5,8 @@ import { Skeleton } from '@/components/primitives/Skeleton';
 import { StatusChip } from '@/components/primitives/StatusChip';
 import { layout, radius, space } from '@/lib/design/tokens';
 import type { ThemeName } from '@/lib/design/tokens';
-import { formatDistance, formatDuration } from '@/lib/format/units';
-import { displayName, type SavedRouteSummary } from '@/lib/route/persistence';
+import { historyRowOf } from '@/lib/route/history-row';
+import type { SavedRouteSummary } from '@/lib/route/persistence';
 import { LIST_VIRTUALISATION_THRESHOLD } from '@/types';
 
 /**
@@ -103,7 +103,7 @@ export function HistoryView({
           // (`CLAUDE.md` §6 rule 3).
           initialNumToRender={LIST_VIRTUALISATION_THRESHOLD}
           contentContainerStyle={{ paddingTop: space.space4, paddingBottom: space.space8 }}
-          renderItem={({ item }) => <RouteRow summary={item} onOpen={onOpen} theme={theme} />}
+          renderItem={({ item }) => <RouteRow summary={item} onOpen={onOpen} />}
           ListFooterComponent={
             locked.length === 0 ? null : (
               <LockedSection count={locked.length} onUpgrade={onUpgrade} />
@@ -116,48 +116,76 @@ export function HistoryView({
   );
 }
 
+/**
+ * One saved route, at a glance.
+ *
+ * Four facts in the order a driver asks for them — when, how big, where from and
+ * to, how far — and every one of them decided by `historyRowOf` rather than
+ * here. What the row does is lay them out.
+ *
+ * **The journey line is the reason this was rebuilt.** A title, a distance and a
+ * duration are identical across a week of rounds, so a driver looking for last
+ * Tuesday had to open routes until they found it.
+ */
 function RouteRow({
   summary,
   onOpen,
-  theme: _theme,
 }: {
   summary: SavedRouteSummary;
   onOpen: (routeId: string) => void;
-  theme: ThemeName;
 }): React.JSX.Element {
-  const name = displayName(summary);
-  const distance =
-    summary.distanceMeters === null ? null : formatDistance(summary.distanceMeters, 'metric');
-  const duration =
-    summary.durationSeconds === null ? null : formatDuration(summary.durationSeconds);
-
-  // The row is one accessibility element. A screen reader walking a name, a
-  // distance and a duration as three separate stops learns the same thing three
-  // times and cannot tell where one route ends and the next begins.
-  const spoken = [name, summary.isDegraded ? 'estimated without traffic' : null, distance, duration]
-    .filter((part): part is string => part !== null)
-    .join(', ');
+  const row = historyRowOf(summary);
 
   return (
     <Pressable
       onPress={() => {
-        onOpen(summary.routeId);
+        onOpen(row.routeId);
       }}
       accessibilityRole="button"
-      accessibilityLabel={`Open ${spoken}`}
+      // The row is one accessibility element. A screen reader walking a title, a
+      // journey and two metrics as four separate stops learns the same thing
+      // four times and cannot tell where one route ends and the next begins.
+      accessibilityLabel={`Open ${row.spoken}`}
+      accessibilityHint="Loads this route, ready to optimize"
       style={{ minHeight: layout.touchMin, marginBottom: layout.listRowGap }}
       testID="history-row"
     >
-      <Text className="text-body-strong text-text-primary">{name}</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.space2 }}>
+        <Text className="text-body-strong text-text-primary flex-1" numberOfLines={1}>
+          {row.title}
+        </Text>
+
+        {row.status !== null && (
+          <StatusChip
+            kind={row.status === 'in-progress' ? 'stale' : 'quota'}
+            label={row.status === 'in-progress' ? 'In progress' : 'Done'}
+          />
+        )}
+      </View>
+
+      <Text className="text-label-xs text-text-tertiary" style={{ marginTop: space.space1 }}>
+        {row.meta}
+      </Text>
+
+      {row.journey !== null && (
+        // One line, truncated at the end rather than wrapped: two routes whose
+        // rows are different heights are two routes the eye has to measure
+        // before it can compare them.
+        <Text
+          className="text-caption text-text-secondary"
+          style={{ marginTop: space.space1 }}
+          numberOfLines={1}
+        >
+          {row.journey}
+        </Text>
+      )}
 
       <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: space.space1 }}>
-        {(distance !== null || duration !== null) && (
-          <Text className="text-caption text-text-secondary">
-            {[distance, duration].filter((part) => part !== null).join(' · ')}
-          </Text>
+        {row.metrics !== null && (
+          <Text className="text-caption-strong text-text-primary">{row.metrics}</Text>
         )}
 
-        {summary.isDegraded && (
+        {row.isDegraded && (
           <View style={{ marginLeft: space.space2 }}>
             {/* Stored on the route, so the label survives every reload. A T0
                 result that stops looking degraded once it is saved is the one
