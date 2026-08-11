@@ -46,7 +46,7 @@ is needed.
 ## Decision
 
 **An upstream refusal is never reduced to a number.** Both adapters read the
-error envelope, log `google_refused` with Google's own `status` enum and
+error envelope, log `upstream_refused` with the provider's own status enum and
 message, and carry the enum on the failure so callers can distinguish a request
 we built wrong (`INVALID_ARGUMENT`) from a key or API that is not enabled
 (`PERMISSION_DENIED`) — same HTTP status, opposite fixes.
@@ -81,7 +81,7 @@ an entrypoint contains no decisions; this applies it.
 ## Consequences
 
 **The next failure is diagnosable from the dashboard.** Supabase → Edge
-Functions → Logs, filtered to `google_refused`, gives the API, the HTTP status,
+Functions → Logs, filtered to `upstream_refused`, gives the API, the HTTP status,
 Google's enum and Google's sentence. Three deployments were spent on questions
 that line answers.
 

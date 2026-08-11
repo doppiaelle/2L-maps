@@ -24,6 +24,8 @@
  * mode as a typo.
  */
 
+import { logUpstreamRefusal, readUpstreamError } from './upstream-error.ts';
+
 const MESSAGES_ENDPOINT = 'https://api.anthropic.com/v1/messages';
 const ANTHROPIC_VERSION = '2023-06-01';
 
@@ -121,6 +123,10 @@ export function createParseAdapter(options: ParseAdapterOptions): ParseAdapter {
     const timeout = new AbortController();
     const timer = setTimeout(() => timeout.abort(), timeoutMs);
 
+    // What the user pasted. The image is never a candidate: it does not appear
+    // in an error message as text, and it may not be held anywhere (risk C19).
+    const redact = input.text === undefined ? [] : [input.text];
+
     let response: Response;
     try {
       response = await fetchImpl(MESSAGES_ENDPOINT, {
@@ -153,6 +159,18 @@ export function createParseAdapter(options: ParseAdapterOptions): ParseAdapter {
     }
 
     if (!response.ok) {
+      // **Anthropic names the model it does not have**, and this branch used to
+      // discard that. A 404 here reached production as
+      // `{"reason":"rejected","upstreamStatus":404}` — which is indistinguishable
+      // from a wrong URL, a retired model and a key scoped to nothing, and all
+      // three need different fixes. The body says which (`upstream-error.ts`).
+      //
+      // The prompt carries the user's pasted addresses, so whatever the message
+      // quotes back is scrubbed before it is written (`CLAUDE.md` §9 rule 7).
+      const body: unknown = await response.json().catch(() => null);
+      const error = readUpstreamError(body, redact);
+      logUpstreamRefusal(MESSAGES_ENDPOINT, response.status, error);
+
       return {
         ok: false,
         failure:

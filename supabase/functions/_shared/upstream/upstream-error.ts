@@ -1,5 +1,5 @@
 /**
- * What Google said when it refused.
+ * What the upstream said when it refused.
  *
  * **This exists because the documentation is not reachable from where this code
  * is written, and guessing at it has now cost three deployments.**
@@ -7,19 +7,21 @@
  * every request carrying it and address search stopped answering for everybody.
  * The status code — 400 — said only that we were wrong about something.
  *
- * Google says considerably more than that, and both adapters were throwing it
- * away. The envelope is:
+ * Every upstream this product calls says considerably more than that, and every
+ * adapter was throwing it away — Places, Routes, Anthropic and OpenRouter alike.
+ * All four use the same envelope, which is why one reader covers them:
  *
  * ```json
  * { "error": { "code": 400, "status": "INVALID_ARGUMENT",
  *              "message": "Invalid value at 'included_primary_types[0]' …" } }
  * ```
  *
- * That message names the field and the value. It is more precise than the
- * reference page, it is current by construction, and it arrives at the exact
- * moment it is needed. **Reading it is how this codebase learns an API it cannot
- * browse** — so the rule is now: an upstream refusal is never reduced to a
- * number.
+ * That message names the field and the value. OpenRouter's names the model
+ * ("No endpoints found for …"); Anthropic's names the model too. It is more
+ * precise than the reference page, it is current by construction, and it
+ * arrives at the exact moment it is needed. **Reading it is how this codebase
+ * learns an API it cannot browse** — so the rule is now: an upstream refusal is
+ * never reduced to a number (`CLAUDE.md` §13 rule 11).
  *
  * ## What may be logged
  *
@@ -31,10 +33,13 @@
  * forgets is a breach and there is no test that can see the omission.
  */
 
-/** Google's own error, as much of it as is safe and useful to keep. */
-export interface GoogleError {
-  /** The enum — `INVALID_ARGUMENT`, `NOT_FOUND`, `PERMISSION_DENIED`. Stable,
-   *  machine-readable, and the first thing worth branching on. */
+/** The upstream's own error, as much of it as is safe and useful to keep. */
+export interface UpstreamError {
+  /** The enum, where the provider sends one — `INVALID_ARGUMENT`, `NOT_FOUND`,
+   *  `PERMISSION_DENIED` from Google, `not_found_error` from Anthropic.
+   *  `UNKNOWN` when there is none, which is OpenRouter's usual case: it sends a
+   *  message and a numeric code and no enum, and the message is the part that
+   *  matters anyway. */
   readonly status: string;
   /** The sentence, redacted and bounded. */
   readonly message: string;
@@ -66,14 +71,24 @@ const COORDINATE_PATTERN = /-?\d{1,3}\.\d{3,}/g;
  * Returns `null` rather than throwing for anything unrecognised: a refusal we
  * cannot read is still a refusal, and the caller already has the HTTP status.
  */
-export function readGoogleError(body: unknown, redact: readonly string[] = []): GoogleError | null {
+export function readUpstreamError(
+  body: unknown,
+  redact: readonly string[] = [],
+): UpstreamError | null {
   if (typeof body !== 'object' || body === null) return null;
 
   const error = (body as Record<string, unknown>)['error'];
   if (typeof error !== 'object' || error === null) return null;
 
   const fields = error as Record<string, unknown>;
-  const status = typeof fields['status'] === 'string' ? fields['status'] : 'UNKNOWN';
+  // `status` is Google's word for it and `type` is Anthropic's. OpenRouter sends
+  // neither and only a message, which is the field all three agree on.
+  const status =
+    typeof fields['status'] === 'string'
+      ? fields['status']
+      : typeof fields['type'] === 'string'
+        ? fields['type']
+        : 'UNKNOWN';
   const message = typeof fields['message'] === 'string' ? fields['message'] : '';
 
   return { status, message: scrub(message, redact) };
@@ -103,16 +118,22 @@ export function scrub(message: string, redact: readonly string[]): string {
 /**
  * Write the refusal where it can be found.
  *
- * One shape for both adapters, so a search for `google_refused` finds every
- * upstream refusal the product has ever had regardless of which API produced it.
+ * **One event name for all four upstreams**, so a search for `upstream_refused`
+ * in the dashboard finds every refusal the product has ever had without knowing
+ * in advance which service produced it. `api` says which; that is a field to
+ * read, not a word to have guessed.
  */
-export function logGoogleRefusal(api: string, httpStatus: number, error: GoogleError | null): void {
+export function logUpstreamRefusal(
+  api: string,
+  httpStatus: number,
+  error: UpstreamError | null,
+): void {
   console.error(
     JSON.stringify({
-      event: 'google_refused',
+      event: 'upstream_refused',
       api,
       httpStatus,
-      googleStatus: error?.status ?? null,
+      upstreamCode: error?.status ?? null,
       message: error?.message ?? null,
     }),
   );

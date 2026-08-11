@@ -35,6 +35,8 @@ import {
  * arrives at the cheaper path by accident.
  */
 
+import { logUpstreamRefusal, readUpstreamError } from './upstream-error.ts';
+
 const COMPLETIONS_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
 
 /** Free at time of writing, and configuration rather than a constant precisely
@@ -57,6 +59,9 @@ export function createOpenRouterParseAdapter(options: OpenRouterAdapterOptions):
   return async (input: ParseInput): Promise<ParseOutcome> => {
     // A longer default timeout than the Anthropic path: a free tier is a queue,
     // and being slow is its normal state rather than a fault.
+    // What the user pasted, removed from the message before it is logged.
+    const redact = input.text === undefined ? [] : [input.text];
+
     const timeout = new AbortController();
     const timer = setTimeout(() => timeout.abort(), timeoutMs);
 
@@ -106,6 +111,19 @@ export function createOpenRouterParseAdapter(options: OpenRouterAdapterOptions):
     }
 
     if (!response.ok) {
+      // **OpenRouter names the model it will not serve.** Its 404 body reads
+      // "No endpoints found for <model>" — which is the difference between a
+      // retired model id, a `:free` variant the account has not opted into, and
+      // a key with no credit. All three arrived in production as the same
+      // `{"reason":"rejected","upstreamStatus":404}` and the AI has been dead
+      // ever since (`upstream-error.ts`).
+      //
+      // Once the log names it, `PARSE_MODEL` is an environment variable
+      // (`runtime.ts`), so the fix is a dashboard edit rather than a release.
+      const body: unknown = await response.json().catch(() => null);
+      const error = readUpstreamError(body, redact);
+      logUpstreamRefusal(COMPLETIONS_ENDPOINT, response.status, error);
+
       return {
         ok: false,
         failure:

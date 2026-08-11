@@ -268,14 +268,14 @@ Supabase dashboard → Edge Functions → Logs. Every line is one-line JSON with
 so filtering by that word is enough. Four causes produce identical sentences on the phone, and
 these are what tell them apart ([ADR-0026](adr/0026-google-tells-us-what-is-wrong.md)):
 
-| `event` | Emitted when | What it carries |
-|---|---|---|
-| `google_refused` | Google answered 4xx/5xx to any Places or Routes call | The endpoint URL, the HTTP status, Google's own `status` enum, and Google's message — **the field and value it objected to** |
-| `place_unresolved` | A `place_id` could not be turned into coordinates | The id and the upstream status. This is what puts "Address needs refreshing" on a row |
-| `autocomplete_failed` | `/places-autocomplete` gave up | Which of the four failures, and the upstream status |
-| `request_rejected` | A request failed our own schema before the pipeline ran | The endpoint and the **field names** that failed |
-| `request_refused` | The pipeline refused — no entitlement, quota, rate limit | The endpoint and the code |
-| `pipeline_failed` | An unhandled throw inside the pipeline | The error type and message |
+| `event` | Emitted when | What it carries | Which function's log |
+|---|---|---|---|
+| `upstream_refused` | **Any** upstream refused — Places, Routes, Anthropic or OpenRouter | `api` (which one), `httpStatus`, `upstreamCode` (the provider's own enum), and its **message: the field, value or model it objected to** | the one that made the call |
+| `place_unresolved` | A `place_id` could not be turned into coordinates | The id and the upstream status. This is what puts "Address needs refreshing" on a row | **`place-details`** |
+| `autocomplete_failed` | `/places-autocomplete` gave up | Which of the four failures, and the upstream status | `places-autocomplete` |
+| `request_rejected` | A request failed our own schema before the pipeline ran | The endpoint and the **field names** that failed | any |
+| `request_refused` | The pipeline refused — no entitlement, quota, rate limit | The endpoint and the code | any |
+| `pipeline_failed` | An unhandled throw inside the pipeline | The error type and message | any |
 
 **No line contains an address, a coordinate, or a `place_id` tied to a user**
 ([`CLAUDE.md`](../CLAUDE.md) §9 rule 7). Google's message is scrubbed of the values we sent

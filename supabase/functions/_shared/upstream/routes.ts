@@ -1,4 +1,4 @@
-import { logGoogleRefusal, readGoogleError } from './google-error.ts';
+import { logUpstreamRefusal, readUpstreamError } from './upstream-error.ts';
 
 /**
  * The Google Routes API adapter — tier T1.
@@ -81,7 +81,7 @@ export type RoutesFailure =
       /** Google's own enum. `INVALID_ARGUMENT` is a request we built wrong;
        *  `PERMISSION_DENIED` is a key or an API that is not enabled. Same
        *  status code, opposite fixes. */
-      readonly googleStatus?: string;
+      readonly upstreamCode?: string;
     }
   /** A 200 whose body does not match what the contract describes. */
   | { readonly kind: 'malformed'; readonly retryable: false }
@@ -149,10 +149,10 @@ export function createRoutesAdapter(options: RoutesAdapterOptions) {
       // **Which is why the body is read.** "Our request is wrong" is not a
       // diagnosis, and optimization has now failed for three different reasons
       // that all looked like this one. Google names the offending field; the
-      // coordinates in it are stripped first (`google-error.ts`).
+      // coordinates in it are stripped first (`upstream-error.ts`).
       const body: unknown = await response.json().catch(() => null);
-      const error = readGoogleError(body, redact);
-      logGoogleRefusal(ROUTES_ENDPOINT, response.status, error);
+      const error = readUpstreamError(body, redact);
+      logUpstreamRefusal(ROUTES_ENDPOINT, response.status, error);
 
       return {
         ok: false,
@@ -163,7 +163,7 @@ export function createRoutesAdapter(options: RoutesAdapterOptions) {
                 kind: 'rejected',
                 retryable: false,
                 status: response.status,
-                ...(error === null ? {} : { googleStatus: error.status }),
+                ...(error === null ? {} : { upstreamCode: error.status }),
               },
       };
     }

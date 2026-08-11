@@ -165,3 +165,60 @@ describe('what is sent', () => {
     expect(JSON.parse(body)).toMatchObject({ temperature: 0 });
   });
 });
+
+describe('when the provider refuses, it names the model', () => {
+  it('logs OpenRouter’s own message instead of a bare 404', async () => {
+    // The AI has been dead in production with
+    // `{"reason":"rejected","upstreamStatus":404}` and nothing else. A 404 from
+    // OpenRouter is one of three different faults — a retired model id, a
+    // `:free` variant the account never opted into, or a key with no credit —
+    // and its body says which. `PARSE_MODEL` is an environment variable, so
+    // once the log names it the fix is a dashboard edit (ADR-0026).
+    const fetchImpl = (async () => ({
+      ok: false,
+      status: 404,
+      json: async () => ({
+        error: {
+          code: 404,
+          message: 'No endpoints found for meta-llama/llama-3.3-70b-instruct:free.',
+        },
+      }),
+    })) as unknown as typeof fetch;
+
+    const parse = createOpenRouterParseAdapter({ apiKey: 'k', fetchImpl, maxCandidates: 25 });
+    const logged: string[] = [];
+    const spy = jest.spyOn(console, 'error').mockImplementation((line: unknown) => {
+      logged.push(String(line));
+    });
+
+    const outcome = await parse({ text: 'Via Roma 12', locale: null });
+    spy.mockRestore();
+
+    expect(outcome).toMatchObject({ ok: false, failure: { kind: 'rejected', status: 404 } });
+    const line = JSON.parse(logged[0] ?? '{}') as Record<string, unknown>;
+    expect(line['event']).toBe('upstream_refused');
+    expect(line['httpStatus']).toBe(404);
+    // The model name is the whole point — without it a 404 says nothing.
+    expect(String(line['message'])).toContain('llama-3.3-70b-instruct:free');
+  });
+
+  it('never logs the addresses the user pasted', async () => {
+    const fetchImpl = (async () => ({
+      ok: false,
+      status: 400,
+      json: async () => ({ error: { message: 'bad input: "Via dei Tulipani 4"' } }),
+    })) as unknown as typeof fetch;
+
+    const parse = createOpenRouterParseAdapter({ apiKey: 'k', fetchImpl, maxCandidates: 25 });
+    const logged: string[] = [];
+    const spy = jest.spyOn(console, 'error').mockImplementation((line: unknown) => {
+      logged.push(String(line));
+    });
+
+    await parse({ text: 'Via dei Tulipani 4', locale: null });
+    spy.mockRestore();
+
+    expect(logged[0]).not.toContain('Tulipani');
+    expect(logged[0]).toContain('bad input');
+  });
+});

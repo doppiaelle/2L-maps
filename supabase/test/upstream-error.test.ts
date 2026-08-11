@@ -1,8 +1,8 @@
 import {
   MAX_MESSAGE_LENGTH,
-  readGoogleError,
+  readUpstreamError,
   scrub,
-} from '../functions/_shared/upstream/google-error';
+} from '../functions/_shared/upstream/upstream-error';
 
 /**
  * Reading what Google said, and never repeating what the user typed.
@@ -21,7 +21,7 @@ import {
 describe('reading the envelope', () => {
   it('keeps the enum and the sentence', () => {
     // The exact shape of a Places rejection, which is what this was written for.
-    const error = readGoogleError({
+    const error = readUpstreamError({
       error: {
         code: 400,
         status: 'INVALID_ARGUMENT',
@@ -40,20 +40,20 @@ describe('reading the envelope', () => {
     // A refusal we cannot parse is still a refusal, and the caller already has
     // the HTTP status. Throwing here would turn a diagnosable failure into an
     // exception inside the diagnosis.
-    expect(readGoogleError(null)).toBeNull();
-    expect(readGoogleError('<html>502 Bad Gateway</html>')).toBeNull();
-    expect(readGoogleError({ nothing: 'useful' })).toBeNull();
+    expect(readUpstreamError(null)).toBeNull();
+    expect(readUpstreamError('<html>502 Bad Gateway</html>')).toBeNull();
+    expect(readUpstreamError({ nothing: 'useful' })).toBeNull();
   });
 
   it('survives an envelope missing the fields it wants', () => {
-    const error = readGoogleError({ error: { code: 404 } });
+    const error = readUpstreamError({ error: { code: 404 } });
     expect(error).toEqual({ status: 'UNKNOWN', message: '' });
   });
 });
 
 describe('what may never reach a log line', () => {
   it('removes the address the user typed', () => {
-    const error = readGoogleError(
+    const error = readUpstreamError(
       {
         error: {
           status: 'INVALID_ARGUMENT',

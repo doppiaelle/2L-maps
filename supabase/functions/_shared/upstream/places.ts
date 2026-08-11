@@ -20,7 +20,7 @@
  * long.
  */
 
-import { logGoogleRefusal, readGoogleError } from './google-error.ts';
+import { logUpstreamRefusal, readUpstreamError } from './upstream-error.ts';
 
 const AUTOCOMPLETE_ENDPOINT = 'https://places.googleapis.com/v1/places:autocomplete';
 const DETAILS_ENDPOINT = 'https://places.googleapis.com/v1/places';
@@ -58,7 +58,7 @@ export type PlacesFailure =
        *  difference between "an address Google has never heard of" and "our key
        *  is not authorised for this API", which look identical as a 404 and a
        *  403 and need opposite responses from us. */
-      readonly googleStatus?: string;
+      readonly upstreamCode?: string;
     }
   | { readonly kind: 'malformed'; readonly retryable: false };
 
@@ -81,7 +81,7 @@ export function createPlacesAdapter(options: PlacesAdapterOptions) {
     init: { method: 'GET' | 'POST'; body?: unknown },
     fieldMask: string,
     /** What this request contained that the user typed. Removed from Google's
-     *  message before it is logged — see `google-error.ts`. */
+     *  message before it is logged — see `upstream-error.ts`. */
     redact: readonly string[] = [],
   ): Promise<Outcome<unknown>> => {
     const timeout = new AbortController();
@@ -113,10 +113,10 @@ export function createPlacesAdapter(options: PlacesAdapterOptions) {
     if (!response.ok) {
       // **Google's own message, not just its number.** A 400 says we are wrong
       // about something; the body says which field and which value, which is the
-      // only description of this API available from here (`google-error.ts`).
+      // only description of this API available from here (`upstream-error.ts`).
       const body: unknown = await response.json().catch(() => null);
-      const error = readGoogleError(body, redact);
-      logGoogleRefusal(url, response.status, error);
+      const error = readUpstreamError(body, redact);
+      logUpstreamRefusal(url, response.status, error);
 
       return {
         ok: false,
@@ -127,7 +127,7 @@ export function createPlacesAdapter(options: PlacesAdapterOptions) {
                 kind: 'rejected',
                 retryable: false,
                 status: response.status,
-                ...(error === null ? {} : { googleStatus: error.status }),
+                ...(error === null ? {} : { upstreamCode: error.status }),
               },
       };
     }

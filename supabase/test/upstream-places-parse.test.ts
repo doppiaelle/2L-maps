@@ -135,14 +135,14 @@ describe('when Google refuses, it says why and we keep it', () => {
     spy.mockRestore();
 
     const line = JSON.parse(logged[0] ?? '{}') as Record<string, unknown>;
-    expect(line['event']).toBe('google_refused');
-    expect(line['googleStatus']).toBe('INVALID_ARGUMENT');
+    expect(line['event']).toBe('upstream_refused');
+    expect(line['upstreamCode']).toBe('INVALID_ARGUMENT');
     expect(String(line['message'])).toContain('included_primary_types[0]');
     // And the caller learns it too, so a 404 on one address is distinguishable
     // from a key that is not authorised for the API at all.
     expect(outcome).toMatchObject({
       ok: false,
-      failure: { kind: 'rejected', status: 400, googleStatus: 'INVALID_ARGUMENT' },
+      failure: { kind: 'rejected', status: 400, upstreamCode: 'INVALID_ARGUMENT' },
     });
   });
 
