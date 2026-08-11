@@ -3,8 +3,9 @@ import { FlatList, Pressable, Text, View } from 'react-native';
 import { StateView } from '@/components/feedback/StateView';
 import { Skeleton } from '@/components/primitives/Skeleton';
 import { StatusChip } from '@/components/primitives/StatusChip';
-import { layout, radius, space } from '@/lib/design/tokens';
+import { colours, layout, radius, space } from '@/lib/design/tokens';
 import type { ThemeName } from '@/lib/design/tokens';
+import type { SaveNotice } from '@/lib/route/save-notice';
 import { historyRowOf } from '@/lib/route/history-row';
 import type { SavedRouteSummary } from '@/lib/route/persistence';
 import { LIST_VIRTUALISATION_THRESHOLD } from '@/types';
@@ -38,6 +39,18 @@ export interface HistoryViewProps {
   onRetry: () => void;
   onUpgrade: () => void;
   onDismiss: () => void;
+  /**
+   * A route that has not reached the server yet, and why.
+   *
+   * **It is said here rather than over the route** ([ADR-0027](../../docs/adr/0027-the-drive-happens-elsewhere.md)).
+   * What has gone wrong is that a route is missing from *this* list, so this is
+   * where a driver can act on it — and Confirm, which they press to set off, is
+   * never covered by a panel about filing. The previous placement was worse than
+   * useless: it sat on the pill and its own dismiss button re-ran the write, so
+   * a repeated failure reopened it immediately.
+   */
+  readonly notice?: SaveNotice | null;
+  onRetryNotice?: () => void;
   readonly theme: ThemeName;
   readonly testID?: string;
 }
@@ -51,6 +64,8 @@ export function HistoryView({
   onRetry,
   onUpgrade,
   onDismiss,
+  notice = null,
+  onRetryNotice,
   theme,
   testID,
 }: HistoryViewProps): React.JSX.Element {
@@ -59,6 +74,40 @@ export function HistoryView({
       <Text accessibilityRole="header" className="text-title-md text-text-primary">
         History
       </Text>
+
+      {notice !== null && (
+        // Above the list, in the flow rather than over it: nothing here is
+        // urgent enough to cover a row, and the driver's work is safe on the
+        // phone either way — which is what it says.
+        <View
+          style={{
+            marginTop: space.space4,
+            padding: space.space3,
+            borderRadius: radius.radiusMd,
+            borderWidth: 1,
+            borderColor: colours[theme].border,
+            borderLeftWidth: 3,
+            borderLeftColor: colours[theme].warning,
+          }}
+          accessibilityLiveRegion="polite"
+          testID="history-save-notice"
+        >
+          <Text className="text-body-strong text-text-primary">{notice.title}</Text>
+          <Text className="text-caption text-text-secondary mt-space-1">{notice.detail}</Text>
+
+          {notice.canRetry && onRetryNotice !== undefined && (
+            <Pressable
+              onPress={onRetryNotice}
+              accessibilityRole="button"
+              accessibilityLabel="Try saving this route again"
+              style={{ minHeight: layout.touchMin, justifyContent: 'center' }}
+              testID="history-save-retry"
+            >
+              <Text className="text-body-strong text-accent">Try again</Text>
+            </Pressable>
+          )}
+        </View>
+      )}
 
       {isLoading && <LoadingRows />}
 

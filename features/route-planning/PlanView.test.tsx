@@ -190,6 +190,31 @@ describe('the map’s own controls', () => {
   });
 });
 
+describe('getting back to the map', () => {
+  it('offers a way back when a result is still in hand', () => {
+    // The menu control used to discard the result, so the only way back to the
+    // map was to spend another unit of quota on an answer we were still holding
+    // (ADR-0027 / ADR-0022).
+    renderPlan({ hasResult: true }, allowed, { onShowMap: noop });
+    expect(screen.getByLabelText('Show the optimized route on the map')).toBeTruthy();
+  });
+
+  it('offers none when there is no route drawn to go back to', () => {
+    // A button that leads nowhere is worse than no button.
+    renderPlan({});
+    expect(screen.queryByTestId('plan-show-map')).toBeNull();
+  });
+
+  it('keeps it off the map, where it would mean nothing', () => {
+    renderPlan({ hasResult: true }, allowed, {
+      view: 'map',
+      mapSlot: <RNText>map</RNText>,
+      onShowMap: noop,
+    });
+    expect(screen.queryByTestId('plan-show-map')).toBeNull();
+  });
+});
+
 describe('what left with Done and Skip', () => {
   it('offers Confirm and nothing beside it once a route is optimized', () => {
     // The per-stop loop is gone: the drive happens inside a navigation app and

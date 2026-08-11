@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-
 import { Text } from 'react-native';
 
 import { HistoryView } from './HistoryView';
+import { saveNoticeOf } from '@/lib/route/save-notice';
 import { useOpenRoute } from './use-open-route';
 import { useRouteSync } from './use-route-sync';
 import { useSavedRoutes } from './use-saved-routes';
@@ -245,6 +246,55 @@ describe('what History shows', () => {
     renderHistory({ routes: [summary({ status: 'optimized' })] });
     expect(screen.queryByText('In progress', { includeHiddenElements: true })).toBeNull();
     expect(screen.queryByText('Done', { includeHiddenElements: true })).toBeNull();
+  });
+});
+
+describe('a route that has not reached the server', () => {
+  const noop = () => undefined;
+
+  const renderHistory = (props: Partial<Parameters<typeof HistoryView>[0]> = {}) =>
+    render(
+      <HistoryView
+        routes={[summary()]}
+        locked={[]}
+        isLoading={false}
+        isUnavailable={false}
+        onOpen={noop}
+        onRetry={noop}
+        onUpgrade={noop}
+        onDismiss={noop}
+        theme="light"
+        {...props}
+      />,
+    );
+
+  it('says so here, where the route is missing from', () => {
+    // It used to be a toast over the route section, sitting on the Confirm pill
+    // — and its own dismiss button re-ran the write, so a repeated failure
+    // reopened it immediately (ADR-0027).
+    renderHistory({
+      notice: saveNoticeOf({ kind: 'offline' }),
+      onRetryNotice: noop,
+    });
+
+    expect(screen.getByTestId('history-save-notice')).toBeTruthy();
+    expect(screen.getByText(/safe on this phone/)).toBeTruthy();
+    expect(screen.getByTestId('history-save-retry')).toBeTruthy();
+  });
+
+  it('withholds the retry where retrying repeats the same refusal', () => {
+    renderHistory({
+      notice: saveNoticeOf({ kind: 'not-permitted' }),
+      onRetryNotice: noop,
+    });
+
+    expect(screen.getByTestId('history-save-notice')).toBeTruthy();
+    expect(screen.queryByTestId('history-save-retry')).toBeNull();
+  });
+
+  it('says nothing at all while everything is in step', () => {
+    renderHistory({ notice: saveNoticeOf(null) });
+    expect(screen.queryByTestId('history-save-notice')).toBeNull();
   });
 });
 

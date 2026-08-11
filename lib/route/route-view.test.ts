@@ -150,3 +150,21 @@ describe('how long the wait is allowed to be invisible', () => {
     expect(PREPARING_DELAY_MS).toBe(1_000);
   });
 });
+
+describe('a second optimization on a route that already has one', () => {
+  it('opens the map again from the list', () => {
+    // The screen used to key this effect on `result !== null`, so pressing
+    // Optimize a second time changed nothing it could observe — the boolean was
+    // already true — and the answer never appeared. `routeViewAfter` was always
+    // right; what reached it was not.
+    expect(routeViewAfter({ kind: 'result-arrived' }, { current: 'list', hasResult: true })).toBe(
+      'map',
+    );
+  });
+
+  it('returns to the map from the list without a new result', () => {
+    // "Show route" replays the same event. Returning to an answer already in
+    // hand must never cost a unit of quota.
+    expect(routeViewAfter({ kind: 'result-arrived' }, listing)).toBe('map');
+  });
+});

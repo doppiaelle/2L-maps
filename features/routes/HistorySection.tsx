@@ -4,6 +4,8 @@ import { HistoryView } from './HistoryView';
 import { useOpenRoute } from './use-open-route';
 import { useSavedRoutes } from './use-saved-routes';
 import type { ThemeName } from '@/lib/design/tokens';
+import { saveNoticeOf } from '@/lib/route/save-notice';
+import type { SaveFailure } from '@/lib/supabase/routes-adapter';
 
 /**
  * History, as a dock section.
@@ -23,10 +25,25 @@ export interface HistorySectionProps {
   /** Called once a route has actually been restored. Closing before the store
    *  has the route would show the map with the previous one still on it. */
   onOpenRoute: () => void;
+  /**
+   * The last write to the server that did not land, or null.
+   *
+   * **It arrives as a prop rather than from a second `useRouteSync()`.** Two
+   * instances of that hook would be two independent write queues for one route,
+   * and the second would happily upsert over the first. The screen owns the one
+   * instance and hands the outcome down.
+   */
+  readonly saveFailure?: SaveFailure | null;
+  onRetrySave?: () => void;
   readonly theme: ThemeName;
 }
 
-export function HistorySection({ onOpenRoute, theme }: HistorySectionProps): React.JSX.Element {
+export function HistorySection({
+  onOpenRoute,
+  saveFailure = null,
+  onRetrySave,
+  theme,
+}: HistorySectionProps): React.JSX.Element {
   const saved = useSavedRoutes();
   const { open } = useOpenRoute();
 
@@ -42,6 +59,8 @@ export function HistorySection({ onOpenRoute, theme }: HistorySectionProps): Rea
         });
       }}
       onRetry={saved.refetch}
+      notice={saveNoticeOf(saveFailure)}
+      {...(onRetrySave === undefined ? {} : { onRetryNotice: onRetrySave })}
       onUpgrade={() => {
         router.push('/paywall');
       }}

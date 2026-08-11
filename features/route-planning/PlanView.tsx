@@ -62,6 +62,14 @@ export interface PlanViewProps {
    *  mean. */
   onDismissMap?: () => void;
   /**
+   * Back to the drawn route, from the list.
+   *
+   * The other half of the menu control. Passed only when there is a result to
+   * return to, so it is never a button that leads nowhere — and returning costs
+   * nothing, because the result is in memory and the canvas is drawn from it.
+   */
+  onShowMap?: () => void;
+  /**
    * What the hop the driver just tapped measures, or nothing tapped.
    *
    * Two numbers, both of them Google's own answer for that segment and both
@@ -148,6 +156,7 @@ export function PlanView({
   view = 'list',
   mapSlot,
   onDismissMap,
+  onShowMap,
   selectedLeg = null,
   bottomInset = 0,
   theme,
@@ -407,6 +416,25 @@ export function PlanView({
             >
               <Text className="text-body text-accent">Paste a list</Text>
             </Pressable>
+
+            {onShowMap !== undefined && (
+              // Only when there is a route drawn to go back to. Says what it
+              // shows rather than naming the surface: "map" is where it is, and
+              // the route is what the user is going to look at.
+              <Pressable
+                onPress={onShowMap}
+                accessibilityRole="button"
+                accessibilityLabel="Show the optimized route on the map"
+                style={{
+                  minHeight: layout.touchMin,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                testID="plan-show-map"
+              >
+                <Text className="text-body text-accent">Show route</Text>
+              </Pressable>
+            )}
           </View>
         )}
       </View>

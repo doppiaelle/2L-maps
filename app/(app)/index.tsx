@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Linking, View, useColorScheme } from 'react-native';
 
 import { useHandoff } from '@/features/handoff/use-handoff';
@@ -35,7 +35,6 @@ import { buildRouteGeometry, connectorsThrough, planRoute } from '@/lib/map/rout
 import { PREPARING_DELAY_MS, routeViewAfter, showsCanvas, showsMap } from '@/lib/route/route-view';
 import type { RouteView } from '@/lib/route/route-view';
 import { handoffNoticeOf } from '@/lib/handoff/outcome-notice';
-import { saveNoticeOf } from '@/lib/route/save-notice';
 import { newRouteId } from '@/lib/route/route-id';
 import { actionIntentOf, planStateOf } from '@/lib/route/plan-state';
 import { unreachableIn } from '@/lib/route/progress';
@@ -75,7 +74,6 @@ export default function PlanScreen(): React.JSX.Element {
   const undoRemove = useDraftRouteStore((store) => store.undoRemove);
   const moveStopTo = useDraftRouteStore((store) => store.moveStopTo);
   const resetDraft = useDraftRouteStore((store) => store.reset);
-  const clearResult = useDraftRouteStore((store) => store.clearResult);
   const applyResolvedCoordinates = useDraftRouteStore((store) => store.applyResolvedCoordinates);
 
   // What the undo toast is offering. Null means nothing was just removed —
@@ -111,7 +109,6 @@ export default function PlanScreen(): React.JSX.Element {
    * simply not in History (ADR-0027).
    */
   const routeSync = useRouteSync();
-  const saveNotice = saveNoticeOf(routeSync.failure);
 
   // The signal coming back is the interesting edge: the server's copy is behind
   // by whatever the driver did underground. Pushes first, then re-reads.
@@ -234,27 +231,45 @@ export default function PlanScreen(): React.JSX.Element {
     lastFailure: failure === null ? null : failure.kind === 'offline' ? 'offline' : 'upstream',
   });
 
-  // A result arriving is the one thing that opens the map, and it does so
-  // without a second tap: the user pressed Optimize and this is the answer.
-  const hasResult = result !== null;
+  /**
+   * A result arriving is the one thing that opens the map, and it does so
+   * without a second tap: the user pressed Optimize and this is the answer.
+   *
+   * **Keyed on the result, not on whether one exists.** It used to depend on
+   * `result !== null`, so pressing Optimize a second time changed nothing the
+   * effect could see — the boolean was already true — and the map never opened.
+   * A new result is a new object, and that is the event.
+   */
   useEffect(() => {
     // A hop belongs to the result it was measured on. Carrying the index across
     // a new optimization would highlight a different segment and show it the old
     // numbers.
     setSelectedLegIndex(null);
-  }, [result]);
 
-  useEffect(() => {
-    if (hasResult)
+    if (result !== null) {
       setRouteView((current) =>
         routeViewAfter({ kind: 'result-arrived' }, { current, hasResult: true }),
       );
-  }, [hasResult]);
+    }
+  }, [result]);
 
-  // Every edit leaves the map, because the result no longer describes the stops
-  // that are there. A map of the previous route is worse than no map: it looks
-  // current.
-  const editSignature = draft.stops.map((stop) => stop.id).join(',');
+  /**
+   * Every edit leaves the map, because the result no longer describes the stops
+   * that are there. A map of the previous route is worse than no map: it looks
+   * current.
+   *
+   * **The signature is the stop *set*, not the order** — and that is the whole
+   * of "sometimes Optimize stays on the list". A successful optimization
+   * reorders `draft.stops`, so an order-based signature changed at the moment
+   * the result landed, and this effect ran *after* the one above and put the
+   * list straight back. It only happened when the optimizer actually moved
+   * something, which is exactly why it looked intermittent.
+   *
+   * A reorder the *user* performs still leaves the map, by a different and
+   * sounder route: `moveStopTo` clears the result, so `showsMap` has nothing to
+   * draw.
+   */
+  const editSignature = [...draft.stops.map((stop) => stop.id)].sort().join(',');
   useEffect(() => {
     setRouteView((current) => routeViewAfter({ kind: 'edited' }, { current, hasResult: false }));
     setHandoffNotice(null);
@@ -269,13 +284,19 @@ export default function PlanScreen(): React.JSX.Element {
    * work that did not have to be done again. Anything that flashes for 200 ms
    * reads as a glitch (`docs/03_USER_JOURNEYS.md` J1).
    *
-   * The timer is cleared on the way out, so a result that lands at 900 ms never
-   * gets overwritten by a waiting face scheduled before it arrived.
+   * The timer is cleared on the way out **and the callback checks again before
+   * it acts**. A result landing at 990 ms would otherwise be covered by a
+   * waiting face scheduled before it arrived — the cleanup and the callback race
+   * within the same tick, and one guard cannot be relied on to win.
    */
+  const isOptimizingRef = useRef(isOptimizing);
+  isOptimizingRef.current = isOptimizing;
+
   useEffect(() => {
     if (!isOptimizing) return;
 
     const timer = setTimeout(() => {
+      if (!isOptimizingRef.current) return;
       setRouteView((current) =>
         routeViewAfter({ kind: 'optimize-started' }, { current, hasResult: false }),
       );
@@ -367,13 +388,31 @@ export default function PlanScreen(): React.JSX.Element {
                 : legSummary(selectedLegIndex, geometry.legs)
             }
             onDismissMap={() => {
-              // The result goes; the stops stay. "Back to the list" with an
-              // empty list would not be back to anything.
-              clearResult();
+              /**
+               * **The result stays.** This used to call `clearResult()`, so the
+               * three lines threw away an optimization the user had already paid
+               * for: the route stopped being optimized, Confirm turned back into
+               * Optimize, and the only way back to the map was to spend another
+               * unit of quota on an answer we were still holding.
+               *
+               * What the control says is "back to the stop list", and that is now
+               * all it does. `onShowMap` is the way back.
+               */
               setRouteView(
                 routeViewAfter({ kind: 'dismissed' }, { current: routeView, hasResult: true }),
               );
             }}
+            // Only offered when there is a drawn route to return to. Free: the
+            // result is in memory and the canvas is drawn from it.
+            {...(result === null
+              ? {}
+              : {
+                  onShowMap: () => {
+                    setRouteView((current) =>
+                      routeViewAfter({ kind: 'result-arrived' }, { current, hasResult: true }),
+                    );
+                  },
+                })}
             stops={rows}
             distance={distance}
             duration={duration}
@@ -464,7 +503,16 @@ export default function PlanScreen(): React.JSX.Element {
 
       {activeSection === 'history' && (
         <SectionPanel theme={theme} topInset={insets.top} testID="section-history">
-          <HistorySection onOpenRoute={closeSection} theme={theme} />
+          {/* The failure belongs here rather than over the route. What has gone
+              wrong is that a route is *not in History*, so History is where it
+              is said — and Confirm, which the driver presses to set off, is
+              never covered by a panel about filing. */}
+          <HistorySection
+            onOpenRoute={closeSection}
+            saveFailure={routeSync.failure}
+            onRetrySave={routeSync.sync}
+            theme={theme}
+          />
         </SectionPanel>
       )}
 
@@ -487,30 +535,6 @@ export default function PlanScreen(): React.JSX.Element {
         theme={theme}
         testID="plan-dock"
       />
-
-      {saveNotice !== null && handoffNotice === null && (
-        // Below the handoff notice in priority: if both are true the driver is
-        // about to leave the app, and "your route did not reach History" is not
-        // what they need to read while setting off. It stays until dismissed —
-        // the whole failure of the old behaviour was silence.
-        <NoticeToast
-          title={saveNotice.title}
-          detail={saveNotice.detail}
-          kind={saveNotice.kind}
-          bottomOffset={DOCK_OUTER_HEIGHT + insets.bottom + space.space2}
-          theme={theme}
-          {...(saveNotice.canRetry
-            ? { action: { label: 'Try again', onPress: routeSync.sync } }
-            : {})}
-          onDismiss={() => {
-            // Dismissing hides the message, not the problem. There is nothing to
-            // clear: `failure` is whatever the last write produced, and the next
-            // one replaces it — including with null.
-            routeSync.sync();
-          }}
-          testID="plan-save-notice"
-        />
-      )}
 
       {handoffNotice !== null && (
         // No timer on this one. A route split into three parts, or a navigation

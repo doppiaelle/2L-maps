@@ -112,6 +112,15 @@ export function useRouteSync(): RouteSync {
       return;
     }
 
+    /**
+     * Named in a log line, because "it can't be failing" has to be checkable.
+     *
+     * The **kind only** — no address, no place id, no route id. Which of the
+     * five it is decides whether this is a connection, an unresolved place, a
+     * policy refusal or our own state machine, and those have entirely different
+     * fixes (`CLAUDE.md` §9 rule 7).
+     */
+    console.warn(`[route-sync] save failed, kind=${outcome.failure.kind}`);
     setFailure(outcome.failure);
   }, [services, session?.userId, draft, result, status, queryClient]);
 
