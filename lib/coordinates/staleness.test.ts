@@ -36,7 +36,6 @@ const stop = (placeId: string, coord: CoordinateCache | null): Stop => ({
   position: 0,
   entryOrder: 0,
   coordinate: coord,
-  isCompleted: false,
 });
 
 describe('the 30-day boundary', () => {

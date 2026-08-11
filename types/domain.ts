@@ -76,7 +76,11 @@ export interface Stop {
   readonly entryOrder: number;
   /** Null whenever the cache has expired or was never populated (ADR-0007). */
   readonly coordinate: CoordinateCache | null;
-  readonly isCompleted: boolean;
+  // `isCompleted` used to live here. It was the driver's answer to the Done
+  // button, and both are gone: the drive happens inside a navigation app, so
+  // nobody is in this one to say a stop is finished
+  // ([ADR-0027](../docs/adr/0027-the-drive-happens-elsewhere.md)). The column
+  // survives in the schema and is read back through `readStopState`.
 }
 
 /**

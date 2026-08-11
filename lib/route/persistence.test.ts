@@ -1,6 +1,7 @@
 import {
   ROUTE_STATUSES,
   canTransition,
+  completeSupersededRoute,
   displayName,
   fromRows,
   partitionByAllowance,
@@ -42,7 +43,6 @@ const stop = (id: string, position: number, overrides: Partial<Stop> = {}): Stop
     refreshedAt: new Date().toISOString(),
   },
   placeText: null,
-  isCompleted: false,
   ...overrides,
 });
 
@@ -133,23 +133,52 @@ describe('the lifecycle', () => {
 
 describe('what status a route is in', () => {
   it('is draft before anything has happened', () => {
-    expect(statusFor({ isOptimized: false, isUnderway: false, isFinished: false })).toBe('draft');
+    expect(statusFor({ isOptimized: false, isUnderway: false })).toBe('draft');
   });
 
   it('is optimized once a result produced the order', () => {
-    expect(statusFor({ isOptimized: true, isUnderway: false, isFinished: false })).toBe(
-      'optimized',
-    );
+    expect(statusFor({ isOptimized: true, isUnderway: false })).toBe('optimized');
   });
 
   it('lets in-progress outrank optimized', () => {
-    expect(statusFor({ isOptimized: true, isUnderway: true, isFinished: false })).toBe(
-      'in_progress',
-    );
+    expect(statusFor({ isOptimized: true, isUnderway: true })).toBe('in_progress');
   });
 
-  it('lets finished outrank everything', () => {
-    expect(statusFor({ isOptimized: true, isUnderway: true, isFinished: true })).toBe('completed');
+  it('never derives completed, because nothing in the app can observe it', () => {
+    // There is no Done button and no last stop to mark (ADR-0027). Deriving
+    // `completed` from anything available here would be a guess about a driver
+    // who is not holding the phone.
+    for (const isOptimized of [true, false]) {
+      for (const isUnderway of [true, false]) {
+        expect(statusFor({ isOptimized, isUnderway })).not.toBe('completed');
+      }
+    }
+  });
+});
+
+describe('what closes a day', () => {
+  it('completes the previous route once it has been handed over', () => {
+    expect(completeSupersededRoute({ routeId: 'route-1', status: 'in_progress' })).toEqual({
+      routeId: 'route-1',
+      from: 'in_progress',
+      to: 'completed',
+    });
+  });
+
+  it('leaves a route that was optimized and abandoned alone', () => {
+    // It was never driven. Marking it completed would put a day in History that
+    // did not happen.
+    expect(completeSupersededRoute({ routeId: 'route-1', status: 'optimized' })).toBeNull();
+    expect(completeSupersededRoute({ routeId: 'route-1', status: 'draft' })).toBeNull();
+  });
+
+  it('does nothing when there was no previous route', () => {
+    expect(completeSupersededRoute(null)).toBeNull();
+  });
+
+  it('never re-closes a route that is already completed', () => {
+    expect(completeSupersededRoute({ routeId: 'route-1', status: 'completed' })).toBeNull();
+    expect(completeSupersededRoute({ routeId: 'route-1', status: 'archived' })).toBeNull();
   });
 });
 
@@ -159,7 +188,6 @@ describe('a draft as rows', () => {
     // coordinate written there is a breach nothing would ever clean up.
     const { stops } = toRows(draftWith([stop('a', 0), stop('b', 1)]), 'user-1', {
       status: 'draft',
-      progress: null,
       totals: null,
     });
 
@@ -173,7 +201,7 @@ describe('a draft as rows', () => {
     const { stops } = toRows(
       draftWith([stop('a', 0, { label: 'Back entrance', note: 'Ring twice' })]),
       'user-1',
-      { status: 'draft', progress: null, totals: null },
+      { status: 'draft', totals: null },
     );
 
     expect(stops[0]?.label).toBe('Back entrance');
@@ -185,7 +213,6 @@ describe('a draft as rows', () => {
     // returned, which is what "already the fastest order" is measured against.
     const { stops } = toRows(draftWith([stop('a', 0)]), 'user-1', {
       status: 'draft',
-      progress: null,
       totals: null,
     });
     expect(stops[0]?.optimized_order).toBeNull();
@@ -194,7 +221,6 @@ describe('a draft as rows', () => {
   it('records the optimized order once there is one', () => {
     const { stops } = toRows(draftWith([stop('a', 0)], { isOptimized: true }), 'user-1', {
       status: 'optimized',
-      progress: null,
       totals: null,
     });
     expect(stops[0]?.optimized_order).toBe(0);
@@ -206,7 +232,6 @@ describe('a draft as rows', () => {
       'user-1',
       {
         status: 'optimized',
-        progress: null,
         totals: {
           tier: 'T0',
           distanceMeters: 1000,
@@ -219,14 +244,24 @@ describe('a draft as rows', () => {
     expect(route.optimization_tier).toBe('T0');
   });
 
-  it('carries progress onto the rows', () => {
+  it('carries the optimizer’s unreachable stops onto the rows', () => {
+    // The only stop state left, and the only one the user cannot cause.
     const { stops } = toRows(draftWith([stop('a', 0), stop('b', 1)]), 'user-1', {
       status: 'in_progress',
-      progress: { routeId: 'route-1', states: { a: 'completed', b: 'skipped' } },
+      unreachableStopIds: ['b'],
       totals: null,
     });
 
-    expect(stops.map((row) => row.state)).toEqual(['completed', 'skipped']);
+    expect(stops.map((row) => row.state)).toEqual(['pending', 'unreachable']);
+  });
+
+  it('writes every stop pending when nothing has been optimized yet', () => {
+    const { stops } = toRows(draftWith([stop('a', 0), stop('b', 1)]), 'user-1', {
+      status: 'draft',
+      totals: null,
+    });
+
+    expect(stops.map((row) => row.state)).toEqual(['pending', 'pending']);
   });
 });
 
@@ -284,19 +319,30 @@ describe('rows as a draft', () => {
 });
 
 describe('progress across devices', () => {
-  it('restores what was already done on a route underway', () => {
-    const progress = progressFromRows(routeRow({ status: 'in_progress' }), [
-      stopRow({ id: 'a', state: 'completed' }),
-      stopRow({ id: 'b', state: 'pending' }),
-    ]);
+  it('restores the departure of a route another device set off on', () => {
+    // The write that moved the route to `in_progress` *is* the handoff, so its
+    // timestamp is the route's start time. A second phone opening the route has
+    // to land on a day in progress, not on a plan.
+    const progress = progressFromRows(
+      routeRow({ status: 'in_progress' }),
+      '2026-08-11T05:15:00.000Z',
+    );
 
-    expect(progress).toEqual({ routeId: 'route-1', states: { a: 'completed' } });
+    expect(progress).toEqual({ routeId: 'route-1', startedAt: '2026-08-11T05:15:00.000Z' });
   });
 
-  it('has no progress for a route that has not started', () => {
-    // A draft with progress attached would put a plan into the in-progress
-    // state on launch, which outranks everything else the user might want.
-    expect(progressFromRows(routeRow({ status: 'optimized' }), [stopRow()])).toBeNull();
+  it('has no progress for a route that has not been handed over', () => {
+    // A plan with progress attached would show a day underway on launch, hide
+    // the ads slot and change what the dock emphasises — all for a route
+    // nobody has driven.
+    expect(progressFromRows(routeRow({ status: 'optimized' }), '2026-08-11T05:15:00Z')).toBeNull();
+    expect(progressFromRows(routeRow({ status: 'draft' }), '2026-08-11T05:15:00Z')).toBeNull();
+  });
+
+  it('has no progress for a route that is already finished', () => {
+    // `completed` is behind the driver. Restoring it as underway would put a
+    // closed day back on the screen as the current one.
+    expect(progressFromRows(routeRow({ status: 'completed' }), '2026-08-11T05:15:00Z')).toBeNull();
   });
 });
 

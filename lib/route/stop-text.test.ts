@@ -29,7 +29,6 @@ const stop = (overrides: Partial<Stop> = {}): Stop => ({
   position: 0,
   entryOrder: 0,
   coordinate: null,
-  isCompleted: false,
   ...overrides,
 });
 

@@ -34,7 +34,6 @@ const stop = (id: string, position: number, withCoordinate = true): Stop => ({
         refreshedAt: new Date().toISOString(),
       }
     : null,
-  isCompleted: false,
 });
 
 interface Harness {
@@ -53,7 +52,7 @@ function Probe({
   open: (url: string) => Promise<boolean>;
   order: string[];
 }): React.JSX.Element {
-  const handoff = useHandoff({ stops, resolved: new Map(), open });
+  const handoff = useHandoff({ routeId: 'route-1', stops, resolved: new Map(), open });
 
   return (
     <Text
@@ -115,11 +114,13 @@ describe('the ordering that cannot be got wrong', () => {
     expect(order[1]).toBe('opened');
   });
 
-  it('marks nothing completed, because departing is not arriving', async () => {
-    // Marking on departure would show a route finished by a driver still in the
-    // van.
+  it('records the route it was actually given', async () => {
+    // **It used to write `stops[0].id` here**, so the record named a stop and
+    // matched no route — including the one the lifecycle was about to move to
+    // `in_progress`. That is one half of why a started route never reached
+    // History.
     await run([stop('a', 0), stop('b', 1)]);
-    expect(useRouteProgressStore.getState().stateOfStop('a')).toBe('pending');
+    expect(useRouteProgressStore.getState().progress?.routeId).toBe('route-1');
   });
 
   it('leaves the route underway when the other app does not come up', async () => {
@@ -131,14 +132,15 @@ describe('the ordering that cannot be got wrong', () => {
     expect(useRouteProgressStore.getState().progress).not.toBeNull();
   });
 
-  it('does not restart a route already underway', async () => {
-    useRouteProgressStore.getState().begin('route-1');
-    useRouteProgressStore.getState().mark('a', 'completed');
+  it('records a second departure rather than keeping the first', async () => {
+    // A driver who closes Google Maps at lunch and presses Confirm again in the
+    // afternoon has set off again, and the afternoon is the current departure.
+    useRouteProgressStore.getState().begin('route-1', new Date('2026-08-11T05:00:00.000Z'));
 
     await run([stop('a', 0), stop('b', 1)]);
-    // `run` abandons first, so this asserts the guard rather than the fixture:
-    // a second handoff mid-route must not wipe the marks already made.
-    expect(useRouteProgressStore.getState().progress).not.toBeNull();
+    expect(useRouteProgressStore.getState().progress?.startedAt).not.toBe(
+      '2026-08-11T05:00:00.000Z',
+    );
   });
 });
 

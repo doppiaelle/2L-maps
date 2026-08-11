@@ -53,7 +53,6 @@ const stop = (id: string, position: number): Stop => ({
   position,
   entryOrder: position,
   coordinate: null,
-  isCompleted: false,
 });
 
 const fakeRoutes = (overrides: Partial<RoutesProvider> = {}) => {
@@ -254,7 +253,7 @@ function OpenProbe({ routeId }: { routeId: string }): React.JSX.Element {
       {JSON.stringify({
         routeId: draft.routeId,
         stops: draft.stops.length,
-        marks: progress === null ? null : Object.keys(progress.states).length,
+        startedAt: progress?.startedAt ?? null,
         failure,
       })}
     </Text>
@@ -262,9 +261,10 @@ function OpenProbe({ routeId }: { routeId: string }): React.JSX.Element {
 }
 
 describe('opening a saved route', () => {
-  it('restores the route and its progress together', async () => {
-    // A route restored without its progress puts a driver back at stop one on a
-    // day they are halfway through — data loss arrived at differently.
+  it('restores the route and its departure together', async () => {
+    // A route restored without its departure shows a day in progress as a plan
+    // — and hides it from the dock's emphasis and from the ads rule. Both
+    // halves land or neither does.
     const { provider } = fakeRoutes({
       load: async () => ({
         draft: {
@@ -277,7 +277,7 @@ describe('opening a saved route', () => {
           isDegraded: false,
         },
         status: 'in_progress' as RouteStatus,
-        progress: { routeId: 'route-9', states: { a: 'completed' as const } },
+        progress: { routeId: 'route-9', startedAt: '2026-08-11T05:15:00.000Z' },
       }),
     });
 
@@ -289,7 +289,7 @@ describe('opening a saved route', () => {
     const state = screen.getByTestId('probe').props.children as string;
     expect(state).toContain('"routeId":"route-9"');
     expect(state).toContain('"stops":2');
-    expect(state).toContain('"marks":1');
+    expect(state).toContain('"startedAt":"2026-08-11T05:15:00.000Z"');
   });
 
   it('reports a route it cannot see as not found, without saying whose it is', async () => {

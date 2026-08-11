@@ -1,149 +1,88 @@
-import type { Stop } from '@/types';
+import type { OptimizationResult } from '@/types';
 
 /**
- * Route progress — which stop the user is on, what they finished, what they
- * skipped.
+ * A route that has been handed over.
  *
- * Pure functions, so the store above them holds state and decides nothing. This
- * is the most safety-critical state in the product: it is written **before**
- * every external handoff and never after
- * (docs/11_STATE_MANAGEMENT.md §7, docs/16_INTERNAL_NAVIGATION.md). The app is
- * backgrounded for the whole drive and can be killed at any moment, so a write
- * ordered after the launch is lost exactly when the user has invested most.
+ * **This module used to track which stops the driver had finished.** It held a
+ * map of marks, a next-stop cursor, a completion summary and a re-optimization
+ * filter — the machinery behind two buttons, Done and Skip, that the driver
+ * pressed once per stop on returning to the app.
+ *
+ * They are gone, and so is the machinery ([ADR-0027](../../docs/adr/0027-the-drive-happens-elsewhere.md)).
+ * The product does not navigate ([ADR-0004](../../docs/adr/0004-external-navigation-handoff.md)):
+ * it hands the day to Google Maps or Waze, which drives the whole multi-stop
+ * route itself. The driver never comes back between stops, so nobody was there
+ * to press either button, and a screen asking "did you deliver that one?" of
+ * someone who left an hour ago is a question with no answer.
+ *
+ * What remains is the one fact this product can still honestly assert: **that a
+ * route was handed over, and when.** Not that it was finished — we cannot know
+ * that, and `route_status` moving to `completed` is what starting the *next*
+ * route means (`lib/route/persistence.ts`).
+ *
+ * The ordering rule that governed this module still governs it: progress is
+ * written **before** the handoff and never after
+ * ([`docs/11_STATE_MANAGEMENT.md`](../../docs/11_STATE_MANAGEMENT.md) §7). The app
+ * is backgrounded for the whole drive and can be killed at any moment, so a
+ * write ordered after the launch is lost exactly when the user has invested
+ * most. There is simply far less to write now.
  */
 
-export type StopProgressState = 'pending' | 'completed' | 'skipped' | 'unreachable';
+/**
+ * What a stop looks like on the list and on the map.
+ *
+ * Two states, and the interesting one does not come from the user at all:
+ * `unreachable` is the optimizer reporting that no road connects a stop to the
+ * rest of the route, and it arrives on `OptimizationResult.unreachableStopIds`.
+ * It stays a *state* rather than a boolean because a marker and a row both style
+ * themselves from it, and because the database column it maps to is an enum.
+ *
+ * The enum in the database still carries `completed` and `skipped`, because rows
+ * written before ADR-0027 still hold them and dropping the column would be a
+ * breaking change to a stored shape for no gain. `StopRow.state` is therefore
+ * deliberately wider than this type (`lib/route/persistence.ts`).
+ */
+export type StopProgressState = 'pending' | 'unreachable';
 
 export interface RouteProgress {
   readonly routeId: string;
-  /** Keyed by stop id. A stop absent from this map is pending. */
-  readonly states: Readonly<Record<string, StopProgressState>>;
+  /** When the route was handed to a navigation app, as an ISO instant. The
+   *  product's only evidence that the day was actually driven. */
+  readonly startedAt: string;
 }
 
-export function emptyProgress(routeId: string): RouteProgress {
-  return { routeId, states: {} };
-}
-
-export function stateOf(progress: RouteProgress, stopId: string): StopProgressState {
-  return progress.states[stopId] ?? 'pending';
+/** A route just handed over. `at` is injected rather than read from a clock here,
+ *  so the store above stays the only thing that knows what time it is. */
+export function startedRoute(routeId: string, at: Date): RouteProgress {
+  return { routeId, startedAt: at.toISOString() };
 }
 
 /**
- * Mark a stop.
+ * Which stops the map and the list should mark as unreachable.
  *
- * Returns a new progress rather than mutating, so a caller cannot hold a stale
- * reference that silently diverges from what was persisted.
- *
- * Marking is idempotent and re-markable in both directions: a user who taps Done
- * by mistake must be able to undo it, and a stop marked skipped that they then
- * visit must be markable complete. Neither is an error, and refusing either would
- * strand them mid-route with no way out.
+ * A tiny function for a rule that used to be spread across a progress map, a
+ * store selector and two components: **the optimizer decides this, nothing
+ * else.** A stop is unreachable because no road connects it, not because of
+ * anything the user did.
  */
-export function markStop(
-  progress: RouteProgress,
+export function stopStateOf(
   stopId: string,
-  state: StopProgressState,
-): RouteProgress {
-  return { ...progress, states: { ...progress.states, [stopId]: state } };
-}
-
-/** A stop the user has dealt with, one way or another. */
-function isSettled(state: StopProgressState): boolean {
-  return state !== 'pending';
+  unreachableStopIds: readonly string[],
+): StopProgressState {
+  return unreachableStopIds.includes(stopId) ? 'unreachable' : 'pending';
 }
 
 /**
- * The next stop to navigate to.
+ * The unreachable stops a result names, if it is the kind of result that can.
  *
- * Skipped stops are **not** revisited automatically: the user chose to pass them,
- * and silently routing back would override a decision they made deliberately.
- * They remain in the list, visible, and can be marked complete later — but they
- * do not claim the next-stop position (docs/15_ROUTE_OPTIMIZATION.md).
- *
- * Unreachable stops are likewise not offered: the engine could not route to them,
- * so sending the user there is sending them to a known failure.
+ * **A T0 result never names any, and that is not an omission.** The local solver
+ * orders stops by straight-line distance and knows nothing about roads
+ * ([ADR-0003](../../docs/adr/0003-tiered-optimization-cascade.md)), so it has no
+ * basis for saying a stop cannot be driven to. Reporting none is the honest
+ * answer; inventing the field on that branch of the union would let a degraded
+ * result make a claim it has no way to support.
  */
-export function nextStop(progress: RouteProgress, orderedStops: readonly Stop[]): Stop | null {
-  return orderedStops.find((stop) => stateOf(progress, stop.id) === 'pending') ?? null;
-}
-
-export interface ProgressSummary {
-  readonly total: number;
-  readonly completed: number;
-  readonly skipped: number;
-  readonly unreachable: number;
-  readonly remaining: number;
-  /** True when nothing is left pending — including a route where everything was
-   *  skipped, which is finished even though nothing was delivered. */
-  readonly isFinished: boolean;
-}
-
-export function summarise(progress: RouteProgress, orderedStops: readonly Stop[]): ProgressSummary {
-  let completed = 0;
-  let skipped = 0;
-  let unreachable = 0;
-
-  for (const stop of orderedStops) {
-    const state = stateOf(progress, stop.id);
-    if (state === 'completed') completed += 1;
-    else if (state === 'skipped') skipped += 1;
-    else if (state === 'unreachable') unreachable += 1;
-  }
-
-  const total = orderedStops.length;
-  const remaining = total - completed - skipped - unreachable;
-
-  return {
-    total,
-    completed,
-    skipped,
-    unreachable,
-    remaining,
-    // An empty route is not "finished" — there was nothing to finish, and
-    // showing a completion summary for it would be nonsense.
-    isFinished: total > 0 && remaining === 0,
-  };
-}
-
-/**
- * Drop progress for stops that no longer exist.
- *
- * A stop removed while the route is in progress leaves an orphan entry whose
- * state would keep counting toward the totals and hold `isFinished` false
- * forever, stranding the user on a route they cannot complete.
- */
-export function pruneToStops(
-  progress: RouteProgress,
-  orderedStops: readonly Stop[],
-): RouteProgress {
-  const live = new Set(orderedStops.map((stop) => stop.id));
-  const states: Record<string, StopProgressState> = {};
-
-  for (const [stopId, state] of Object.entries(progress.states)) {
-    if (live.has(stopId)) states[stopId] = state;
-  }
-
-  return { ...progress, states };
-}
-
-/**
- * Which stops a mid-route re-optimization should consider.
- *
- * Completed stops are excluded — they are done. Skipped ones are included, at the
- * end, unless the user removed them: skipping meant "not now", not "never", and a
- * re-optimization is the natural moment to offer them again.
- */
-export function stopsForReoptimization(
-  progress: RouteProgress,
-  orderedStops: readonly Stop[],
-): readonly Stop[] {
-  const pending = orderedStops.filter((stop) => stateOf(progress, stop.id) === 'pending');
-  const skipped = orderedStops.filter((stop) => stateOf(progress, stop.id) === 'skipped');
-  return [...pending, ...skipped];
-}
-
-/** Whether any stop has been settled. Used to decide whether abandoning the route
- *  needs confirming — discarding untouched work costs the user nothing. */
-export function hasStarted(progress: RouteProgress): boolean {
-  return Object.values(progress.states).some(isSettled);
+export function unreachableIn(result: OptimizationResult | null): readonly string[] {
+  if (result === null || result.isDegraded) return [];
+  return result.unreachableStopIds;
 }

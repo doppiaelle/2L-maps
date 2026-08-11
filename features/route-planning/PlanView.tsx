@@ -8,7 +8,7 @@ import type { PrimaryActionState } from '@/components/primitives/PrimaryAction';
 import { RouteSummaryHeader } from '@/components/route/RouteSummaryHeader';
 import { StatusChip } from '@/components/primitives/StatusChip';
 import type { AddressNotice } from '@/lib/places/notice';
-import { layout, radius, space } from '@/lib/design/tokens';
+import { layout, radius, RULE_WIDTH, space } from '@/lib/design/tokens';
 import { metricsAreEstimated } from '@/lib/route/plan-state';
 import type { ActionIntent, PlanState } from '@/lib/route/plan-state';
 import type { RouteView } from '@/lib/route/route-view';
@@ -56,8 +56,9 @@ export interface PlanViewProps {
   /** The drawn route. Passed in rather than rendered here, so this component
    *  stays presentational and knows nothing about projections or SVG. */
   readonly mapSlot?: React.ReactNode;
-  /** The X. Leaves the result behind and returns to the list — with the stops
-   *  intact, which is what "back to the list" has to mean. */
+  /** The menu control on the map. Leaves the result behind and returns to the
+   *  list — with the stops intact, which is what "back to the list" has to
+   *  mean. */
   onDismissMap?: () => void;
   /**
    * Points to keep clear at the bottom, in map mode.
@@ -100,8 +101,6 @@ export interface PlanViewProps {
    * user cannot explain, on the screen they spend the whole day in.
    */
   readonly adSlot?: React.ReactNode;
-  /** Mid-route only, beside **Done**. */
-  onSkipStop?: () => void;
 
   /**
    * Why the addresses are missing, when they are, and what to do about it.
@@ -130,7 +129,6 @@ export function PlanView({
   onAddStop,
   onImport,
   adSlot,
-  onSkipStop,
   addressNotice = null,
   onRetryAddresses,
   view = 'list',
@@ -205,10 +203,17 @@ export function PlanView({
               // not navigation. It dismisses what is on the canvas, it sits on
               // the canvas, and the thumb-zone rule is served by Confirm being
               // where every primary action has always been.
+              //
+              // **Three lines rather than a cross.** A cross says "close this
+              // and lose it"; what actually happens is that the stop list comes
+              // back with every stop still on it, ready to be optimized again.
+              // The same glyph marks Route in the dock, and that is the point —
+              // both mean *the list*.
               <Pressable
                 onPress={onDismissMap}
                 accessibilityRole="button"
-                accessibilityLabel="Discard this route and go back to the list"
+                accessibilityLabel="Back to the stop list"
+                hitSlop={space.space2}
                 style={{
                   position: 'absolute',
                   top: space.space3,
@@ -221,7 +226,7 @@ export function PlanView({
                 }}
                 testID="plan-dismiss-map"
               >
-                <Text className="text-title-md text-text-primary">✕</Text>
+                <MenuGlyph />
               </Pressable>
             )}
           </View>
@@ -229,9 +234,8 @@ export function PlanView({
           <StopList
             state={listStateFor(state, stops)}
             onSelectStop={onSelectStop}
-            // Read-only while driving: reordering under someone following the
-            // list is a hazard rather than an edit.
-            {...(state.kind === 'in-progress' ? {} : { onRemoveStop, onMoveStop })}
+            onRemoveStop={onRemoveStop}
+            onMoveStop={onMoveStop}
             testID="plan-stop-list"
           />
         )}
@@ -247,35 +251,16 @@ export function PlanView({
           <PrimaryAction state={actionState} onPress={onPrimaryAction} testID="plan-action" />
         )}
 
-        {/* Mid-route the two controls sit side by side. Skip is quieter but
-                the same height: the user is driving, and a smaller target is a
-                mis-tap on somebody's delivery. */}
-        {state.kind === 'in-progress' && onSkipStop !== undefined && (
-          <Pressable
-            onPress={onSkipStop}
-            accessibilityRole="button"
-            accessibilityLabel="Skip this stop and move to the next"
-            style={{
-              minHeight: layout.actionMinHeight,
-              marginTop: space.space2,
-              borderRadius: radius.radiusLg,
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-            testID="plan-skip"
-          >
-            <Text className="text-body-strong text-text-secondary">Skip</Text>
-          </Pressable>
-        )}
+        {/* Always reachable, in every state that has a list — adding a stop is
+                the first of the three taps. **Import sits beside it**, because
+                the two are the same choice: one address or a whole day's worth.
+                It used to be reachable only from inside add-stop, which meant a
+                user with a pasted list had to open a search, fail to find what
+                they wanted, and notice a secondary link.
 
-        {/* Always reachable, at every detent and in every state that has a
-                list — adding a stop is the first of the three taps.
-                **Import sits beside it**, because the two are the same choice:
-                one address or a whole day's worth. It used to be reachable only
-                from inside add-stop, which meant a user with a pasted list had
-                to open a search, fail to find what they wanted, and notice a
-                secondary link. */}
-        {state.kind !== 'in-progress' && (
+                They are hidden on the map, where the only question is whether
+                to set off. */}
+        {view !== 'map' && (
           <View
             style={{
               flexDirection: 'row',
@@ -337,6 +322,30 @@ export function PlanView({
 }
 
 /**
+ * Three parallel lines, drawn rather than typed.
+ *
+ * A `≡` character would inherit the font's own weight and spacing, which differ
+ * between the two type voices and again between platforms — and at 200% Dynamic
+ * Type it grows into the corner it sits in. Three views of a fixed height are
+ * the same mark everywhere, and the 44 pt target around them is what the finger
+ * actually hits (`CLAUDE.md` §10 rule 2).
+ */
+function MenuGlyph(): React.JSX.Element {
+  return (
+    <View
+      style={{ width: space.space5, gap: space.space1 }}
+      accessibilityElementsHidden
+      importantForAccessibility="no"
+      testID="plan-menu-glyph"
+    >
+      {[0, 1, 2].map((line) => (
+        <View key={line} className="rounded-full bg-text-primary" style={{ height: RULE_WIDTH }} />
+      ))}
+    </View>
+  );
+}
+
+/**
  * The semantic intent, rendered.
  *
  * Null means no control at all rather than a disabled one: with nothing to
@@ -356,8 +365,6 @@ function toActionState(intent: ActionIntent, state: PlanState): PrimaryActionSta
       // app. "Start" described a thing this product has never done — it does not
       // navigate (ADR-0004).
       return { kind: 'ready', label: 'Confirm' };
-    case 'advance':
-      return { kind: 'ready', label: 'Done' };
     case 'retry':
       return { kind: 'ready', label: 'Try again' };
     case 'blocked':
@@ -381,8 +388,6 @@ function titleFor(state: PlanState): string {
       return 'LOADING ROUTE';
     case 'empty':
       return 'NO STOPS YET';
-    case 'in-progress':
-      return `STOP ${state.completedCount + 1} OF ${state.stopCount}`;
     case 'draft':
     case 'optimizing':
     case 'optimized':

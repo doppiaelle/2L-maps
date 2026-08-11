@@ -20,13 +20,11 @@ const stop = (id: string, position: number): Stop => ({
   position,
   entryOrder: position,
   coordinate: null,
-  isCompleted: false,
 });
 
 const write = () =>
   toRows({ ...emptyDraft('route-1'), stops: [stop('a', 0), stop('b', 1)] }, 'user-1', {
     status: 'draft',
-    progress: null,
     totals: null,
   });
 
@@ -94,7 +92,6 @@ describe('saving', () => {
     const { port, calls } = portWith();
     const empty = toRows(emptyDraft('route-1'), 'user-1', {
       status: 'draft',
-      progress: null,
       totals: null,
     });
 
@@ -229,8 +226,8 @@ describe('loading', () => {
 
   it('rebuilds the draft, its status and its progress together', async () => {
     const responses: unknown[] = [
-      [routeRow({ status: 'in_progress' })],
-      [stopRow({ state: 'completed' })],
+      [{ ...routeRow({ status: 'in_progress' }), updated_at: '2026-08-11T05:15:00.000Z' }],
+      [stopRow({ state: 'pending' })],
     ];
     let index = 0;
 
@@ -246,7 +243,10 @@ describe('loading', () => {
     expect(loaded?.draft.stops).toHaveLength(1);
     // Restored together, or the user lands on the right screen with the wrong
     // contents — which reads as data loss.
-    expect(loaded?.progress?.states).toEqual({ 'stop-a': 'completed' });
+    expect(loaded?.progress).toEqual({
+      routeId: 'route-1',
+      startedAt: '2026-08-11T05:15:00.000Z',
+    });
   });
 });
 

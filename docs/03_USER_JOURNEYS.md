@@ -177,44 +177,64 @@ exactly as it was. A failure that also scrambles the user's manual work is unfor
 
 ### J2 — Drive the route
 
-**Trigger:** the user taps **Start**.
+**Trigger:** the user taps **Confirm**.
 **Persona:** Marco, Elena.
 **Precondition:** an optimized route.
 
 1. First run only: choose a navigation app from those actually installed
    ([`16`](16_INTERNAL_NAVIGATION.md)). The choice is remembered.
-2. The app hands off according to the provider's capability:
+2. **Before anything is opened**, the departure is recorded — the route id and the
+   instant — which moves the route to `in_progress` and puts it in History
+   ([ADR-0027](adr/0027-the-drive-happens-elsewhere.md)). This ordering is not
+   negotiable: the OS is likeliest to reclaim this app precisely while a
+   navigation app is in front of it ([`11`](11_STATE_MANAGEMENT.md) §7).
+3. The app hands off according to the provider's capability:
    - **Google Maps** — a chunk of up to ~9 stops in one handoff;
    - **Waze, Apple Maps** — one destination.
-3. The user leaves the app and drives.
-4. On return, the app shows the current stop with two actions: **Done** and **Skip**.
-5. **Done** advances to the next stop and offers handoff again. **Skip** moves the stop to the
-   end of the route without reordering the rest.
-6. Repeat to the last stop.
+4. The user leaves the app and drives. **The navigation app drives the whole
+   sequence** — it announces each stop, re-routes around traffic and carries on.
+5. They come back when the day is over, or when they want the next chunk, or not
+   at all until tomorrow. Whenever they do, they land on the same optimized route
+   they left, and Confirm hands it over again.
 
-**Terminal states:** route completed (J3) · route abandoned, resumable · app killed, state
-restored on next launch (FR-36).
+**Terminal states:** handed off · navigation app not installed, or refused, and
+said so · route past the URL ceiling · a stop whose coordinate expired and whose
+provider needs one.
 
-**Design tension.** The user returns to the app between every stop, which is the cost of
-external handoff ([ADR-0004](adr/0004-external-navigation-handoff.md)). The return must
-therefore be instant and land on exactly one decision — Done or Skip — with no navigation
-required to reach it.
+**There is no per-stop loop, and this journey used to be built around one.** It
+described the driver returning between every stop to press **Done** or **Skip**,
+and called that "the cost of external handoff". It is not a cost anybody pays: a
+driver following Google Maps through nine waypoints has no reason to reopen this
+app and, with the phone in a cradle and the van moving, no safe moment to. The
+two buttons were pressed by nobody, and every state that depended on them —
+including this route reaching History — was therefore never reached
+([ADR-0027](adr/0027-the-drive-happens-elsewhere.md)).
 
 ---
 
-### J3 — Complete the route
+### J3 — Finish with a route
 
-**Trigger:** the final stop is marked Done.
+**Trigger:** the user starts the next route.
 
-1. A summary: stops completed, total distance, total time, time saved against the entry order.
-2. The route moves to history.
-3. One action: start a new route.
+1. The previous route, **if it was actually handed over**, moves to `completed`
+   and stays in History as the day it was.
+2. A route that was optimized and then abandoned is left as it was. It was never
+   driven, and recording it as completed would put a day in History that did not
+   happen.
 
-**Time saved is the retention mechanism.** "You saved 41 minutes today" is the only moment the
-product proves its value numerically. It is computed as the difference between the optimized
-duration and the duration of the user's original entry order, both from the same
-calculation — never an estimate, because an inflated number discovered to be false destroys
-trust in everything else.
+**Nothing in this app can observe that a route was finished**, and this journey
+no longer pretends otherwise. What it can observe is that the driver set off, and
+that they later reached for the next day.
+
+**Time saved is withdrawn, not estimated.** This journey used to end on a summary
+screen showing "You saved 41 minutes today" — described here as *the only moment
+the product proves its value numerically*, and computed as a true difference
+against the entry order, **never an estimate**. That rule is kept and the number
+is therefore gone: measuring it honestly costs a third `computeRoutes` request
+per optimization, over the entry order at the same routing preference, which the
+product owner declined ([`31`](31_COST_MODEL.md)). `baseline_duration_s` remains
+in the schema, unused and reserved, so reversing that is one upstream call rather
+than a migration. A finished route shows **total duration and total distance**.
 
 ---
 
@@ -354,7 +374,11 @@ the likely reason stated (wrong format, wrong country, empty input).
 - [ ] Every journey survives backgrounding and process death at each step.
 - [ ] J6 verified in genuine airplane mode, not a simulated offline state.
 - [ ] J0 paywall verified against Guideline 3.1.2 before every submission.
-- [ ] Time saved in J3 verified as a true computed difference, never an estimate.
+- [ ] J2's departure verified as written **before** the handoff, by killing the process
+      during the launch and reopening ([ADR-0027](adr/0027-the-drive-happens-elsewhere.md)).
+- [ ] A handed-over route appears in History; an abandoned one is not marked completed.
+- [ ] No screen shows a time-saved figure. The rule that governed it — a true computed
+      difference, never an estimate — is why it is absent rather than approximated.
 
 ## 12. Roadmap
 

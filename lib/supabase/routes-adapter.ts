@@ -79,6 +79,16 @@ export interface RoutesPort {
 // ─── Schemas ─────────────────────────────────────────────────────────────────
 
 const statusSchema = z.enum(ROUTE_STATUSES);
+/**
+ * The `stop_state` enum as the **database** has it, which is wider than what the
+ * product still uses.
+ *
+ * `completed` and `skipped` were retired by
+ * [ADR-0027](../../docs/adr/0027-the-drive-happens-elsewhere.md) and nothing
+ * writes them any more, but every route driven before it still carries them.
+ * Parsing them is what keeps those routes openable; `readStopState` is what
+ * turns them into something this version has a branch for.
+ */
 const stopStateSchema = z.enum(['pending', 'completed', 'skipped', 'unreachable']);
 
 const routeRowSchema = z.object({
@@ -108,6 +118,8 @@ const stopRowSchema = z.object({
   leg_distance_m: z.number().nullable(),
   leg_duration_s: z.number().nullable(),
 });
+
+const loadedRouteRowSchema = routeRowSchema.extend({ updated_at: z.string() });
 
 const summaryRowSchema = routeRowSchema.extend({
   updated_at: z.string(),
@@ -211,13 +223,16 @@ export function createRoutesProvider(port: RoutesPort): RoutesProvider {
 
     load: async (routeId) => {
       const routeResponse = await port.select('routes', {
-        columns: ROUTE_COLUMNS,
+        // `updated_at` comes along because it is when the route last changed
+        // status, and the change that matters is the one to `in_progress` — the
+        // handoff. That instant is the route's start time (`progressFromRows`).
+        columns: `${ROUTE_COLUMNS},updated_at`,
         match: { id: routeId },
         isNull: 'deleted_at',
       });
       if (routeResponse.error !== null) return null;
 
-      const routes = z.array(routeRowSchema).safeParse(routeResponse.data);
+      const routes = z.array(loadedRouteRowSchema).safeParse(routeResponse.data);
       const route = routes.success ? routes.data[0] : undefined;
       // A deep link to somebody else's route, or to one that was deleted, lands
       // here. RLS already returned nothing; this is what turns nothing into a
@@ -236,7 +251,7 @@ export function createRoutesProvider(port: RoutesPort): RoutesProvider {
       return {
         draft: fromRows(route, stops.data),
         status: route.status,
-        progress: progressFromRows(route, stops.data),
+        progress: progressFromRows(route, route.updated_at),
       };
     },
 

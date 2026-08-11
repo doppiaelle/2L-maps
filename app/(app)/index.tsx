@@ -36,7 +36,7 @@ import type { RouteView } from '@/lib/route/route-view';
 import { handoffNoticeOf } from '@/lib/handoff/outcome-notice';
 import { newRouteId } from '@/lib/route/route-id';
 import { actionIntentOf, planStateOf } from '@/lib/route/plan-state';
-import { summarise } from '@/lib/route/progress';
+import { unreachableIn } from '@/lib/route/progress';
 import { wasAlreadyOptimal } from '@/lib/route/draft';
 
 /**
@@ -60,8 +60,6 @@ export default function PlanScreen(): React.JSX.Element {
   const draft = useDraftRouteStore((store) => store.draft);
   const result = useDraftRouteStore((store) => store.result);
   const progress = useRouteProgressStore((store) => store.progress);
-  const mark = useRouteProgressStore((store) => store.mark);
-  const nextStop = useRouteProgressStore((store) => store.next);
   const activeSection = useUiStore((store) => store.activeSection);
   const openSection = useUiStore((store) => store.openSection);
   const closeSection = useUiStore((store) => store.closeSection);
@@ -150,7 +148,9 @@ export default function PlanScreen(): React.JSX.Element {
   const { rows, markers, undrawableStopIds } = buildPlanRows({
     stops: draft.stops,
     resolved: places.byPlaceId,
-    progress,
+    // The optimizer's own answer, and the only source there is. Nothing else can
+    // make a stop anything other than pending now (ADR-0027).
+    unreachableStopIds: unreachableIn(result),
     now,
   });
 
@@ -159,6 +159,7 @@ export default function PlanScreen(): React.JSX.Element {
   const { optimize, isOptimizing, failure } = useOptimizeRoute();
 
   const handoff = useHandoff({
+    routeId: draft.routeId,
     stops: draft.stops,
     resolved: places.byPlaceId,
     // `openURL` rejects when nothing can handle the URL; that is a refusal, not
@@ -169,29 +170,6 @@ export default function PlanScreen(): React.JSX.Element {
         () => false,
       ),
   });
-
-  const summary = progress === null ? null : summarise(progress, draft.stops);
-  const completed = summary?.completed ?? 0;
-
-  /**
-   * Mark the stop the driver is actually at.
-   *
-   * `next` is the authority on which one that is — the order on screen and the
-   * order still to visit are not the same list once anything has been skipped,
-   * and asking the store rather than reading `stops[completed]` is what keeps
-   * those two from drifting.
-   */
-  const advance = (state: 'completed' | 'skipped') => {
-    const current = nextStop(draft.stops);
-    if (current === null) return;
-
-    mark(current.id, state);
-
-    // This mark was the last one outstanding, so the route is finished. The
-    // summary is a terminal moment and is presented full, rather than as
-    // another sheet over a map the driver is done with (docs/10 §6).
-    if ((summary?.remaining ?? draft.stops.length) <= 1) router.push('/summary');
-  };
 
   // Decoded once, here, and memoised — never per render. A 25-stop polyline is
   // long enough that decoding it every frame is the most common cause of map
@@ -228,8 +206,6 @@ export default function PlanScreen(): React.JSX.Element {
   const state = planStateOf({
     isLoading: places.isLoading && draft.stops.length > 0,
     stopCount: draft.stops.length,
-    completedCount: completed,
-    isRouteUnderway: progress !== null,
     isOptimizing,
     hasResult: draft.isOptimized,
     isDegraded: draft.isDegraded,
@@ -339,18 +315,15 @@ export default function PlanScreen(): React.JSX.Element {
               // The control's own state already says which of the two this is; the
               // screen only has to route the tap. `planStateOf` decided that, and
               // re-deriving it here would be the same rule in two places.
-              // Mid-route the same control means Done, and the state machine already
-              // said so — re-deriving it here would be one rule in two places.
-              if (state.kind === 'in-progress') {
-                advance('completed');
-                return;
-              }
-
               if (state.kind !== 'optimized') {
                 optimize();
                 return;
               }
 
+              // Confirm. `useHandoff` records the departure **before** it opens
+              // anything — that write is what moves the route to `in_progress`
+              // and therefore into History, which is exactly what was not
+              // happening (`docs/11_STATE_MANAGEMENT.md` §7).
               void handoff.start().then((outcome) => {
                 // A first handoff with no provider chosen presents the picker rather
                 // than guessing — sending a twelve-stop day to the wrong app is a bad
@@ -394,9 +367,6 @@ export default function PlanScreen(): React.JSX.Element {
             }}
             onImport={() => {
               router.push('/import');
-            }}
-            onSkipStop={() => {
-              advance('skipped');
             }}
             // Four causes, four sentences, and a retry only where retrying can
             // work. Every row used to say "Address needs refreshing" for all of

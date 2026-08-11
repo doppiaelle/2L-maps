@@ -13,9 +13,14 @@ import { MIN_STOPS } from '@/types';
  * route is half driven, a saved route whose coordinates expired — cost a line
  * each rather than a device and a month.
  *
- * The order of the checks is the product's priority, and it is load-bearing:
- * a route in progress outranks everything, because the user is driving and the
- * screen's job is to tell them where to go next.
+ * **There is no longer an `in-progress` state, and that is the point of
+ * [ADR-0027](../../docs/adr/0027-the-drive-happens-elsewhere.md).** It used to
+ * outrank every other state, because the screen's job while driving was to name
+ * the next stop and offer Done and Skip. The driver is not in this app while
+ * driving — Google Maps has the whole multi-stop day — so the screen they come
+ * back to is the same optimized route they left, and Confirm still hands it over
+ * again. A route being underway now changes only what the dock emphasises and
+ * whether an ad may render, neither of which is this function's business.
  */
 
 export type PlanState =
@@ -34,7 +39,6 @@ export type PlanState =
        *  correct answer and the user paid for it. */
       readonly wasAlreadyOptimal: boolean;
     }
-  | { readonly kind: 'in-progress'; readonly completedCount: number; readonly stopCount: number }
   /** The attempt failed and **the order is untouched**. Saying so is the point:
    *  a failed optimization that also scrambled the list is two problems. */
   | { readonly kind: 'failed'; readonly stopCount: number; readonly canRetry: boolean };
@@ -42,8 +46,6 @@ export type PlanState =
 export interface PlanInputs {
   readonly isLoading: boolean;
   readonly stopCount: number;
-  readonly completedCount: number;
-  readonly isRouteUnderway: boolean;
   readonly isOptimizing: boolean;
   readonly hasResult: boolean;
   readonly isDegraded: boolean;
@@ -52,16 +54,6 @@ export interface PlanInputs {
 }
 
 export function planStateOf(inputs: PlanInputs): PlanState {
-  // A route being driven outranks every other state, including a failure and a
-  // loading spinner. The user is in a van; the screen's job is the next stop.
-  if (inputs.isRouteUnderway) {
-    return {
-      kind: 'in-progress',
-      completedCount: inputs.completedCount,
-      stopCount: inputs.stopCount,
-    };
-  }
-
   if (inputs.isLoading) return { kind: 'loading' };
   if (inputs.stopCount === 0) return { kind: 'empty' };
   if (inputs.isOptimizing) return { kind: 'optimizing', stopCount: inputs.stopCount };
@@ -101,9 +93,10 @@ export type ActionIntent =
   | { readonly kind: 'hidden' }
   | { readonly kind: 'optimize'; readonly remaining: number }
   | { readonly kind: 'optimizing' }
+  /** Hand the route to a navigation app. Offered whether or not it has already
+   *  been handed over once — a driver who closed Google Maps at lunch needs the
+   *  same button in the afternoon. */
   | { readonly kind: 'start' }
-  /** Mid-route: mark the current stop done, with skip beside it. */
-  | { readonly kind: 'advance' }
   | { readonly kind: 'retry' }
   | { readonly kind: 'blocked'; readonly reason: string }
   | { readonly kind: 'degraded-only'; readonly note: string }
@@ -120,9 +113,6 @@ export function actionIntentOf(state: PlanState, availability: OptimizeAvailabil
       // Hidden, not disabled: with no stops there is nothing to optimize, and a
       // greyed button invites a tap that can only fail (docs/08 §7).
       return { kind: 'hidden' };
-
-    case 'in-progress':
-      return { kind: 'advance' };
 
     case 'optimizing':
       return { kind: 'optimizing' };

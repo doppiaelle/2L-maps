@@ -62,8 +62,10 @@ deep links, guards, and how navigation state survives process death.
              ├── add-stop.tsx
              ├── import.tsx
              ├── provider.tsx
-             ├── paywall.tsx
-             └── summary.tsx
+             └── paywall.tsx
+
+  `summary.tsx` was here. It was the end of J3, reached by marking the final
+  stop Done, and both are gone (ADR-0027).
 
   Depth never exceeds 3. The critical path stays on index.tsx.
 ```

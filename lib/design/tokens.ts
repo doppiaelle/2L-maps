@@ -191,6 +191,18 @@ export const stroke = {
  *  than as a rendering artefact. */
 export const ROUTE_DASH_PATTERN = [10, 8] as const;
 
+/**
+ * The weight of a drawn rule, in points.
+ *
+ * The menu glyph's three lines are the first user of it. Drawn rather than typed
+ * as `≡`, because a character inherits the font's weight and spacing — which
+ * differ between this system's two type voices and again between platforms — and
+ * grows into its corner at 200% Dynamic Type. Two points rather than a hairline:
+ * one physical pixel disappears on a high-density screen in daylight, which is
+ * the condition this app is used in.
+ */
+export const RULE_WIDTH = 2;
+
 // ─── Typography ──────────────────────────────────────────────────────────────
 
 export interface TypeToken {

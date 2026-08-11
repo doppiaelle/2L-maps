@@ -1,5 +1,6 @@
 import { colours, mapColours, ROUTE_DASH_PATTERN, stroke } from '@/lib/design/tokens';
 import type { ThemeName } from '@/lib/design/tokens';
+import type { StopProgressState } from '@/lib/route/progress';
 
 /**
  * How the route line is drawn.
@@ -57,8 +58,9 @@ export interface MarkerStyle {
   readonly fill: string;
   readonly border: string;
   readonly foreground: string;
-  /** Replaces the ordinal when present. A completed stop shows a checkmark, an
-   *  unreachable one a warning glyph. */
+  /** Replaces the ordinal when present. An unreachable stop shows a warning
+   *  glyph rather than its number, because its number promises an order the
+   *  route cannot actually be driven in. */
   readonly glyph: string | null;
   /** The word a screen reader would use, kept beside the appearance it belongs
    *  to. The map itself is one accessibility element, but a stop's state is also
@@ -66,7 +68,16 @@ export interface MarkerStyle {
   readonly spoken: string;
 }
 
-export type MarkerState = 'pending' | 'completed' | 'skipped' | 'unreachable';
+/**
+ * Two states, down from four.
+ *
+ * `completed` and `skipped` were the driver's own marks, and there is no longer
+ * anywhere to make one: the drive happens inside a navigation app
+ * ([ADR-0027](../../docs/adr/0027-the-drive-happens-elsewhere.md)). What is left
+ * is the optimizer's own report — this stop has no road to it — which is the one
+ * marker state the user cannot cause and cannot clear.
+ */
+export type MarkerState = StopProgressState;
 
 export function markerStyle(
   theme: ThemeName,
@@ -77,28 +88,14 @@ export function markerStyle(
 
   // Selection wins over state for the fill, because selection is what the user
   // just did and the map has to answer that first. The glyph is kept, so a
-  // selected completed stop still shows its checkmark.
+  // selected unreachable stop still shows its warning.
   const base: Record<MarkerState, MarkerStyle> = {
     pending: {
       fill: palette.surface,
       border: palette.textPrimary,
       foreground: palette.textPrimary,
       glyph: null,
-      spoken: 'not yet visited',
-    },
-    completed: {
-      fill: palette.accent,
-      border: palette.accent,
-      foreground: palette.accentOn,
-      glyph: '✓',
-      spoken: 'completed',
-    },
-    skipped: {
-      fill: palette.surface,
-      border: palette.textSecondary,
-      foreground: palette.textSecondary,
-      glyph: '→',
-      spoken: 'skipped',
+      spoken: 'stop',
     },
     unreachable: {
       fill: palette.surface,

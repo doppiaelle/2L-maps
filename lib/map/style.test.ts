@@ -50,18 +50,17 @@ describe('marker appearance', () => {
     // A user with deuteranopia must be able to read the map (CLAUDE.md §10
     // rule 4). Pending is the exception that proves it: it carries the ordinal,
     // which is itself the distinguishing mark.
-    for (const state of ['completed', 'skipped', 'unreachable'] as const) {
-      expect(markerStyle('light', state, false).glyph).not.toBeNull();
-    }
+    expect(markerStyle('light', 'unreachable', false).glyph).not.toBeNull();
     expect(markerStyle('light', 'pending', false).glyph).toBeNull();
   });
 
   it('keeps the state glyph when a stop is selected', () => {
     // Selection changes the fill; it must not erase what the stop is. A selected
-    // completed stop still shows its checkmark.
-    const style = markerStyle('light', 'completed', true);
+    // unreachable stop still shows its warning — otherwise tapping the one stop
+    // the route cannot serve is what hides that fact.
+    const style = markerStyle('light', 'unreachable', true);
 
-    expect(style.glyph).toBe('✓');
+    expect(style.glyph).toBe('!');
     expect(style.fill).toBe(colours.light.accent);
   });
 
@@ -73,7 +72,7 @@ describe('marker appearance', () => {
     // The ordinal sits on the fill. A mint pin with mint text is a pin with no
     // number, and the number is what the user reads while driving.
     for (const theme of ['light', 'dark'] as const) {
-      for (const state of ['pending', 'completed', 'skipped', 'unreachable'] as const) {
+      for (const state of ['pending', 'unreachable'] as const) {
         const style = markerStyle(theme, state, false);
         expect(style.foreground).not.toBe(style.fill);
       }

@@ -1,6 +1,5 @@
 import { buildPlanRows, placeIdsToResolve } from './plan-rows';
 import type { ResolvedPlace } from './plan-rows';
-import { emptyProgress, markStop } from './progress';
 import { COORDINATE_MAX_AGE_DAYS } from '@/types';
 import type { Stop } from '@/types';
 
@@ -27,7 +26,6 @@ const stop = (id: string, overrides: Partial<Stop> = {}): Stop => ({
     refreshedAt: daysAgo(1),
   },
   placeText: null,
-  isCompleted: false,
   ...overrides,
 });
 
@@ -42,7 +40,7 @@ describe('which coordinate wins', () => {
       resolved: resolved({
         'place-a': { address: 'Somewhere else', coordinate: { latitude: 0, longitude: 0 } },
       }),
-      progress: null,
+      unreachableStopIds: [],
       now: NOW,
     });
 
@@ -65,7 +63,7 @@ describe('which coordinate wins', () => {
       resolved: resolved({
         'place-a': { address: 'Via Nuova', coordinate: { latitude: 46, longitude: 10 } },
       }),
-      progress: null,
+      unreachableStopIds: [],
       now: NOW,
     });
 
@@ -76,7 +74,7 @@ describe('which coordinate wins', () => {
     const { rows, markers, undrawableStopIds } = buildPlanRows({
       stops: [stop('a', { coordinate: null })],
       resolved: new Map(),
-      progress: null,
+      unreachableStopIds: [],
       now: NOW,
     });
 
@@ -95,7 +93,7 @@ describe('the address after thirty days', () => {
       resolved: resolved({
         'place-a': { address: 'Via Nuova 4', coordinate: { latitude: 46, longitude: 10 } },
       }),
-      progress: null,
+      unreachableStopIds: [],
       now: NOW,
     });
 
@@ -108,7 +106,7 @@ describe('the address after thirty days', () => {
     const { rows } = buildPlanRows({
       stops: [stop('a', { coordinate: null, label: 'Warehouse' })],
       resolved: new Map(),
-      progress: null,
+      unreachableStopIds: [],
       now: NOW,
     });
 
@@ -118,26 +116,31 @@ describe('the address after thirty days', () => {
 });
 
 describe('a stop’s state', () => {
-  it('comes from progress, not from the stored flag', () => {
-    // `isCompleted` is what the server last saw; progress is what happened
-    // since, including marks made with no signal at all.
-    const progress = markStop(emptyProgress('route-1'), 'a', 'completed');
-
-    const { rows } = buildPlanRows({
-      stops: [stop('a', { isCompleted: false })],
+  it('comes from the optimizer, which is now the only thing that can set one', () => {
+    // Until ADR-0027 this read the progress store, because a driver could mark a
+    // stop done or skipped. Nobody is in the app to do that; what is left is the
+    // one state the user cannot cause — no road reaches this stop.
+    const { rows, markers } = buildPlanRows({
+      stops: [stop('a'), stop('b')],
       resolved: new Map(),
-      progress,
+      unreachableStopIds: ['b'],
       now: NOW,
     });
 
-    expect(rows[0]?.state).toBe('completed');
+    expect(rows[0]?.state).toBe('pending');
+    expect(rows[1]?.state).toBe('unreachable');
+    // The map has to agree with the list, or the same stop reads two ways on
+    // the two faces of one section.
+    expect(markers[1]?.state).toBe('unreachable');
   });
 
-  it('is pending when no route is underway', () => {
+  it('is pending for every stop before there is a result', () => {
+    // Nothing can be known to be unreachable until something has tried to route
+    // to it, so an empty list is the correct answer rather than a missing one.
     const { rows } = buildPlanRows({
-      stops: [stop('a', { isCompleted: true })],
+      stops: [stop('a')],
       resolved: new Map(),
-      progress: null,
+      unreachableStopIds: [],
       now: NOW,
     });
 

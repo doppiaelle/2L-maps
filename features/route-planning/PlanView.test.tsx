@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react-native';
+import { Text as RNText } from 'react-native';
 
 import { PlanView } from './PlanView';
 import type { PlanViewProps } from './PlanView';
@@ -34,8 +35,6 @@ const renderPlan = (
   const full: PlanInputs = {
     isLoading: false,
     stopCount: 3,
-    completedCount: 0,
-    isRouteUnderway: false,
     isOptimizing: false,
     hasResult: false,
     isDegraded: false,
@@ -160,24 +159,52 @@ describe('quota exhausted', () => {
   });
 });
 
-describe('a route in progress', () => {
-  it('says which stop, of how many', () => {
-    renderPlan({ isRouteUnderway: true, completedCount: 2, stopCount: 9 });
-    expect(screen.getByText('STOP 3 OF 9')).toBeTruthy();
+describe('the map’s own controls', () => {
+  it('offers three parallel lines rather than a cross', () => {
+    // A cross says "close this and lose it". What happens is that the stop list
+    // comes back with every stop still on it (ADR-0027 / ADR-0022).
+    renderPlan({ hasResult: true }, allowed, {
+      view: 'map',
+      mapSlot: <RNText>map</RNText>,
+      onDismissMap: noop,
+    });
+
+    expect(screen.getByLabelText('Back to the stop list')).toBeTruthy();
+    // Hidden from the accessibility tree on purpose — the control speaks for it,
+    // and a screen reader announcing "three lines" would be describing the
+    // element rather than what happens (`CLAUDE.md` §10 rule 1).
+    expect(screen.getByTestId('plan-menu-glyph', { includeHiddenElements: true })).toBeTruthy();
+    expect(screen.queryByText('✕')).toBeNull();
   });
 
-  it('offers Done and Skip side by side, both full size', () => {
-    // The user is driving. A smaller Skip target is a mis-tap on somebody's
-    // delivery.
-    renderPlan({ isRouteUnderway: true }, allowed, { onSkipStop: noop });
+  it('does not offer to add a stop over the map', () => {
+    // On the map the only question is whether to set off.
+    renderPlan({ hasResult: true }, allowed, {
+      view: 'map',
+      mapSlot: <RNText>map</RNText>,
+      onDismissMap: noop,
+    });
 
-    expect(screen.getByText('Done')).toBeTruthy();
-    expect(screen.getByTestId('plan-skip').props.style).toMatchObject({ minHeight: 56 });
-  });
-
-  it('does not offer to add a stop mid-route', () => {
-    renderPlan({ isRouteUnderway: true }, allowed, { onSkipStop: noop });
     expect(screen.queryByLabelText('Add a stop')).toBeNull();
+  });
+});
+
+describe('what left with Done and Skip', () => {
+  it('offers Confirm and nothing beside it once a route is optimized', () => {
+    // The per-stop loop is gone: the drive happens inside a navigation app and
+    // the driver is not here to mark anything (ADR-0027).
+    renderPlan({ hasResult: true });
+
+    expect(screen.getByText('Confirm')).toBeTruthy();
+    expect(screen.queryByText('Done')).toBeNull();
+    expect(screen.queryByTestId('plan-skip')).toBeNull();
+  });
+
+  it('keeps the list editable, because nothing is being driven from it', () => {
+    // Reordering used to be withheld mid-route, when someone was following the
+    // list stop by stop. Nobody is.
+    renderPlan({ hasResult: true });
+    expect(screen.queryAllByTestId('stop-controls').length).toBeGreaterThan(0);
   });
 });
 

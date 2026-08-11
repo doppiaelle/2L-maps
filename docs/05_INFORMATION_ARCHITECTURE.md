@@ -105,8 +105,11 @@ there is no fourth level, and adding one requires an ADR.
     ├── sheet: peek ──▶ half ──▶ full        stops, in order
     │      └── stop detail                   sheet within sheet
     ├── add stop        modal                search · favourites · recents
-    ├── import list     modal                paste · CSV
-    └── summary         after handoff        completion, time saved
+    └── import list     modal                paste · CSV
+
+  Confirm hands the route to a navigation app and records the departure. It
+  opens nothing here: the driver leaves, and there is no screen waiting for
+  them to come back to (ADR-0027).
 
   History          saved and past routes ──▶ opens into Plan
   Settings         account · preferences · legal
@@ -172,7 +175,6 @@ the specification: the copies diverge.
 | Unreachable stop | The stop's own row, with a reason | A separate error list |
 | Quota state | Settings, and inline when an action is blocked | A persistent banner |
 | Subscription state | Settings → Subscription; paywall when blocking | Anywhere ambient |
-| Time saved | Route completion summary | The plan surface |
 | Attribution | Map surface, permanently | — |
 
 Two items appear in two places deliberately. The **degraded warning** appears in the sheet

@@ -4,17 +4,19 @@ import type { OptimizeAvailability } from '@/lib/entitlement/plans';
 import { MIN_STOPS } from '@/types';
 
 /**
- * Eleven states are specified for this screen (docs/08_SCREEN_SPECIFICATIONS.md
- * §7). The ones that matter most are the ones a reviewer never sees: the
- * allowance running out mid-draft, a failure that must leave the order alone,
- * and a route in progress arriving on top of any of them.
+ * The states specified for this screen (docs/08_SCREEN_SPECIFICATIONS.md §7).
+ * The ones that matter most are the ones a reviewer never sees: the allowance
+ * running out mid-draft, and a failure that must leave the order alone.
+ *
+ * `in-progress` is no longer among them. It used to outrank every other state,
+ * because the screen's job while driving was to name the next stop and offer
+ * Done and Skip; the drive happens inside a navigation app and the driver is not
+ * here ([ADR-0027](../../docs/adr/0027-the-drive-happens-elsewhere.md)).
  */
 
 const inputs = (overrides: Partial<PlanInputs> = {}): PlanInputs => ({
   isLoading: false,
   stopCount: 5,
-  completedCount: 0,
-  isRouteUnderway: false,
   isOptimizing: false,
   hasResult: false,
   isDegraded: false,
@@ -58,27 +60,14 @@ describe('which state Plan is in', () => {
   });
 });
 
-describe('a route being driven outranks everything', () => {
-  it('beats loading, optimizing and a failure', () => {
-    // The user is in a van. The screen's job is the next stop.
-    for (const other of [
-      { isLoading: true },
-      { isOptimizing: true },
-      { lastFailure: 'offline' as const },
-      { hasResult: true },
-    ]) {
-      expect(planStateOf(inputs({ isRouteUnderway: true, ...other })).kind).toBe('in-progress');
-    }
-  });
-
-  it('carries how far through the route the user is', () => {
-    expect(planStateOf(inputs({ isRouteUnderway: true, completedCount: 3, stopCount: 9 }))).toEqual(
-      {
-        kind: 'in-progress',
-        completedCount: 3,
-        stopCount: 9,
-      },
-    );
+describe('a route already handed over', () => {
+  it('comes back to the same optimized state the driver left', () => {
+    // Returning from Google Maps must not land on a different screen. The route
+    // is still optimized, the map still shows it, and Confirm still hands it
+    // over again — which is what a driver who closed the navigation app at lunch
+    // needs in the afternoon.
+    expect(planStateOf(inputs({ hasResult: true })).kind).toBe('optimized');
+    expect(actionIntentOf(planStateOf(inputs({ hasResult: true })), allowed()).kind).toBe('start');
   });
 });
 
@@ -153,12 +142,6 @@ describe('what the control says', () => {
 
   it('becomes Start once a route is optimized', () => {
     expect(actionIntentOf(planStateOf(inputs({ hasResult: true })), allowed()).kind).toBe('start');
-  });
-
-  it('becomes the mid-route control while driving', () => {
-    expect(actionIntentOf(planStateOf(inputs({ isRouteUnderway: true })), allowed()).kind).toBe(
-      'advance',
-    );
   });
 
   it('offers a retry after a failure', () => {

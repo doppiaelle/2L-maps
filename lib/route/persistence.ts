@@ -1,5 +1,7 @@
+import { stopStateOf } from './progress';
+
 import type { DraftRoute } from './draft';
-import type { RouteProgress, StopProgressState } from './progress';
+import type { RouteProgress } from './progress';
 import type { RouteShape, Stop } from '@/types';
 
 /**
@@ -66,19 +68,45 @@ export function canTransition(from: RouteStatus, to: RouteStatus): boolean {
  * What the route's status should be, given everything currently true about it.
  *
  * Derived rather than stored on the client, because the client already holds
- * every input: whether an optimization produced the order, whether a route is
- * underway, whether it finished. A second stored copy would be a second source
- * of truth, and the two disagreeing is what makes a route show as "in progress"
- * on a phone that finished it yesterday.
+ * every input. A second stored copy would be a second source of truth, and the
+ * two disagreeing is what makes a route show as "in progress" on a phone that
+ * finished it yesterday.
+ *
+ * **`completed` is not derivable and is deliberately absent from here.** It used
+ * to mean "every stop was marked", and there is nobody left in the app to mark
+ * one ([ADR-0027](../../docs/adr/0027-the-drive-happens-elsewhere.md)). What we
+ * honestly know is that a route was handed to a navigation app, which is
+ * `in_progress`; a route stops being the current one when the driver starts the
+ * next, and that is the transition `completeSupersededRoute` performs.
  */
 export function statusFor(inputs: {
   readonly isOptimized: boolean;
   readonly isUnderway: boolean;
-  readonly isFinished: boolean;
 }): RouteStatus {
-  if (inputs.isFinished) return 'completed';
   if (inputs.isUnderway) return 'in_progress';
   return inputs.isOptimized ? 'optimized' : 'draft';
+}
+
+/**
+ * The transition that closes the day, and what triggers it.
+ *
+ * Nothing inside a route can finish it any more, so the next route does: opening
+ * or starting a new one is the driver saying, with their hands rather than with
+ * a button, that the last one is behind them. Only a route that was actually
+ * handed over is closed this way — an `optimized` route the user simply
+ * abandoned was never driven and stays what it was.
+ *
+ * Returns null when there is nothing to close, so the caller has no condition of
+ * its own to get wrong.
+ */
+export function completeSupersededRoute(
+  previous: {
+    readonly routeId: string;
+    readonly status: RouteStatus;
+  } | null,
+): { readonly routeId: string; readonly from: RouteStatus; readonly to: RouteStatus } | null {
+  if (previous === null || previous.status !== 'in_progress') return null;
+  return { routeId: previous.routeId, from: 'in_progress', to: 'completed' };
 }
 
 // ─── Rows ────────────────────────────────────────────────────────────────────
@@ -108,7 +136,20 @@ export interface StopRow {
   readonly note: string | null;
   readonly entry_order: number;
   readonly optimized_order: number | null;
-  readonly state: StopProgressState;
+  /**
+   * The `stop_state` enum, as the database has it — **not** `StopProgressState`.
+   *
+   * The two were the same type until ADR-0027 retired `completed` and `skipped`
+   * from the product. The column still accepts all four and rows written before
+   * then still hold them, so this stays as wide as the wire — narrowing it here
+   * would make the compiler certify something only a migration could make true,
+   * and the first old route anyone opened would fail to parse.
+   *
+   * Nothing reads it back. What a stop's state *means* now comes from the
+   * optimization result, which is where `unreachable` originates; the column is
+   * written so the server's copy is complete and so a future reader has it.
+   */
+  readonly state: string;
   readonly leg_distance_m: number | null;
   readonly leg_duration_s: number | null;
 }
@@ -137,7 +178,9 @@ export function toRows(
   userId: string,
   context: {
     readonly status: RouteStatus;
-    readonly progress: RouteProgress | null;
+    /** Named by the optimizer, not by the driver. Omitted before there is a
+     *  result, which is when nothing can be known to be unreachable. */
+    readonly unreachableStopIds?: readonly string[];
     readonly totals: {
       readonly tier: string | null;
       readonly distanceMeters: number | null;
@@ -175,15 +218,15 @@ export function toRows(
       note: stop.note,
       entry_order: stop.entryOrder,
       optimized_order: draft.isOptimized ? stop.position : null,
-      state: progressStateOf(context.progress, stop.id),
+      // Only ever `pending` or `unreachable` now. The column's enum still
+      // carries `completed` and `skipped` for rows written before ADR-0027;
+      // nothing writes them again, and `readStopState` narrows them on the way
+      // back in.
+      state: stopStateOf(stop.id, context.unreachableStopIds ?? []),
       leg_distance_m: null,
       leg_duration_s: null,
     })),
   };
-}
-
-function progressStateOf(progress: RouteProgress | null, stopId: string): StopProgressState {
-  return progress?.states[stopId] ?? 'pending';
 }
 
 /**
@@ -224,23 +267,25 @@ export function fromRows(route: RouteRow, stops: readonly StopRow[]): DraftRoute
       // addresses through `/place-details` exactly as before.
       placeText: null,
       coordinate: null,
-      isCompleted: row.state === 'completed',
     })),
     isOptimized,
     isDegraded: route.is_degraded,
   };
 }
 
-/** Progress as stored, so a route reopened on another device knows which stops
- *  are done rather than starting the day again. */
-export function progressFromRows(route: RouteRow, stops: readonly StopRow[]): RouteProgress | null {
-  if (route.status !== 'in_progress' && route.status !== 'completed') return null;
-
-  const states: Record<string, StopProgressState> = {};
-  for (const row of stops) {
-    if (row.state !== 'pending') states[row.id] = row.state;
-  }
-  return { routeId: route.id, states };
+/**
+ * Whether this route was handed to a navigation app, and when.
+ *
+ * A route reopened on a second device has to land in the same state as the one
+ * that set off, or the driver sees a plan where there is a day in progress. The
+ * timestamp is `updated_at` rather than a column of its own: the write that
+ * moved the route to `in_progress` *is* the handoff (`use-route-sync.ts`), so
+ * the two instants are the same one, and a migration to store it twice would be
+ * a schema change to record something already recorded.
+ */
+export function progressFromRows(route: RouteRow, updatedAt: string): RouteProgress | null {
+  if (route.status !== 'in_progress') return null;
+  return { routeId: route.id, startedAt: updatedAt };
 }
 
 // ─── History ─────────────────────────────────────────────────────────────────

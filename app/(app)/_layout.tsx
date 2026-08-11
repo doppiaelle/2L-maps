@@ -33,7 +33,10 @@ export default function AppLayout(): React.JSX.Element {
         name="(modal)/paywall"
         options={{ presentation: 'modal', gestureEnabled: false }}
       />
-      <Stack.Screen name="(modal)/summary" options={{ presentation: 'fullScreenModal' }} />
+      {/* `(modal)/summary` used to sit here. It was the end of J3 — the screen
+          that appeared when the last stop was marked Done — and both are gone
+          (ADR-0027). Nothing in the app can now assert that a day is finished,
+          so nothing shows a screen claiming it. */}
     </Stack>
   );
 }

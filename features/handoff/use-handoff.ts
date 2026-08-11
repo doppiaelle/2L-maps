@@ -57,6 +57,15 @@ export interface ResolvedPlace {
 }
 
 export interface HandoffOptions {
+  /**
+   * The route being handed over.
+   *
+   * **It used to write `stops[0].id` here**, so `progress.routeId` named a stop
+   * rather than a route and never matched anything — including the route the
+   * lifecycle was about to move to `in_progress`. That is one half of why a
+   * started route did not reach History.
+   */
+  readonly routeId: string;
   readonly stops: readonly Stop[];
   readonly resolved: ReadonlyMap<string, ResolvedPlace>;
   /** Opens a URL, reporting whether the other app came up. Injected so the whole
@@ -65,10 +74,9 @@ export interface HandoffOptions {
   open: (url: string) => Promise<boolean>;
 }
 
-export function useHandoff({ stops, resolved, open }: HandoffOptions): HandoffState {
+export function useHandoff({ routeId, stops, resolved, open }: HandoffOptions): HandoffState {
   const preferredProvider = usePreferencesStore((store) => store.preferences.navigationProvider);
-  const progress = useRouteProgressStore((store) => store.progress);
-  const begin = useRouteProgressStore((store) => store.begin);
+  const beginAndHandOff = useRouteProgressStore((store) => store.beginAndHandOff);
 
   const [lastOutcome, setLastOutcome] = useState<HandoffOutcome | null>(null);
 
@@ -124,19 +132,30 @@ export function useHandoff({ stops, resolved, open }: HandoffOptions): HandoffSt
     const first = planned.plan.chunks[0];
     if (first === undefined) return record({ kind: 'no-route' });
 
-    // Written before the URL opens. A process killed while Google Maps is in the
-    // foreground comes back to a route that knows it had begun; the other order
-    // comes back to a route that never started.
-    if (progress === null) begin(stops[0]?.id ?? 'route');
+    /**
+     * The record is written before the URL opens, and `beginAndHandOff` is what
+     * makes that unskippable.
+     *
+     * A process killed while Google Maps is in the foreground comes back to a
+     * route that knows it set off; the other order comes back to a route that
+     * never started — and therefore to a History with a day missing from it.
+     *
+     * **It is written every time, not only the first.** A driver who closes the
+     * navigation app at lunch and presses Confirm again in the afternoon is
+     * setting off again, and the second departure is the current one.
+     */
+    let opened = false;
+    await beginAndHandOff(routeId, async () => {
+      opened = await open(first.url);
+    });
 
-    const opened = await open(first.url);
     // A refusal is reported, not swallowed. The route stays underway either way
     // — the user did set out — but the screen has to be able to say that the
     // navigation app did not come up.
     return record(
       opened ? { kind: 'handed-off', chunkCount: planned.plan.chunks.length } : { kind: 'failed' },
     );
-  }, [places, stops, preferredProvider, progress, begin, open]);
+  }, [places, stops, routeId, preferredProvider, beginAndHandOff, open]);
 
   return { start, lastOutcome, preferredProvider };
 }

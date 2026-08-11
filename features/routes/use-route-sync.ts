@@ -5,8 +5,14 @@ import { useServices } from '@/features/api/services-provider';
 import { useSession } from '@/features/auth/session-provider';
 import { useDraftRouteStore, useRouteProgressStore } from '@/features/stores';
 import { queryKeys } from '@/lib/query/client';
-import { canTransition, statusFor, toRows, type RouteStatus } from '@/lib/route/persistence';
-import { summarise } from '@/lib/route/progress';
+import {
+  canTransition,
+  completeSupersededRoute,
+  statusFor,
+  toRows,
+  type RouteStatus,
+} from '@/lib/route/persistence';
+import { unreachableIn } from '@/lib/route/progress';
 import type { SaveFailure } from '@/lib/supabase/routes-adapter';
 
 /**
@@ -58,16 +64,17 @@ export function useRouteSync(): RouteSync {
   // What the server last accepted. The transition guard needs a *from*, and
   // deriving it from the current draft would compare a status to itself.
   const lastWrittenStatus = useRef<RouteStatus | null>(null);
-  // Which write is in flight, so a burst of marks does not produce a burst of
-  // overlapping upserts that land out of order.
+  // Which write is in flight, so two status changes in quick succession do not
+  // produce overlapping upserts that land out of order.
   const inFlight = useRef<Promise<void> | null>(null);
-
-  const summary = progress === null ? null : summarise(progress, draft.stops);
+  /** The route this hook was last looking at, so the moment it becomes a
+   *  different one is observable. That moment is the only thing left that can
+   *  close a day. */
+  const previousRoute = useRef<{ routeId: string; status: RouteStatus } | null>(null);
 
   const status = statusFor({
     isOptimized: draft.isOptimized,
     isUnderway: progress !== null,
-    isFinished: summary?.isFinished ?? false,
   });
 
   const write = useCallback(async (): Promise<void> => {
@@ -82,7 +89,7 @@ export function useRouteSync(): RouteSync {
     const outcome = await services.routes.save(
       toRows(draft, userId, {
         status,
-        progress,
+        unreachableStopIds: unreachableIn(result),
         totals:
           result === null
             ? null
@@ -106,7 +113,7 @@ export function useRouteSync(): RouteSync {
     }
 
     setFailure(outcome.failure);
-  }, [services, session?.userId, draft, progress, result, status, queryClient]);
+  }, [services, session?.userId, draft, result, status, queryClient]);
 
   /**
    * The newest `write`, held so `sync` can stay stable.
@@ -131,19 +138,58 @@ export function useRouteSync(): RouteSync {
   /**
    * The trigger.
    *
-   * `status` and the progress states are the only dependencies, deliberately.
-   * An edit that changes neither is a sketch being sketched, and the local store
-   * already holds it.
+   * `status` is the only dependency, deliberately. An edit that does not change
+   * it is a sketch being sketched, and the local store already holds it.
+   *
+   * There used to be a second dependency — a serialised copy of every stop's
+   * mark — because the driver produced a write per stop all day. They do not any
+   * more ([ADR-0027](../../docs/adr/0027-the-drive-happens-elsewhere.md)): a
+   * whole route now produces two writes, one when it is optimized and one when
+   * it is handed over.
    */
-  const progressKey = progress === null ? '' : JSON.stringify(progress.states);
-
   useEffect(() => {
     // A pure draft stays local until something happens to it worth recording.
     if (status === 'draft' && lastWrittenStatus.current === null) return;
     sync();
-    // `progressKey` is a string, not an object, so a re-render that rebuilds an
-    // identical progress map does not fire another write.
-  }, [status, progressKey, sync]);
+  }, [status, sync]);
+
+  /**
+   * Starting the next route is what finishes the last one.
+   *
+   * Nothing inside a route can finish it any more — there is no Done button and
+   * no final stop to mark ([ADR-0027](../../docs/adr/0027-the-drive-happens-elsewhere.md)).
+   * So the driver reaching for the next day is the signal, and it is a good one:
+   * nobody plans tomorrow's round while still driving today's.
+   *
+   * Only a route that was actually **handed over** is closed. One that was
+   * optimized and then abandoned was never driven, and marking it completed
+   * would put a day in History that never happened.
+   */
+  const routeId = draft.routeId;
+  useEffect(() => {
+    const superseded = completeSupersededRoute(
+      previousRoute.current === null || previousRoute.current.routeId === routeId
+        ? null
+        : previousRoute.current,
+    );
+
+    previousRoute.current = { routeId, status };
+    if (superseded === null || services === null) return;
+
+    void services.routes
+      .advance(superseded.routeId, superseded.from, superseded.to)
+      .then((outcome) => {
+        // A refused transition is not a user-facing failure: the previous route
+        // is already in a terminal state, which is where this was taking it.
+        if (outcome.ok) {
+          void queryClient.invalidateQueries({ queryKey: queryKeys.savedRoutes() });
+        }
+      });
+    // `status` is read, not depended on: this fires when the *route* changes,
+    // and re-running it on a status change would try to close a route that is
+    // still the current one.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routeId, services, queryClient]);
 
   return { failure, sync };
 }

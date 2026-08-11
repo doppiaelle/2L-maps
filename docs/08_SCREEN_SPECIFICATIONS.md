@@ -84,7 +84,6 @@ thumb during a gesture is a control the user misses while driving.
 | Import list | `(app)/import` | Modal: paste or CSV |
 | Stop detail | sheet-within-sheet | Label, note, actions |
 | Provider picker | `(app)/provider` | Modal, first run |
-| Route summary | `(app)/summary` | Completion, time saved |
 | History | `(app)/history` | Saved and past routes |
 | Settings | `(app)/settings` | Account, preferences, legal |
 
@@ -141,7 +140,7 @@ and stays true, which is the property the pinned-at-every-detent rule was protec
 | **Optimized** | Markers renumber with `motion-deliberate`. Polyline draws. Metrics update. Primary action becomes **Start** |
 | **Optimized, degraded (T0)** | As above, but: dashed `warning` connectors instead of a polyline; a `warning` chip in the sheet header reading "Estimated without traffic"; the label persists into history |
 | **Already optimal** | "Already the fastest order" stated positively in the header. Not silence, not an error |
-| **In progress** | Sheet at peek showing the current stop. Two actions: **Done** and **Skip**. Completed stops mint with checkmarks |
+| **Handed over** | Unchanged from **Optimized**. The driver left with Google Maps driving the whole sequence and comes back to what they left; Confirm hands it over again ([ADR-0027](adr/0027-the-drive-happens-elsewhere.md)). There is no per-stop state to show |
 | **Offline** | Persistent unobtrusive indicator. Map shows an explicit offline state. Search disabled with a reason. T0 offered if ≤8 stops |
 | **Optimization failed** | Inline error in the sheet header with retry. **The order is untouched** |
 | **Quota exhausted** | Sheet header states the limit, the reset date, and what still works. Primary action disabled with an explanation, not greyed silently |
@@ -209,28 +208,31 @@ attention** (each row with its reason and an edit action).
 Partial success is presented as success: the primary action reads "Add 22 stops" while three
 rows still need attention.
 
-### Route summary
+### Route summary — removed
 
-Shown on completing the final stop.
+There was a screen here, shown on marking the final stop, whose whole subject was a
+figure it never got to display:
 
 ```
-  ┌──────────────────────────────┐
-  │                              │
-  │        41 MIN                │  ← metric-xl. The proof.
-  │        SAVED                 │  ← label-sm
-  │                              │
-  │   12 stops · 34 km · 1h 12m  │  ← caption
-  │                              │
-  │  ┌────────────────────────┐  │
-  │  │      New route         │  │
-  │  └────────────────────────┘  │
-  └──────────────────────────────┘
+        41 MIN          ← metric-xl. The proof.
+        SAVED
+   12 stops · 34 km · 1h 12m
 ```
 
-Time saved is the measured difference between the optimized duration and the duration of the
-user's original entry order ([`12_DATABASE.md`](12_DATABASE.md) `baseline_duration_s`). **If the
-saving is zero or negative, the screen says so honestly** and shows the totals instead — an
-inflated number discovered to be false would destroy trust in every other number.
+**Nothing ever reached it.** It was the end of J3, and J3 began with a per-stop
+Done button that nobody pressed — the navigation app drives the whole route and
+the driver does not return between stops
+([ADR-0027](adr/0027-the-drive-happens-elsewhere.md)).
+
+The honesty rule that governed the number is what removed it rather than
+approximating it. Time saved had to be *the measured difference* between the
+optimized duration and the duration of the user's own entry order
+([`12_DATABASE.md`](12_DATABASE.md) `baseline_duration_s`) — never an estimate,
+because an inflated number discovered to be false would destroy trust in every
+other number on the screen. Measuring it honestly costs a third `computeRoutes`
+request per optimization, and the product owner declined that
+([`31_COST_MODEL.md`](31_COST_MODEL.md)). So there is no figure, and the finished
+route shows what was actually measured: **total duration and total distance**.
 
 ### History
 
@@ -330,7 +332,8 @@ achievable at all.
 - [ ] Dynamic Type verified at 200% on Plan at 25 stops.
 - [ ] Every gesture has a non-gesture equivalent.
 - [ ] Paywall verified against Guideline 3.1.2.
-- [ ] Time saved verified as a true measurement, including the zero case.
+- [ ] No screen shows a time-saved figure. It is absent rather than estimated, and
+      `baseline_duration_s` stays reserved (ADR-0027).
 - [ ] Plan verified functional with the map failed.
 
 ## 14. Roadmap
@@ -368,10 +371,13 @@ Recents before search is a cost decision wearing an interaction-design costume. 
 address book is free and search is the dominant COGS line, the ordering that saves money is
 also the ordering that saves the user time. That alignment is rare and worth exploiting.
 
-The route summary's honesty rule matters more than it appears. Time saved is the product's only
-numeric proof of value, and the temptation to compare against a deliberately bad baseline is
-real. Comparing against the user's own entry order — and admitting when it was already optimal —
-is what makes the number believable the other ninety percent of the time.
+The route summary's honesty rule outlived the screen it was written for, and that is the
+interesting part. Time saved was to be the product's only numeric proof of value, and the
+temptation to compare against a deliberately bad baseline was real; the rule said compare
+against the user's own entry order and admit when it was already optimal. When it turned out
+that honouring the rule cost a third upstream request per optimization, the rule won and the
+number went ([ADR-0027](adr/0027-the-drive-happens-elsewhere.md)). A specification that only
+binds when it is cheap is not a specification.
 
 ## 17. Rejected alternatives
 

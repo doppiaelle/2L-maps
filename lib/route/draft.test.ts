@@ -31,7 +31,6 @@ const stop = (id: string, placeId = `place-${id}`): Stop => ({
   position: 0,
   entryOrder: 0,
   coordinate: null,
-  isCompleted: false,
 });
 
 const draftWith = (ids: string[]) =>
@@ -343,7 +342,6 @@ describe('writing resolved coordinates into the stops', () => {
     position: 0,
     entryOrder: 0,
     coordinate: null,
-    isCompleted: false,
   });
 
   const resolved = (entries: Record<string, [number, number, string]>) =>

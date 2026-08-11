@@ -18,7 +18,6 @@ const stop = (id: string): Stop => ({
   position: 0,
   entryOrder: 0,
   coordinate: null,
-  isCompleted: false,
 });
 
 const newStore = () => createDraftRouteStore(memoryDraftStorage());
@@ -238,7 +237,6 @@ describe('reading a draft written by an older build', () => {
               note: null,
               position: 0,
               coordinate: null,
-              isCompleted: false,
             },
             {
               id: 'b',
@@ -248,7 +246,6 @@ describe('reading a draft written by an older build', () => {
               note: null,
               position: 1,
               coordinate: null,
-              isCompleted: false,
             },
           ],
           isDegraded: false,
@@ -290,7 +287,6 @@ describe('reading a draft written by an older build', () => {
               position: 0,
               entryOrder: 2,
               coordinate: null,
-              isCompleted: false,
             },
           ],
           isOptimized: true,

@@ -89,7 +89,6 @@ export default function AddStopScreen(): React.JSX.Element {
       // would be a coordinate with no refresh date, which is the one thing the
       // expiry rule cannot handle.
       coordinate: null,
-      isCompleted: false,
     });
 
     // Recorded whatever the source. A book that only remembers what was already

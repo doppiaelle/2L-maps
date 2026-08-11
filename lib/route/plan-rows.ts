@@ -1,10 +1,10 @@
 import { isCoordinateFresh } from '@/lib/coordinates/staleness';
 import { haversineMeters } from '@/lib/geo/haversine';
 import type { LatLng } from '@/lib/geo/haversine';
-import { stateOf } from '@/lib/route/progress';
+import { stopStateOf } from '@/lib/route/progress';
 import { stopTextOf } from '@/lib/route/stop-text';
 import type { StopText } from '@/lib/route/stop-text';
-import type { RouteProgress, StopProgressState } from '@/lib/route/progress';
+import type { StopProgressState } from '@/lib/route/progress';
 import type { PlaceId, Stop } from '@/types';
 
 /**
@@ -27,9 +27,13 @@ import type { PlaceId, Stop } from '@/types';
  * launch; preferring the cache unconditionally would draw a driver's route from
  * month-old data.
  *
- * **Progress decides a stop's state, not the stop's own flag.** `isCompleted` on
- * the stored stop is what the server last saw; the progress store is what
- * happened since, including the marks made with no signal at all.
+ * **The optimizer decides a stop's state, and nothing else does.** This used to
+ * read the progress store, because a stop could be completed or skipped by the
+ * driver. It cannot any more
+ * ([ADR-0027](../../docs/adr/0027-the-drive-happens-elsewhere.md)), so the only
+ * state a stop can be in beyond `pending` is `unreachable` — no road connects it
+ * — and that arrives on the optimization result, already computed, already
+ * server-side.
  */
 
 export interface PlanRow {
@@ -69,7 +73,10 @@ export interface ResolvedPlace {
 export interface PlanRowInputs {
   readonly stops: readonly Stop[];
   readonly resolved: ReadonlyMap<PlaceId, ResolvedPlace>;
-  readonly progress: RouteProgress | null;
+  /** Straight off the optimization result. Empty before there is one, which is
+   *  correct rather than merely convenient: nothing can be known to be
+   *  unreachable until something has tried to route to it. */
+  readonly unreachableStopIds: readonly string[];
   readonly now: Date;
 }
 
@@ -98,7 +105,7 @@ export function buildPlanRows(inputs: PlanRowInputs): PlanRows {
         : (fresh?.coordinate ?? null);
 
     const address = cached?.formattedAddress ?? fresh?.address ?? null;
-    const state = inputs.progress === null ? 'pending' : stateOf(inputs.progress, stop.id);
+    const state = stopStateOf(stop.id, inputs.unreachableStopIds);
 
     rows.push({
       id: stop.id,

@@ -70,7 +70,6 @@ export default function ImportScreen(): React.JSX.Element {
               // stamps a refresh date — and a coordinate without one is the
               // single case the expiry rule cannot handle.
               coordinate: null,
-              isCompleted: false,
             });
           });
 
