@@ -170,7 +170,8 @@ never on `message`.**
 | Idempotency | Required. A repeated key within 60 s returns the original result without a billable call |
 | Rate limit | 20 per hour per user |
 | Quota | 300 per calendar month per user |
-| Cache | Content-keyed; TTL 15 min |
+| Cache | Content-keyed on the **sorted stop set** plus origin, shape and departure bucket; TTL 6 h. Reordering alone is a hit — the optimizer's answer does not depend on the order the stops were typed in. Adding, removing or replacing a stop changes the key by construction, so a re-run needs no flag from the client. A hit still consumes a unit: the lookup sits after the quota check ([`13_BACKEND.md`](13_BACKEND.md) §5) |
+| Cache contents | The order is stored as **place ids**, never as the caller's `stopId`s, and leg ids are stripped. Two users with the same addresses share the entry and each gets the order back in their own terms; an entry that cannot be mapped onto the caller's stops is treated as a miss |
 | `unreachable` | Never causes total failure unless **all** stops are unreachable |
 
 ### `GET /places-autocomplete`

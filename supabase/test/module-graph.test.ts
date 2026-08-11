@@ -147,15 +147,32 @@ function walk(entryPoints: readonly string[]): Graph {
  */
 function specifiersIn(source: string): string[] {
   const found = new Set<string>();
+  // **Comments first.** These are regexes, not a parser, and a doc comment
+  // containing the words `from "where I am"` is indistinguishable from an
+  // import to one. That is not hypothetical: a prose line describing the cache
+  // key reflowed onto one line and this suite reported a missing import map
+  // entry for a phrase in English.
+  const code = withoutComments(source);
 
-  for (const match of source.matchAll(/\bfrom\s*['"]([^'"]+)['"]/g)) {
+  for (const match of code.matchAll(/\bfrom\s*['"]([^'"]+)['"]/g)) {
     if (match[1] !== undefined) found.add(match[1]);
   }
-  for (const match of source.matchAll(/\bimport\s*['"]([^'"]+)['"]/g)) {
+  for (const match of code.matchAll(/\bimport\s*['"]([^'"]+)['"]/g)) {
     if (match[1] !== undefined) found.add(match[1]);
   }
 
   return [...found];
+}
+
+/**
+ * Strip block and line comments.
+ *
+ * Crude on purpose — it does not need to survive a comment marker inside a
+ * string literal, because a specifier is what comes *after* `from`, and this
+ * only has to stop prose being read as code.
+ */
+function withoutComments(source: string): string {
+  return source.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/[^\n]*/g, ' ');
 }
 
 /** A path relative to the repository root, so a failure is clickable. */
