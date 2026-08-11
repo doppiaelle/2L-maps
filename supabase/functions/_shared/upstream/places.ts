@@ -193,6 +193,26 @@ export function createPlacesAdapter(options: PlacesAdapterOptions) {
       const resolved = results.flatMap((r) => (r.place === null ? [] : [r.place]));
       const unresolved = results.flatMap((r) => (r.place === null ? [r.placeId] : []));
 
+      // **Why a lookup failed, findable.** An id that Google will not return
+      // reaches the client as one row saying "Address needs refreshing", with
+      // nothing anywhere naming the cause — and it happens to some addresses and
+      // not others, which is the hardest kind of report to act on. The place id
+      // is a public identifier and carries no personal data (ADR-0007); the
+      // status is Google's own. Neither is the user's address.
+      for (const result of results) {
+        if (result.place !== null) continue;
+        console.error(
+          JSON.stringify({
+            event: 'place_unresolved',
+            placeId: result.placeId,
+            // Null when Google answered 200 with a body we could not read — a
+            // place with no `location`, which is a different fault from a refusal.
+            upstreamStatus: result.failure?.kind === 'rejected' ? result.failure.status : null,
+            reason: result.failure?.kind ?? 'unreadable',
+          }),
+        );
+      }
+
       const retryableFailures = results.filter((r) => r.failure?.retryable === true);
       const outage =
         resolved.length === 0 && retryableFailures.length === results.length && results.length > 0
