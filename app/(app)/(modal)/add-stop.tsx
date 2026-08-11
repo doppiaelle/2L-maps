@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useColorScheme } from 'react-native';
 
 import { useConnectivity } from '@/features/network/connectivity-provider';
@@ -28,6 +28,18 @@ import type { SourcedOption } from '@/lib/places/search';
  */
 export default function AddStopScreen(): React.JSX.Element {
   const scheme = useColorScheme();
+
+  /**
+   * Whether this search is choosing the route's **start** rather than a stop.
+   *
+   * The same screen, because it is the same question — which place — and a
+   * second search screen would be the same code with one branch changed. What
+   * differs is where the answer goes, and "My location" is offered
+   * unconditionally here: starting from where the van is parked is the ordinary
+   * case for a round, and making the driver type to reveal it hid the one option
+   * they wanted (`docs/18_PERMISSIONS.md` §4).
+   */
+  const isChoosingOrigin = useLocalSearchParams<{ origin?: string }>().origin === '1';
 
   const draft = useDraftRouteStore((store) => store.draft);
   const addStopToDraft = useDraftRouteStore((store) => store.addStopToDraft);
@@ -67,6 +79,14 @@ export default function AddStopScreen(): React.JSX.Element {
   });
 
   const add = (option: SourcedOption) => {
+    if (isChoosingOrigin) {
+      setOrigin(option.placeId, false);
+      book.record(option.placeId);
+      search.endSession();
+      router.back();
+      return;
+    }
+
     addStopToDraft({
       // Short and generated. Embedding the place id here put it over the
       // contract's 64-character ceiling for a long address, and it is already
@@ -115,7 +135,7 @@ export default function AddStopScreen(): React.JSX.Element {
         isOffline: isOffline(connectivity),
         isSearching: search.isSearching,
       })}
-      offersCurrentLocation={offersCurrentLocation(search.query)}
+      offersCurrentLocation={isChoosingOrigin || offersCurrentLocation(search.query)}
       isLocationDenied={location.permission === 'denied'}
       onUseCurrentLocation={() => {
         void location.enable().then((started) => {
@@ -128,6 +148,11 @@ export default function AddStopScreen(): React.JSX.Element {
           // and the draft has modelled it as its own field since the first
           // commit — adding it to the list would put a stop with no durable key
           // into a list keyed by one (ADR-0007).
+          //
+          // **It now appears on screen.** Until the "From" row existed this wrote
+          // the origin and closed the modal, so from the driver's side picking
+          // "My location" produced no visible change at all — which is exactly
+          // how it was reported.
           setOrigin(null, true);
           router.back();
         });

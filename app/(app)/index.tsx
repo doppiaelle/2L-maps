@@ -37,6 +37,7 @@ import type { RouteView } from '@/lib/route/route-view';
 import { handoffNoticeOf } from '@/lib/handoff/outcome-notice';
 import { newRouteId } from '@/lib/route/route-id';
 import { actionIntentOf, planStateOf } from '@/lib/route/plan-state';
+import { reorderableCount, routeEndsOf, shapeForEnd } from '@/lib/route/route-ends';
 import { unreachableIn } from '@/lib/route/progress';
 import { wasAlreadyOptimal } from '@/lib/route/draft';
 
@@ -73,6 +74,7 @@ export default function PlanScreen(): React.JSX.Element {
   const removeStopById = useDraftRouteStore((store) => store.removeStopById);
   const undoRemove = useDraftRouteStore((store) => store.undoRemove);
   const moveStopTo = useDraftRouteStore((store) => store.moveStopTo);
+  const setRouteShape = useDraftRouteStore((store) => store.setRouteShape);
   const resetDraft = useDraftRouteStore((store) => store.reset);
   const applyResolvedCoordinates = useDraftRouteStore((store) => store.applyResolvedCoordinates);
 
@@ -138,7 +140,9 @@ export default function PlanScreen(): React.JSX.Element {
   // and expired on the map because the clock moved between two calls.
   const now = new Date();
 
-  const places = useResolvedPlaces(placeIdsToResolve(draft.stops, now));
+  // The origin travels with the stops. Its address is what the "From" row says,
+  // and the draft holds only its id (ADR-0007).
+  const places = useResolvedPlaces(placeIdsToResolve(draft.stops, now, draft.originPlaceId));
 
   // What the lookup returned is kept, rather than re-bought on the next render,
   // the next launch and every time the stop list changes shape. The thirty-day
@@ -164,6 +168,29 @@ export default function PlanScreen(): React.JSX.Element {
     unreachableStopIds: unreachableIn(result),
     now,
   });
+
+  /**
+   * Where the round starts and finishes.
+   *
+   * Both ends were invisible: the origin was a field no screen drew, and
+   * `setRouteShape` had no caller at all, so every route was one-way — which
+   * pins the last typed stop as the destination and withholds it from the
+   * optimizer (ADR-0027).
+   */
+  const ends = routeEndsOf({
+    originPlaceId: draft.originPlaceId,
+    originIsCurrentLocation: draft.originIsCurrentLocation,
+    originAddress:
+      draft.originPlaceId === null
+        ? null
+        : (places.byPlaceId.get(draft.originPlaceId)?.address ?? null),
+    shape: draft.shape,
+    firstStopTitle: rows[0]?.text.title ?? null,
+  });
+
+  // The route starts from stop one only when no origin was chosen at all — the
+  // same condition `optimizeUpstream` applies, and it costs a movable stop.
+  const startsFromFirstStop = draft.originPlaceId === null && !draft.originIsCurrentLocation;
 
   const quota = useUsageQuota();
   const availability = useOptimizeAvailability(draft.stops.length, quota);
@@ -414,6 +441,30 @@ export default function PlanScreen(): React.JSX.Element {
                   },
                 })}
             stops={rows}
+            ends={{
+              ends,
+              theme,
+              onEditStart: () => {
+                router.push('/add-stop?origin=1');
+              },
+              onSelectEnd: (end) => {
+                // The store already clears the result: the optimal order
+                // genuinely differs between the two shapes, so a cached answer
+                // for one is not an answer for the other.
+                setRouteShape(shapeForEnd(end));
+              },
+              reorderable:
+                draft.stops.length < 3
+                  ? null
+                  : {
+                      movable: reorderableCount({
+                        stopCount: draft.stops.length,
+                        end: draft.shape === 'round-trip' ? 'back-to-start' : 'last-stop',
+                        startsFromFirstStop,
+                      }),
+                      total: draft.stops.length,
+                    },
+            }}
             distance={distance}
             duration={duration}
             onSelectStop={selectStop}

@@ -195,6 +195,8 @@ export function createRoutesAdapter(options: RoutesAdapterOptions) {
       if (order === null) {
         return { ok: false, failure: { kind: 'no-route', retryable: false } };
       }
+
+      logOptimizedOrder(request, order);
       return { ok: true, order };
     },
 
@@ -356,4 +358,49 @@ function readPolyline(value: unknown): string | null {
   if (typeof value !== 'object' || value === null) return null;
   const encoded = (value as Record<string, unknown>)['encodedPolyline'];
   return typeof encoded === 'string' ? encoded : null;
+}
+
+/**
+ * What we asked to be ordered, and what came back.
+ *
+ * **Because "is it choosing the best order?" is not answerable from here.** A
+ * refusal is logged (`upstream_refused`), but a *surprising success* is not, and
+ * a driver reporting an order they did not expect leaves us with a guess. This
+ * turns the next such report into a fact — which is the whole of `CLAUDE.md` §13
+ * rule 11: read what the upstream said rather than reconstructing it.
+ *
+ * It also settles a reading that **two intermediates cannot distinguish**. This
+ * adapter takes `optimizedIntermediateWaypointIndex[i]` to be the original index
+ * of the stop that comes *i*-th; the inverse reading — the new position of
+ * original stop *i* — produces identical output for every permutation of two,
+ * and different output for three or more. One real route with three
+ * intermediates says which it is.
+ *
+ * **Place ids only.** They are public identifiers naming a building rather than
+ * a person, which is the same reasoning `coordinatesIn` sets out for why
+ * coordinates are scrubbed and ids are not
+ * ([ADR-0007](../../../docs/adr/0007-place-id-durable-coordinates-perishable.md),
+ * `CLAUDE.md` §9 rule 7). A coordinate origin contributes nothing here.
+ */
+function logOptimizedOrder(request: RoutesRequest, order: readonly number[]): void {
+  console.log(
+    JSON.stringify({
+      event: 'optimize_order',
+      submitted: request.intermediates.map((waypoint) =>
+        waypoint.kind === 'place' ? waypoint.placeId : 'coordinate',
+      ),
+      returned: order,
+      isRoundTrip: sameWaypoint(request.origin, request.destination),
+    }),
+  );
+}
+
+/** Whether the route comes back to where it started, which is what decides
+ *  whether the last stop was pinned or offered for reordering. */
+function sameWaypoint(a: RoutesWaypoint, b: RoutesWaypoint): boolean {
+  if (a.kind === 'place' && b.kind === 'place') return a.placeId === b.placeId;
+  if (a.kind === 'coordinate' && b.kind === 'coordinate') {
+    return a.latitude === b.latitude && a.longitude === b.longitude;
+  }
+  return false;
 }

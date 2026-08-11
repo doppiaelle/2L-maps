@@ -4,6 +4,7 @@ import { Text as RNText } from 'react-native';
 import { PlanView } from './PlanView';
 import type { PlanViewProps } from './PlanView';
 import { actionIntentOf, planStateOf } from '@/lib/route/plan-state';
+import { routeEndsOf } from '@/lib/route/route-ends';
 import type { PlanInputs } from '@/lib/route/plan-state';
 import type { OptimizeAvailability } from '@/lib/entitlement/plans';
 
@@ -187,6 +188,54 @@ describe('the map’s own controls', () => {
     });
 
     expect(screen.queryByLabelText('Add a stop')).toBeNull();
+  });
+});
+
+describe('where the round starts and ends', () => {
+  const ends = (overrides: Partial<Parameters<typeof routeEndsOf>[0]> = {}) => ({
+    ends: routeEndsOf({
+      originPlaceId: null,
+      originIsCurrentLocation: true,
+      originAddress: null,
+      shape: 'one-way' as const,
+      firstStopTitle: 'Via 0, Bergamo',
+      ...overrides,
+    }),
+    theme: 'light' as const,
+    onEditStart: noop,
+    onSelectEnd: noop,
+  });
+
+  it('shows where the route starts, which nothing ever did', () => {
+    // The origin has been on the draft since the first commit and no screen drew
+    // it, so picking "My location" produced no visible change at all (ADR-0027).
+    renderPlan({}, allowed, { ends: ends() });
+    expect(screen.getByTestId('route-start')).toBeTruthy();
+    expect(screen.getByText('My location')).toBeTruthy();
+  });
+
+  it('offers the return that was unreachable', () => {
+    // `setRouteShape` had no caller, so every route was one-way — and a one-way
+    // route pins its last typed stop as the destination.
+    renderPlan({}, allowed, { ends: ends() });
+    expect(screen.getByTestId('route-end-back-to-start')).toBeTruthy();
+    expect(screen.getByText('Back to my location')).toBeTruthy();
+  });
+
+  it('says how many stops are actually reorderable', () => {
+    renderPlan({}, allowed, {
+      ends: { ...ends(), reorderable: { movable: 2, total: 4 } },
+    });
+    expect(screen.getByText('2 of 4 stops can be reordered')).toBeTruthy();
+  });
+
+  it('keeps it off the map, where the question is already answered', () => {
+    renderPlan({ hasResult: true }, allowed, {
+      view: 'map',
+      mapSlot: <RNText>map</RNText>,
+      ends: ends(),
+    });
+    expect(screen.queryByTestId('plan-route-ends')).toBeNull();
   });
 });
 

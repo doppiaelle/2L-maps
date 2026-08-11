@@ -132,10 +132,26 @@ export function buildPlanRows(inputs: PlanRowInputs): PlanRows {
  * launch would be a billed batch for data already held — and `/place-details`
  * is metered like everything else (`docs/31_COST_MODEL.md`).
  */
-export function placeIdsToResolve(stops: readonly Stop[], now: Date): readonly PlaceId[] {
+export function placeIdsToResolve(
+  stops: readonly Stop[],
+  now: Date,
+  /**
+   * The route's starting place, when one was chosen.
+   *
+   * The draft holds an id and nothing else for it — no coordinate cache to check
+   * freshness against — so it is always asked for. That is one lookup, shared
+   * with the stops when it happens to be one of them, and answered by React
+   * Query's cache on every render after the first. Without it the origin can be
+   * *shown* only as "Saved starting point", which is what a driver sees for a
+   * place they picked by name.
+   */
+  originPlaceId: PlaceId | null = null,
+): readonly PlaceId[] {
   const needed = stops
     .filter((stop) => !isCoordinateFresh(stop.coordinate, now))
     .map((stop) => stop.placeId);
+
+  if (originPlaceId !== null) needed.push(originPlaceId);
 
   // Deduplicated: the same address twice in a day is a real working route — a
   // morning delivery and an afternoon collection — and it is one lookup.

@@ -5,6 +5,8 @@ import { StopList } from '@/components/lists/StopList';
 import type { StopListItem } from '@/components/lists/StopList';
 import { PrimaryAction } from '@/components/primitives/PrimaryAction';
 import type { PrimaryActionState } from '@/components/primitives/PrimaryAction';
+import { RouteEndsControl } from '@/components/route/RouteEndsControl';
+import type { RouteEndsControlProps } from '@/components/route/RouteEndsControl';
 import { RouteSummaryHeader } from '@/components/route/RouteSummaryHeader';
 import { StatusChip } from '@/components/primitives/StatusChip';
 import type { AddressNotice } from '@/lib/places/notice';
@@ -91,6 +93,13 @@ export interface PlanViewProps {
   readonly stops: readonly StopListItem[];
   readonly distance: PlanMetric | null;
   readonly duration: PlanMetric | null;
+  /**
+   * Where the round starts and finishes, already decided by `routeEndsOf`.
+   *
+   * Absent on the map, where the question has been answered and the only thing
+   * left is whether to set off.
+   */
+  readonly ends?: RouteEndsControlProps | null;
 
   onSelectStop: (stopId: string) => void;
   /**
@@ -143,6 +152,7 @@ export function PlanView({
   stops,
   distance,
   duration,
+  ends = null,
   onSelectStop,
   onRemoveStop,
   onMoveStop,
@@ -186,6 +196,12 @@ export function PlanView({
           {...chipFor(state)}
           {...noteFor(state)}
         />
+
+        {/* Under the metrics and above the list: the two ends of the round are
+            read before Optimize is pressed, not asked about in front of it
+            (`CLAUDE.md` §7 rule 8). Hidden on the map, where the question has
+            already been answered. */}
+        {ends !== null && view !== 'map' && <RouteEndsControl {...ends} testID="plan-route-ends" />}
       </View>
 
       {addressNotice !== null && (

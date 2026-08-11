@@ -272,6 +272,7 @@ these are what tell them apart ([ADR-0026](adr/0026-google-tells-us-what-is-wron
 |---|---|---|---|
 | `upstream_refused` | **Any** upstream refused — Places, Routes, Anthropic or OpenRouter | `api` (which one), `httpStatus`, `upstreamCode` (the provider's own enum), and its **message: the field, value or model it objected to** | the one that made the call |
 | `place_unresolved` | A `place_id` could not be turned into coordinates | The id and the upstream status. This is what puts "Address needs refreshing" on a row | **`place-details`** |
+| `optimize_order` | Google returned an order — **on success, not on failure** | The `place_id`s submitted for reordering, the index array returned, and whether the route was a round trip. It is how "is it choosing the best order?" gets answered from a real route rather than guessed, and with **three or more** intermediates it also settles which way the index array reads (`CLAUDE.md` §13 rule 11) | **`optimize`** |
 | `autocomplete_failed` | `/places-autocomplete` gave up | Which of the four failures, and the upstream status | `places-autocomplete` |
 | `request_rejected` | A request failed our own schema before the pipeline ran | The endpoint and the **field names** that failed | any |
 | `request_refused` | The pipeline refused — no entitlement, quota, rate limit | The endpoint and the code | any |
