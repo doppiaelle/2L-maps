@@ -59,6 +59,15 @@ export interface PlanViewProps {
   /** The X. Leaves the result behind and returns to the list — with the stops
    *  intact, which is what "back to the list" has to mean. */
   onDismissMap?: () => void;
+  /**
+   * Points to keep clear at the bottom, in map mode.
+   *
+   * The drawn route runs the whole height with the dock floating over it, so the
+   * primary control has to be lifted above the dock by hand — otherwise Confirm
+   * sits underneath the navigation and cannot be pressed. Zero in list mode,
+   * where the panel already stops above the dock.
+   */
+  readonly bottomInset?: number;
   readonly stops: readonly StopListItem[];
   readonly distance: PlanMetric | null;
   readonly duration: PlanMetric | null;
@@ -127,6 +136,7 @@ export function PlanView({
   view = 'list',
   mapSlot,
   onDismissMap,
+  bottomInset = 0,
   testID,
 }: PlanViewProps): React.JSX.Element {
   const actionState = useMemo(() => toActionState(intent, state), [intent, state]);
@@ -185,7 +195,8 @@ export function PlanView({
           show, so nothing around it moves as the section changes face. */}
       <View style={{ flex: 1 }}>
         {view === 'map' ? (
-          <View style={{ flex: 1, paddingHorizontal: layout.screenPadding }}>
+          // No horizontal padding: the drawing is the ground, not a card on it.
+          <View style={{ flex: 1 }}>
             {mapSlot}
 
             {onDismissMap !== undefined && (
@@ -201,7 +212,7 @@ export function PlanView({
                 style={{
                   position: 'absolute',
                   top: space.space3,
-                  right: layout.screenPadding + space.space3,
+                  right: space.space3,
                   width: layout.touchMin,
                   height: layout.touchMin,
                   borderRadius: radius.radiusFull,
@@ -226,7 +237,12 @@ export function PlanView({
         )}
       </View>
 
-      <View style={{ paddingHorizontal: layout.screenPadding, paddingBottom: space.space3 }}>
+      <View
+        style={{
+          paddingHorizontal: layout.screenPadding,
+          paddingBottom: space.space3 + bottomInset,
+        }}
+      >
         {actionState !== null && (
           <PrimaryAction state={actionState} onPress={onPrimaryAction} testID="plan-action" />
         )}

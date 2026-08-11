@@ -7,6 +7,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo } from 'react';
 import { useColorScheme } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import '../global.css';
 import { ThemeVariables } from '@/components/design/ThemeVariables';
@@ -108,40 +109,46 @@ export default function RootLayout(): React.JSX.Element {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      {/* Above every screen, because CSS variables inherit down the tree: this
+      {/* Explicit rather than relied upon. The navigator supplies one of these
+          on most paths, and `useSafeAreaInsets` silently returns zeros when it
+          does not — which is a section starting under the status bar and a dock
+          sitting on the gesture bar, with nothing to indicate why. */}
+      <SafeAreaProvider>
+        {/* Above every screen, because CSS variables inherit down the tree: this
           is what gives `text-primary` and every other colour class a value, and
           what makes those values follow the theme. Without it they resolve to
           nothing (`components/design/ThemeVariables.tsx`). */}
-      <ThemeVariables theme={scheme === 'dark' ? 'dark' : 'light'}>
-        <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
-          <ConnectivityProvider port={connectivity}>
-            <SessionProvider auth={auth}>
-              {/* Inside `SessionProvider`, because the services are null until
+        <ThemeVariables theme={scheme === 'dark' ? 'dark' : 'light'}>
+          <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
+            <ConnectivityProvider port={connectivity}>
+              <SessionProvider auth={auth}>
+                {/* Inside `SessionProvider`, because the services are null until
                 there is a session: every endpoint behind them is authenticated,
                 and a query firing during the cold-start gap would cache the
                 signed-out answer and leave a paying user on the free
                 allowances. */}
-              <ServicesProvider baseUrl={baseUrl} routes={routes} favourites={favourites}>
-                {/* Both null: RevenueCat needs an account and three configured
+                <ServicesProvider baseUrl={baseUrl} routes={routes} favourites={favourites}>
+                  {/* Both null: RevenueCat needs an account and three configured
                   products, AdMob needs an account and a certified CMP for the
                   EEA (ADR-0015). Absence is the ordinary case until they exist,
                   which is what keeps every screen that touches them working. */}
-                <MonetisationProvider billing={null} ads={null}>
-                  {/* Above the screens rather than inside one, because the map
+                  <MonetisationProvider billing={null} ads={null}>
+                    {/* Above the screens rather than inside one, because the map
                       follows the driver and the add-stop modal needs the same
                       fix: two subscribers would be two GPS subscriptions. */}
-                  <LocationProvider port={location}>
-                    <DeepLinkProvider port={linking}>
-                      <StatusBar style="auto" />
-                      <RestorationGate />
-                    </DeepLinkProvider>
-                  </LocationProvider>
-                </MonetisationProvider>
-              </ServicesProvider>
-            </SessionProvider>
-          </ConnectivityProvider>
-        </PersistQueryClientProvider>
-      </ThemeVariables>
+                    <LocationProvider port={location}>
+                      <DeepLinkProvider port={linking}>
+                        <StatusBar style="auto" />
+                        <RestorationGate />
+                      </DeepLinkProvider>
+                    </LocationProvider>
+                  </MonetisationProvider>
+                </ServicesProvider>
+              </SessionProvider>
+            </ConnectivityProvider>
+          </PersistQueryClientProvider>
+        </ThemeVariables>
+      </SafeAreaProvider>
     </GestureHandlerRootView>
   );
 }

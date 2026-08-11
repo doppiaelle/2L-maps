@@ -24,7 +24,9 @@ import { SettingsSection } from '@/features/settings/SettingsSection';
 import { dockItems, toggleSection } from '@/lib/ui/dock';
 import { NoticeToast } from '@/components/feedback/NoticeToast';
 import { UndoToast } from '@/components/feedback/UndoToast';
-import { space } from '@/lib/design/tokens';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { colours, space } from '@/lib/design/tokens';
 import { addressNoticeOf } from '@/lib/places/notice';
 import { formatDistance, formatDuration } from '@/lib/format/units';
 import { buildPlanRows, placeIdsToResolve, straightLineMeters } from '@/lib/route/plan-rows';
@@ -106,6 +108,9 @@ export default function PlanScreen(): React.JSX.Element {
   const { open: openRoute } = useOpenRoute();
 
   const isBackgrounded = useIsBackgrounded();
+  // The device's own edges. Read once, here, and passed down: a component that
+  // asks answers differently in a test and in split screen.
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     // Cleared once honoured. Leaving it set would re-open the same route on
@@ -253,10 +258,27 @@ export default function PlanScreen(): React.JSX.Element {
 
   const theme = scheme === 'dark' ? 'dark' : 'light';
 
+  const isMapShowing = showsMap(routeView, result !== null);
+
   return (
-    <View style={{ flex: 1 }} testID="plan-screen">
+    <View
+      // **The background was never set**, so under the dock — past where the
+      // section panel stops — the window's own colour showed through as a white
+      // band across the bottom of a dark screen. One surface, one colour, edge
+      // to edge.
+      style={{ flex: 1, backgroundColor: colours[theme].bg }}
+      testID="plan-screen"
+    >
       {activeSection === 'itinerary' && (
-        <SectionPanel theme={theme} testID="section-itinerary">
+        <SectionPanel
+          theme={theme}
+          // The status bar. Without it the section began under the clock.
+          topInset={insets.top}
+          // The drawn route runs the whole height with the dock floating on it;
+          // the stop list stops above the dock, or its last row is unreachable.
+          extendsBehindDock={isMapShowing}
+          testID="section-itinerary"
+        >
           <PlanView
             state={state}
             intent={actionIntentOf(state, availability)}
@@ -264,7 +286,9 @@ export default function PlanScreen(): React.JSX.Element {
             // (ADR-0022). `showsMap` is the floor: a view of 'map' with no
             // result would draw an empty canvas, and the drawn map has no tiles
             // to fall back on.
-            view={showsMap(routeView, result !== null) ? 'map' : 'list'}
+            view={isMapShowing ? 'map' : 'list'}
+            // Lifts Confirm clear of the dock the map runs underneath.
+            bottomInset={isMapShowing ? DOCK_OUTER_HEIGHT : 0}
             mapSlot={
               result === null ? null : (
                 <RouteCanvas
@@ -385,18 +409,20 @@ export default function PlanScreen(): React.JSX.Element {
       )}
 
       {activeSection === 'history' && (
-        <SectionPanel theme={theme} testID="section-history">
+        <SectionPanel theme={theme} topInset={insets.top} testID="section-history">
           <HistorySection onOpenRoute={closeSection} theme={theme} />
         </SectionPanel>
       )}
 
       {activeSection === 'settings' && (
-        <SectionPanel theme={theme} testID="section-settings">
+        <SectionPanel theme={theme} topInset={insets.top} testID="section-settings">
           <SettingsSection theme={theme} />
         </SectionPanel>
       )}
 
       <Dock
+        // The gesture bar sits below the dock rather than behind it.
+        bottomInset={insets.bottom}
         items={dockItems(activeSection, { isRouteInProgress: progress !== null })}
         onSelect={(section) => {
           // `toggleSection` decides; the screen only routes. Tapping the open
@@ -417,7 +443,7 @@ export default function PlanScreen(): React.JSX.Element {
           title={handoffNotice.title}
           detail={handoffNotice.detail}
           kind={handoffNotice.kind}
-          bottomOffset={DOCK_OUTER_HEIGHT + space.space2}
+          bottomOffset={DOCK_OUTER_HEIGHT + insets.bottom + space.space2}
           theme={theme}
           onDismiss={() => {
             setHandoffNotice(null);

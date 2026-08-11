@@ -140,12 +140,10 @@ export const RouteCanvas = memo(function RouteCanvas({
 
   return (
     <View
-      style={{
-        flex: 1,
-        backgroundColor: map.land,
-        borderRadius: radius.radiusLg,
-        overflow: 'hidden',
-      }}
+      // No corner radius and no inset: the drawing is the ground the section
+      // stands on, and it runs under the dock rather than stopping at it
+      // (ADR-0022). A rounded card would read as a panel with a map inside it.
+      style={{ flex: 1, backgroundColor: map.land }}
       onLayout={(event) => {
         const { width, height } = event.nativeEvent.layout;
         setSize((current) =>

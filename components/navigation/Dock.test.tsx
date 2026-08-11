@@ -129,3 +129,44 @@ describe('the panel over the map', () => {
     expect(screen.getByTestId('panel').props.accessibilityViewIsModal).toBe(true);
   });
 });
+
+/**
+ * The edges of the device, which the panel had no idea about.
+ *
+ * Both of these were reported from a phone rather than found in review, and both
+ * are the kind of defect a simulator at default settings hides: the section
+ * began under the status bar, and below the dock the window's own colour showed
+ * through as a white band across the bottom of a dark screen.
+ */
+describe('the section panel and the device', () => {
+  it('starts below the status bar, not under it', () => {
+    render(
+      <SectionPanel theme="light" topInset={48} testID="panel">
+        {null}
+      </SectionPanel>,
+    );
+    // The inset plus the product's own margin, never one or the other.
+    expect(screen.getByTestId('panel').props.style.paddingTop).toBeGreaterThan(48);
+  });
+
+  it('stops above the dock for a list, whose last row must be reachable', () => {
+    render(
+      <SectionPanel theme="light" testID="panel">
+        {null}
+      </SectionPanel>,
+    );
+    expect(screen.getByTestId('panel').props.style.bottom).toBe(DOCK_OUTER_HEIGHT);
+  });
+
+  it('runs the whole height for a surface, so the map passes under the dock', () => {
+    // Stopping the drawing short leaves a band of background between the map and
+    // the dock, and the map reads as a panel rather than as the ground
+    // (ADR-0022).
+    render(
+      <SectionPanel theme="light" extendsBehindDock testID="panel">
+        {null}
+      </SectionPanel>,
+    );
+    expect(screen.getByTestId('panel').props.style.bottom).toBe(0);
+  });
+});
