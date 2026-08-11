@@ -26,6 +26,7 @@ const stop = (id: string, overrides: Partial<Stop> = {}): Stop => ({
     formattedAddress: `Via ${id}, Bergamo`,
     refreshedAt: daysAgo(1),
   },
+  placeText: null,
   isCompleted: false,
   ...overrides,
 });

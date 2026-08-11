@@ -2,6 +2,8 @@ import { isCoordinateFresh } from '@/lib/coordinates/staleness';
 import { haversineMeters } from '@/lib/geo/haversine';
 import type { LatLng } from '@/lib/geo/haversine';
 import { stateOf } from '@/lib/route/progress';
+import { stopTextOf } from '@/lib/route/stop-text';
+import type { StopText } from '@/lib/route/stop-text';
 import type { RouteProgress, StopProgressState } from '@/lib/route/progress';
 import type { PlaceId, Stop } from '@/types';
 
@@ -33,8 +35,18 @@ import type { PlaceId, Stop } from '@/types';
 export interface PlanRow {
   readonly id: string;
   readonly position: number;
-  /** Null when the purge has taken it. The row still renders — the user's label
-   *  carries it, or it says the address needs refreshing. */
+  /**
+   * The two lines the row draws, already decided.
+   *
+   * **The row used to decide this itself**, with `label ?? address ??
+   * 'Address needs refreshing'` — three sources reconciled inside a component,
+   * with no notion of the thirty-day clock and no way to say whether the
+   * placeholder meant "expired" or "the second round trip has not landed yet".
+   * `stopTextOf` owns the rule now, and it is tested without a renderer.
+   */
+  readonly text: StopText;
+  /** Null when the purge has taken it. Kept alongside `text` because the map
+   *  and the handoff need the address itself, not the line a row shows. */
   readonly address: string | null;
   readonly label: string | null;
   readonly state: StopProgressState;
@@ -91,6 +103,7 @@ export function buildPlanRows(inputs: PlanRowInputs): PlanRows {
     rows.push({
       id: stop.id,
       position: index + 1,
+      text: stopTextOf({ stop, resolvedAddress: fresh?.address ?? null, now: inputs.now }),
       address,
       label: stop.label,
       state,

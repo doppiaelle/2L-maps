@@ -1,6 +1,7 @@
 import { Pressable, Text, View } from 'react-native';
 
 import { layout } from '@/lib/design/tokens';
+import type { StopText } from '@/lib/route/stop-text';
 
 /**
  * One stop in the list.
@@ -29,10 +30,15 @@ export type StopState = 'pending' | 'completed' | 'skipped' | 'unreachable';
 
 export interface StopRowProps {
   readonly position: number;
-  /** Null once the 30-day purge has taken it with the coordinates. */
-  readonly address: string | null;
-  /** User-authored, and shown above the address when present. */
-  readonly label: string | null;
+  /**
+   * The two lines to draw, decided upstream by `stopTextOf`.
+   *
+   * **The row used to reconcile the sources itself** — `label ?? address ??
+   * 'Address needs refreshing'` — which put a domain rule in a component with
+   * no notion of the thirty-day clock, and made the placeholder mean two very
+   * different things at once (`CLAUDE.md` §1).
+   */
+  readonly text: StopText;
   readonly state: StopState;
   /** Null once the 30-day cache has expired. */
   readonly hasCoordinate: boolean;
@@ -69,8 +75,7 @@ const PRESENTATION: Readonly<
 
 export function StopRow({
   position,
-  address,
-  label,
+  text,
   state,
   hasCoordinate,
   meta,
@@ -81,11 +86,7 @@ export function StopRow({
   testID,
 }: StopRowProps): React.JSX.Element {
   const presentation = PRESENTATION[state];
-  // The user's own words first, then Google's, then an honest admission. A row
-  // that renders an empty line for a purged address looks like a bug in the list
-  // rather than a stop that needs re-resolving.
-  const title = label ?? address ?? 'Address needs refreshing';
-  const subtitle = label !== null ? address : null;
+  const { title, subtitle } = text;
 
   return (
     <Pressable

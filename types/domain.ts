@@ -25,12 +25,41 @@ export interface CoordinateCache {
   readonly refreshedAt: string;
 }
 
+/**
+ * What Google called this place, kept so a row can be read without buying it again.
+ *
+ * **The absence of this was the whole of "Address needs refreshing".** Autocomplete
+ * returns the two lines a row displays — "Via Roma 12" / "Torino, TO, Italia" —
+ * and the app threw them away at the moment of choosing, then made every row
+ * depend on a second, billed `/place-details` round trip to recover text it had
+ * already been given. A stop whose lookup had not landed showed a placeholder;
+ * offline, it showed it for ever.
+ *
+ * **Not `label`.** That field is documented as user-authored and stored
+ * indefinitely. This is Google-derived, so it perishes at thirty days on exactly
+ * the same clock as a coordinate
+ * ([ADR-0007](../docs/adr/0007-place-id-durable-coordinates-perishable.md)) —
+ * which is why it carries its own `refreshedAt` rather than borrowing the
+ * coordinate's, and why it is a separate field rather than a convenient string.
+ */
+export interface PlaceTextCache {
+  /** The first line: the street and number, or the place's name. */
+  readonly primaryText: string;
+  /** The second: town, province, country. May be empty — some places have none. */
+  readonly secondaryText: string;
+  /** When Google last told us this. Drives expiry, same as a coordinate's. */
+  readonly refreshedAt: string;
+}
+
 /** One place the user intends to visit. Not the same as a waypoint. */
 export interface Stop {
   readonly id: string;
   readonly placeId: PlaceId;
   /** User-authored. User content, stored indefinitely. */
   readonly label: string | null;
+  /** Google's own words for this place, perishable. Null when it was never
+   *  captured — an older draft, or a stop typed by hand. */
+  readonly placeText: PlaceTextCache | null;
   readonly note: string | null;
   /** Zero-based position in the route as it currently stands. After an
    *  optimization this is the optimized order. */

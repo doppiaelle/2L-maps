@@ -14,8 +14,7 @@ import { LIST_VIRTUALISATION_THRESHOLD } from '@/types';
 const stop = (i: number): StopListItem => ({
   id: `stop-${i}`,
   position: i + 1,
-  address: `Via ${i}, Bergamo`,
-  label: null,
+  text: { title: `Via ${i}, Bergamo`, subtitle: null, needsRefreshing: false },
   state: 'pending',
   hasCoordinate: true,
   meta: null,

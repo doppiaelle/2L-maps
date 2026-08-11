@@ -48,6 +48,7 @@ const stop = (id: string, position: number): Stop => ({
   id,
   placeId: `place-${id}`,
   label: null,
+  placeText: null,
   note: null,
   position,
   entryOrder: position,

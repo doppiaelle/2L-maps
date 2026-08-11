@@ -219,6 +219,10 @@ export function fromRows(route: RouteRow, stops: readonly StopRow[]): DraftRoute
       note: row.note,
       position: index,
       entryOrder: row.entry_order,
+      // No suggestion text either: the server stores place ids and coordinates,
+      // never Google's autocomplete lines. A reopened route recovers its
+      // addresses through `/place-details` exactly as before.
+      placeText: null,
       coordinate: null,
       isCompleted: row.state === 'completed',
     })),

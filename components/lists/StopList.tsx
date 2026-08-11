@@ -2,6 +2,7 @@ import { memo, useCallback } from 'react';
 import { FlatList, Text, View } from 'react-native';
 
 import { StopRow } from '@/components/primitives/StopRow';
+import type { StopText } from '@/lib/route/stop-text';
 import type { StopState } from '@/components/primitives/StopRow';
 import { layout } from '@/lib/design/tokens';
 import { LIST_VIRTUALISATION_THRESHOLD } from '@/types';
@@ -33,11 +34,10 @@ import { LIST_VIRTUALISATION_THRESHOLD } from '@/types';
 export interface StopListItem {
   readonly id: string;
   readonly position: number;
-  /** Null once the 30-day purge has taken it with the coordinates
-   *  (docs/12_DATABASE.md). The row still renders — the user's label carries it,
-   *  or it says the address needs refreshing. */
-  readonly address: string | null;
-  readonly label: string | null;
+  /** The two lines to draw, decided by `stopTextOf` rather than by the row —
+   *  which source wins, and whether Google's words have expired, are domain
+   *  rules and not presentation (`CLAUDE.md` §1). */
+  readonly text: StopText;
   readonly state: StopState;
   readonly hasCoordinate: boolean;
   readonly meta: string | null;
@@ -91,8 +91,7 @@ const Row = memo(
     return (
       <StopRow
         position={item.position}
-        address={item.address}
-        label={item.label}
+        text={item.text}
         state={item.state}
         hasCoordinate={item.hasCoordinate}
         meta={item.meta}
@@ -132,8 +131,11 @@ const Row = memo(
   (a, b) =>
     a.item.id === b.item.id &&
     a.item.position === b.item.position &&
-    a.item.address === b.item.address &&
-    a.item.label === b.item.label &&
+    // `text` is rebuilt on every read, so it is compared by value like the rest
+    // — a reference check here would defeat the memo and look like it worked.
+    a.item.text.title === b.item.text.title &&
+    a.item.text.subtitle === b.item.text.subtitle &&
+    a.item.text.needsRefreshing === b.item.text.needsRefreshing &&
     a.item.state === b.item.state &&
     a.item.hasCoordinate === b.item.hasCoordinate &&
     a.item.meta === b.item.meta &&

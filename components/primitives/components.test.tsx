@@ -15,8 +15,7 @@ const renderRow = (overrides: Partial<React.ComponentProps<typeof StopRow>> = {}
   render(
     <StopRow
       position={3}
-      address="Via Roma 12, Bergamo"
-      label={null}
+      text={{ title: 'Via Roma 12, Bergamo', subtitle: null, needsRefreshing: false }}
       state="pending"
       hasCoordinate
       meta={null}
@@ -74,7 +73,10 @@ describe('what a screen reader hears', () => {
 
   it('carries the position and the title in one utterance', () => {
     // A screen reader user should not have to explore the row to learn either.
-    renderRow({ position: 7, label: 'Warehouse' });
+    renderRow({
+      position: 7,
+      text: { title: 'Warehouse', subtitle: null, needsRefreshing: false },
+    });
     expect(screen.getByRole('button').props.accessibilityLabel).toBe(
       'Stop 7, Warehouse, not yet visited',
     );
@@ -116,7 +118,9 @@ describe('the row as a control', () => {
   });
 
   it('shows the address under a user-authored label rather than replacing it', () => {
-    renderRow({ label: 'Warehouse' });
+    renderRow({
+      text: { title: 'Warehouse', subtitle: 'Via Roma 12, Bergamo', needsRefreshing: false },
+    });
     expect(screen.getByText('Warehouse')).toBeTruthy();
     expect(screen.getByText('Via Roma 12, Bergamo')).toBeTruthy();
   });
@@ -234,8 +238,7 @@ describe('a stop whose address has been purged', () => {
     render(
       <StopRow
         position={1}
-        address={null}
-        label="Warehouse"
+        text={{ title: 'Warehouse', subtitle: null, needsRefreshing: false }}
         state="pending"
         hasCoordinate={false}
         meta={null}
@@ -252,8 +255,7 @@ describe('a stop whose address has been purged', () => {
     render(
       <StopRow
         position={1}
-        address={null}
-        label={null}
+        text={{ title: 'Address needs refreshing', subtitle: null, needsRefreshing: true }}
         state="pending"
         hasCoordinate={false}
         meta={null}

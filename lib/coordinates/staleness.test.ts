@@ -31,6 +31,7 @@ const stop = (placeId: string, coord: CoordinateCache | null): Stop => ({
   id: `stop-${placeId}`,
   placeId,
   label: null,
+  placeText: null,
   note: null,
   position: 0,
   entryOrder: 0,

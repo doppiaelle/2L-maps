@@ -28,6 +28,7 @@ const draftWith = (placeIds: readonly string[]): DraftRoute => ({
     id: `s${index}`,
     placeId,
     label: null,
+    placeText: null,
     note: null,
     position: index,
     entryOrder: index,

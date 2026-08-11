@@ -18,8 +18,7 @@ const noop = () => undefined;
 const stopItem = (i: number) => ({
   id: `stop-${i}`,
   position: i + 1,
-  address: `Via ${i}, Bergamo`,
-  label: null,
+  text: { title: `Via ${i}, Bergamo`, subtitle: null, needsRefreshing: false },
   state: 'pending' as const,
   hasCoordinate: true,
   meta: null,

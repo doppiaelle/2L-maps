@@ -13,6 +13,7 @@ const stop = (id: string, position = 0): Stop => ({
   id,
   placeId: `place-${id}`,
   label: null,
+  placeText: null,
   note: null,
   position,
   entryOrder: position,

@@ -10,6 +10,7 @@ import { useDraftRouteStore } from '@/features/stores';
 import { useLocation } from '@/features/location/location-provider';
 import { isOffline } from '@/lib/network/connectivity';
 import { newStopId } from '@/lib/route/route-id';
+import { placeTextFrom } from '@/lib/route/stop-text';
 import { canSubmitSearch, offersCurrentLocation, searchStateOf } from '@/lib/places/search';
 import type { SourcedOption } from '@/lib/places/search';
 
@@ -73,6 +74,13 @@ export default function AddStopScreen(): React.JSX.Element {
       id: newStopId(),
       placeId: option.placeId,
       label: null,
+      // **Google already told us what this place is called — keep it.**
+      // Throwing these two lines away is what made every row depend on a
+      // second, billed `/place-details` round trip to recover text we had been
+      // handed for free, and what put "Address needs refreshing" on stops the
+      // user had just picked from a working search. Perishable, on the same
+      // thirty-day clock as a coordinate (ADR-0007).
+      placeText: placeTextFrom(option, new Date()),
       note: null,
       position: draft.stops.length,
       entryOrder: draft.stops.length,

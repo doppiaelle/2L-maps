@@ -5,6 +5,7 @@ import { ImportView } from '@/features/import/ImportView';
 import { useImport } from '@/features/import/use-import';
 import { useDraftRouteStore } from '@/features/stores';
 import { newStopId } from '@/lib/route/route-id';
+import { placeTextFrom } from '@/lib/route/stop-text';
 
 /**
  * Import a list — presented over Plan, dismissed back to it
@@ -52,6 +53,15 @@ export default function ImportScreen(): React.JSX.Element {
               // Left unlabelled: the resolved address is what Plan shows, and a
               // label duplicating it would be noise on every row.
               label: null,
+              // The geocoder's address, kept so an imported row reads on the
+              // first frame instead of waiting on `/place-details` for text the
+              // import already paid for. One line, because a geocode returns a
+              // formatted address rather than the two-part split autocomplete
+              // gives. Perishable on the thirty-day clock (ADR-0007).
+              placeText: placeTextFrom(
+                { primaryText: place.address, secondaryText: '' },
+                new Date(),
+              ),
               note: null,
               position: index,
               entryOrder: index,

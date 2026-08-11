@@ -41,6 +41,7 @@ const stop = (id: string, position: number, overrides: Partial<Stop> = {}): Stop
     formattedAddress: `Via ${id} 1, Bergamo`,
     refreshedAt: new Date().toISOString(),
   },
+  placeText: null,
   isCompleted: false,
   ...overrides,
 });
