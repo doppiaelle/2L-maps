@@ -193,7 +193,30 @@ Config plugins own everything that must be correct at build time:
 | `android-preview` | Merge to `main`, or on demand | Gradle development build; APK as an artifact |
 | `e2e` | Deferred | Maestro against the artifact |
 | `release` | Deferred | Release build and store submission |
-| `migrate` | Deferred | Applies migrations, regenerates types |
+| `migrate` | On demand | Applies migrations, regenerates types |
+| `deploy-functions` | Push to `main` touching `supabase/functions/**`, or on demand | Deploys the Edge Functions ([ADR-0024](adr/0024-deploy-the-functions-with-the-app.md)) |
+
+### Migrations, and how to tell whether they landed
+
+`migrate` is run by a person, on purpose — a schema change is not undone by
+pushing again. It needs re-running **when, and only when, a file is added to
+`supabase/migrations/`**; re-running it otherwise is safe and does nothing,
+since every statement in those files is written `if not exists`.
+
+Its last step is a gate rather than a migration: it fails if
+`types/database.generated.ts` in the repository does not match the live schema,
+which on a first run is the expected outcome because the file does not exist
+yet. **That failure does not mean the migrations were not applied.** The step
+that applies them is `Push migrations`, and the run summary names it — check
+that step, not the job's overall conclusion. To clear the gate, download the
+`database-types` artifact from the run and commit it.
+
+To check the database itself rather than the workflow, paste
+[`supabase/sql/check-schema.sql`](../supabase/sql/check-schema.sql) into the
+dashboard's SQL Editor. It lists every column, table, enum value and function
+the Edge Functions name, and says which are missing — because a half-applied
+migration and a broken upstream key produce the same sentence on the phone
+([ADR-0025](adr/0025-a-preference-may-not-fail-a-request.md)).
 
 Everything running today is on Linux, at the 1× minute rate. **macOS runners bill at 10×**, so
 the 2,000 free private-repo minutes would be roughly 200 effective macOS minutes
