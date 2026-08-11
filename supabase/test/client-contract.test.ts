@@ -3,8 +3,13 @@ import { createGeocodingProvider } from '@/lib/api/geocoding-adapter';
 import { createRoutingProvider } from '@/lib/api/routing-adapter';
 import type { RoutingOutcome } from '@/lib/providers/types';
 
+import { geocodeUpstream } from '../functions/_shared/endpoints/geocode';
 import { optimizeUpstream } from '../functions/_shared/endpoints/optimize';
 import type { RoutesPort } from '../functions/_shared/endpoints/optimize';
+import { parseAddressesUpstream } from '../functions/_shared/endpoints/parse-addresses';
+import { placeDetailsUpstream } from '../functions/_shared/endpoints/place-details';
+import { autocompleteUpstream } from '../functions/_shared/endpoints/places-autocomplete';
+import type { DatabaseClient } from '../functions/_shared/dependencies';
 
 import {
   autocompleteRequestSchema,
@@ -372,5 +377,152 @@ describe('/optimize — what comes back', () => {
     );
 
     expect(outcome).toMatchObject({ ok: true });
+  });
+});
+
+/**
+ * The response direction, for the four endpoints that never had it.
+ *
+ * `/optimize` got this treatment after the leg ids rejected every 200 the
+ * endpoint had ever produced ([ADR-0023](../../docs/adr/0023-legs-name-their-stops.md)).
+ * The other four were left with the request direction only — which is to say
+ * that the exact bug that took optimization down for its entire existence was
+ * still possible, unchanged, in four places.
+ *
+ * Each case below builds the body with the **real endpoint function** and parses
+ * it with the **real client adapter**, through the real `ApiClient`, after
+ * `JSON.stringify`. No fixture is written by hand at either end: a fixture
+ * states what its author believed the other side does, and this file exists
+ * because that belief has now been wrong four separate times.
+ */
+describe('what comes back, for the endpoints that never checked', () => {
+  /** A client whose network answers with exactly this body, 200. */
+  const clientReturning = (body: unknown): ApiClient =>
+    new ApiClient({
+      baseUrl: 'https://example.test/functions/v1',
+      getAccessToken: () => Promise.resolve('test-token'),
+      fetchImpl: (() =>
+        Promise.resolve(
+          new Response(JSON.stringify(body), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          }),
+        )) as unknown as typeof fetch,
+    });
+
+  const fakeDatabase = (rows: readonly Record<string, unknown>[] = []): DatabaseClient => ({
+    queryOne: async () => null,
+    queryMany: async <T>(): Promise<readonly T[]> => rows as unknown as readonly T[],
+    execute: async () => {},
+  });
+
+  it('/places-autocomplete — the client reads the server’s suggestions', async () => {
+    const upstream = await autocompleteUpstream(
+      { input: 'via roma', sessionToken: 'token' },
+      {
+        database: fakeDatabase(),
+        places: {
+          suggest: async () => ({
+            ok: true as const,
+            value: [{ placeId: 'ChIJa', primaryText: 'Via Roma 12', secondaryText: 'Bergamo, BG' }],
+          }),
+        },
+      },
+    );
+
+    const outcome = await createGeocodingProvider({
+      client: clientReturning(upstream.result),
+    }).suggest('via roma', 'token', {});
+
+    expect(outcome).toMatchObject({ ok: true });
+    if (!outcome.ok) throw new Error('expected suggestions');
+    expect(outcome.suggestions[0]?.placeId).toBe('ChIJa');
+  });
+
+  it('/place-details — the client reads both halves, resolved and not', async () => {
+    // The half that matters most: `unresolved` is what puts "Address needs
+    // refreshing" on a row, so the client and the server must agree on how it
+    // is spelled or every stop looks broken.
+    const upstream = await placeDetailsUpstream(
+      { placeIds: ['ChIJa', 'ChIJgone'] },
+      {
+        database: fakeDatabase(),
+        places: {
+          detailsFor: async () => ({
+            resolved: [
+              { placeId: 'ChIJa', formattedAddress: 'Via Roma 12, Bergamo', lat: 45.7, lng: 9.7 },
+            ],
+            unresolved: ['ChIJgone'],
+            outage: null,
+          }),
+        },
+      },
+    );
+
+    const outcome = await createGeocodingProvider({
+      client: clientReturning(upstream.result),
+    }).resolveBatch(['ChIJa', 'ChIJgone']);
+
+    expect(outcome).toMatchObject({ ok: true });
+    if (!outcome.ok) throw new Error('expected a resolution');
+    expect(outcome.resolved[0]?.coordinate).toEqual({ latitude: 45.7, longitude: 9.7 });
+    expect(outcome.unresolved).toEqual(['ChIJgone']);
+  });
+
+  it('/geocode — the client keeps each row attached to its line', async () => {
+    const upstream = await geocodeUpstream(
+      { addresses: ['Via Roma 12, Bergamo', 'nonsense'], region: 'IT' },
+      {
+        database: fakeDatabase(),
+        places: {
+          geocode: async () => ({
+            resolved: [
+              {
+                index: 0,
+                placeId: 'ChIJa',
+                formattedAddress: 'Via Roma 12, Bergamo',
+                lat: 45.7,
+                lng: 9.7,
+              },
+            ],
+            unresolved: [{ index: 1, input: 'nonsense' }],
+            outage: null,
+          }),
+        },
+      },
+    );
+
+    const outcome = await createGeocodingProvider({
+      client: clientReturning(upstream.result),
+    }).geocodeAddresses(['Via Roma 12, Bergamo', 'nonsense']);
+
+    expect(outcome).toMatchObject({ ok: true });
+    if (!outcome.ok) throw new Error('expected a geocode');
+    expect(outcome.resolved[0]?.placeId).toBe('ChIJa');
+    expect(outcome.unresolved).toEqual(['nonsense']);
+  });
+
+  it('/parse-addresses — the client reads the candidates and the leftovers', async () => {
+    const upstream = await parseAddressesUpstream(
+      { text: 'Via Roma 12\nrubbish' },
+      {
+        parse: async () => ({
+          ok: true as const,
+          result: { addresses: ['Via Roma 12'], unparsed: ['rubbish'] },
+        }),
+      },
+    );
+
+    const outcome = await createGeocodingProvider({
+      client: clientReturning(upstream.result),
+    }).parse({ kind: 'text', text: 'Via Roma 12\nrubbish' });
+
+    expect(outcome).toMatchObject({ ok: true });
+    if (!outcome.ok) throw new Error('expected a parse');
+    // The client flattens the indexed rows to plain strings, which is fine —
+    // what matters is that it can read the shape at all. Before this test the
+    // server built that shape inside an entrypoint `tsc` does not check.
+    expect(outcome.candidates).toEqual(['Via Roma 12']);
+    expect(outcome.unparsed).toEqual(['rubbish']);
   });
 });
