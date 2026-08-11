@@ -293,3 +293,47 @@ describe('inspecting a hop', () => {
     expect(screen.queryByTestId('route-leg-selected', visually)).toBeNull();
   });
 });
+
+describe('the ground under a route that crosses a country', () => {
+  /** Rome, Milan, Bari — the route the product owner reported on, and about
+   *  nine hundred kilometres across. */
+  const national = [
+    stop('a', 1, at(41.9, 12.5)),
+    stop('b', 2, at(45.46, 9.19)),
+    stop('c', 3, at(41.12, 16.87)),
+  ];
+
+  const nationalRoad: DrawnRoute = {
+    kind: 'road',
+    path: [at(41.9, 12.5), at(45.46, 9.19), at(41.12, 16.87)],
+    legPaths: [
+      [at(41.9, 12.5), at(45.46, 9.19)],
+      [at(45.46, 9.19), at(41.12, 16.87)],
+    ],
+  };
+
+  it('draws a coastline where the invented town would be a lie', () => {
+    // The reported defect: a fixed pixel grid makes each "block" about a hundred
+    // kilometres at this scale, so the background was empty but for a few
+    // scattered squares (ADR-0028).
+    laidOut(canvas(nationalRoad, national));
+
+    expect(screen.getAllByTestId('landmass', visually).length).toBeGreaterThan(0);
+    expect(screen.queryAllByTestId('scenery-road', visually)).toHaveLength(0);
+  });
+
+  it('draws streets and no coastline on a delivery round', () => {
+    // The two take turns. A coastline a few kilometres across is one edge of one
+    // country and reads as nothing at all.
+    laidOut(canvas(road, [stop('a', 1), stop('b', 2), stop('c', 3)]));
+
+    expect(screen.getAllByTestId('scenery-road', visually).length).toBeGreaterThan(0);
+    expect(screen.queryAllByTestId('landmass', visually)).toHaveLength(0);
+  });
+
+  it('still attributes, because the stops on it are still Google’s', () => {
+    // The ground changing does not change where the route came from (ADR-0021).
+    laidOut(canvas(nationalRoad, national));
+    expect(screen.getByTestId('route-canvas-attribution', visually)).toBeTruthy();
+  });
+});

@@ -15,6 +15,7 @@ const moduleNameMapper = {
   '^@/lib/(.*)$': '<rootDir>/lib/$1',
   '^@/types$': '<rootDir>/types/index.ts',
   '^@/types/(.*)$': '<rootDir>/types/$1',
+  '^@/assets/(.*)$': '<rootDir>/assets/$1',
 };
 
 /** @type {import('jest').Config} */

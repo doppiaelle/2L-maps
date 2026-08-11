@@ -61,6 +61,21 @@ module.exports = [
     },
   },
   {
+    /**
+     * Build scripts run on Node, not on the device.
+     *
+     * `scripts/build-landmass.mjs` regenerates a committed asset and is linted
+     * like everything else — but it legitimately reaches for `Buffer`,
+     * `process` and `fetch`, none of which exist in the app's own globals.
+     * Declaring the environment is the honest fix; adding an ignore would take
+     * the file out of the lint entirely.
+     */
+    files: ['scripts/**/*.mjs', 'scripts/**/*.js'],
+    languageOptions: {
+      globals: { Buffer: 'readonly', process: 'readonly', fetch: 'readonly', console: 'readonly' },
+    },
+  },
+  {
     // types/ imports nothing.
     files: ['types/**/*.ts'],
     rules: {

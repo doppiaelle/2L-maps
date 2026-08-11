@@ -36,6 +36,17 @@ export interface Point {
 export interface Projection {
   /** Place one coordinate on the canvas. */
   readonly project: (coordinate: LatLng) => Point;
+  /**
+   * The other direction: which coordinate a canvas point stands for.
+   *
+   * Exact rather than approximate, and it exists for one caller — deciding which
+   * part of the world is actually inside the canvas, so the coastline underneath
+   * can be clipped to it instead of projecting every ring on Earth
+   * (`lib/map/landmass.ts`). The route's own padding means the canvas always
+   * covers more ground than the stops do, which is precisely why this cannot be
+   * derived from the stops.
+   */
+  readonly unproject: (point: Point) => LatLng;
   /** How much of the canvas one degree of latitude covers, after fitting.
    *  Exposed so a caller can size something in real distance if it ever needs
    *  to — a scale bar, a radius. */
@@ -64,7 +75,11 @@ export function fitProjection(
   const usableHeight = Math.max(size.height - padding * 2, 1);
 
   if (coordinates.length === 0) {
-    return { project: () => ({ x: size.width / 2, y: size.height / 2 }), scale: 1 };
+    return {
+      project: () => ({ x: size.width / 2, y: size.height / 2 }),
+      unproject: () => ({ latitude: 0, longitude: 0 }),
+      scale: 1,
+    };
   }
 
   const latitudes = coordinates.map((c) => c.latitude);
@@ -110,6 +125,10 @@ export function fitProjection(
       // forgetting this draws every route upside down, which looks plausible
       // enough on a symmetric route to survive review.
       y: offsetY + (maxLatitude - coordinate.latitude) * scale,
+    }),
+    unproject: (point) => ({
+      latitude: maxLatitude - (point.y - offsetY) / scale,
+      longitude: minLongitude + (point.x - offsetX) / (longitudeScale * scale),
     }),
   };
 }

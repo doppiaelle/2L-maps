@@ -138,6 +138,7 @@ owning your area (see §Areas below) → [`29`](29_DEFINITION_OF_DONE.md).
 | [0024](adr/0024-deploy-the-functions-with-the-app.md) | The Edge Functions deploy on push like the app, and a response schema requires only what the caller would break without |
 | [0025](adr/0025-a-preference-may-not-fail-a-request.md) | A request field that only improves an answer is advisory and is dropped rather than allowed to fail the call; extends ADR-0024 to the request direction |
 | [0026](adr/0026-google-tells-us-what-is-wrong.md) | Every upstream refusal is read and logged with Google's own message; autocomplete sends no type filter, so search matches Google Maps. **Read before writing any Google request field** |
+| [0028](adr/0028-a-coastline-under-the-route.md) | A bundled public-domain coastline is drawn under the route at national scale, where the invented town would be claiming detail it does not have. **Widens the C3 exposure** and amends `CLAUDE.md` §13 rule 5 and ADR-0012 |
 | [0027](adr/0027-the-drive-happens-elsewhere.md) | Done and Skip removed and J2/J3 withdrawn: the navigation app drives the whole route, so nobody returns between stops. Confirm records the departure and puts the route in History; the next route closes the last. Time saved is withdrawn rather than estimated |
 
 ---

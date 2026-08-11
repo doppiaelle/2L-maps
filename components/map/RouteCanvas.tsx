@@ -8,7 +8,8 @@ import { MapAttribution } from './MapAttribution';
 import { colours, mapColours, radius, space, stroke } from '@/lib/design/tokens';
 import type { ThemeName } from '@/lib/design/tokens';
 import type { LatLng } from '@/lib/geo/haversine';
-import { fitProjection, pathThrough } from '@/lib/map/projection';
+import { landmassFor } from '@/lib/map/landmass';
+import { fitProjection, metresPerPoint, pathThrough } from '@/lib/map/projection';
 import { sceneryFor } from '@/lib/map/scenery';
 import type { Scenery } from '@/lib/map/scenery';
 import type { Point } from '@/lib/map/projection';
@@ -147,6 +148,10 @@ export const RouteCanvas = memo(function RouteCanvas({
     ];
 
     const projection = fitProjection(extent, size, CANVAS_PADDING);
+    // How much ground a point covers, which is what decides whether this canvas
+    // gets streets or a coastline. They never both draw.
+    const ground = metresPerPoint(projection.scale);
+    const land = landmassFor({ projection, size, metresPerPoint: ground });
 
     const pins = placed.map((stop) => ({
       stopId: stop.stopId,
@@ -167,12 +172,13 @@ export const RouteCanvas = memo(function RouteCanvas({
         .map((points) => ({ points, d: pathThrough(points) }));
       return {
         pins,
+        land,
         road: pathThrough(projected),
         legs,
         segments: [],
         // The town is generated around the *simplified* line, so the scenery and
         // the route agree about where the route is.
-        scenery: sceneryFor({ path: projected, size, seed: scenerySeed }),
+        scenery: sceneryFor({ path: projected, size, seed: scenerySeed, metresPerPoint: ground }),
         heading: projected,
       };
     }
@@ -181,11 +187,12 @@ export const RouteCanvas = memo(function RouteCanvas({
       const through = pins.map((pin) => pin.point);
       return {
         pins,
+        land,
         road: null,
         // A T0 result has no per-leg geometry to inspect, and the waiting face
         // has no result at all. Nothing to tap in either case.
         legs: [],
-        scenery: sceneryFor({ path: through, size, seed: scenerySeed }),
+        scenery: sceneryFor({ path: through, size, seed: scenerySeed, metresPerPoint: ground }),
         heading: through,
         // Separate paths rather than one dashed line through every stop. A
         // single path would join at the stops and read as continuous, which is
@@ -197,7 +204,7 @@ export const RouteCanvas = memo(function RouteCanvas({
       };
     }
 
-    return { pins, road: null, legs: [], segments: [], scenery: EMPTY_SCENERY, heading: [] };
+    return { pins, land, road: null, legs: [], segments: [], scenery: EMPTY_SCENERY, heading: [] };
   }, [stops, route, size, scenerySeed]);
 
   // Only a *result* can be degraded. While preparing, the connectors are the
@@ -326,6 +333,9 @@ export const RouteCanvas = memo(function RouteCanvas({
       // No corner radius and no inset: the drawing is the ground the section
       // stands on, and it runs under the dock rather than stopping at it
       // (ADR-0022). A rounded card would read as a panel with a map inside it.
+      // Behind the SVG rather than instead of it. The rectangle above decides
+      // whether the drawing is land or sea; this is only what shows in the
+      // instant before the canvas has measured itself.
       style={{ flex: 1, backgroundColor: map.land }}
       onLayout={(event) => {
         const { width, height } = event.nativeEvent.layout;
@@ -356,8 +366,28 @@ export const RouteCanvas = memo(function RouteCanvas({
             <Svg width={size.width} height={size.height} testID="route-canvas-svg">
               {/* The ground. A rectangle rather than the container's background so
               the whole drawing is one surface the SVG owns — and so a future
-              snapshot exports what is on screen rather than a transparent hole. */}
-              <Rect x={0} y={0} width={size.width} height={size.height} fill={map.land} />
+              snapshot exports what is on screen rather than a transparent hole.
+
+              **Sea, when there is a coastline to lay on it.** At the scale where
+              the invented town would be a lie the rectangle becomes water and
+              the landmasses go over it (ADR-0028); at every other scale it stays
+              land, exactly as before, because a coastline a few kilometres
+              across is one edge of one country and reads as nothing. */}
+              <Rect
+                x={0}
+                y={0}
+                width={size.width}
+                height={size.height}
+                fill={drawn.land.length > 0 ? map.water : map.land}
+              />
+
+              {/* Public-domain geometry under Google-derived stops: the hybrid
+                  ADR-0012 rejects by name, chosen by the product owner with the
+                  risk stated (ADR-0028). Outlines only — no borders, no roads,
+                  no names, nothing that would claim to be a map service. */}
+              {drawn.land.map((shape) => (
+                <Path key={shape.id} testID="landmass" d={shape.d} fill={map.land} />
+              ))}
 
               {/* The invented town, underneath everything. Blocks first, then the
               minor streets, then the through-roads — the order a real map is

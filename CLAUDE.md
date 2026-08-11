@@ -395,14 +395,20 @@ Concrete failure modes this project is exposed to, and the rule that prevents ea
    crash breadcrumbs. This is a terms violation, not a bug.
 4. **Never cache map tiles or bulk pre-fetch.** Prohibited by the platform terms, and now
    trivially true: nothing fetches a tile.
-5. **Google-derived content is displayed on a canvas we draw, and this is a known
-   exposure.** The Maps Platform terms forbid it, per API. The decision to do it anyway was
-   taken by the product owner against an explicit recommendation, and the risk it carries —
+5. **Google-derived content is displayed on a canvas we draw, over public-domain geometry,
+   and this is a known exposure.** The Maps Platform terms forbid it, per API. Both decisions
+   were taken by the product owner against an explicit recommendation: the drawn preview in
+   [ADR-0021](docs/adr/0021-drawn-route-preview.md), and the coastline underneath it in
+   [ADR-0028](docs/adr/0028-a-coastline-under-the-route.md), which is precisely the hybrid
+   [ADR-0012](docs/adr/0012-long-term-osm-exit-path.md) rejects by name. The risk they carry —
    revocation of the Maps Platform key, which stops the app for every user at once — is
-   recorded in [ADR-0021](docs/adr/0021-drawn-route-preview.md) and as risk C3. **Do not
-   widen it.** Attribution stays wherever Google-derived content appears, no tile is ever
-   fetched or cached, and the thirty-day coordinate rule is unaffected. Reinstating a map
-   engine, or removing the attribution, both require reopening the ADR.
+   recorded as C3 and is **larger since ADR-0028**, because the drawing now looks more like a
+   map. **Widening it further requires an ADR, not a commit.** What still holds without
+   exception: attribution stays wherever Google-derived content appears, **no tile is ever
+   fetched or cached**, nothing is requested from any map service at runtime, and the
+   thirty-day coordinate rule is unaffected. Reinstating a map engine, adding roads, borders
+   or place names to the drawn ground, or removing the attribution all require reopening the
+   ADRs.
 6. **Never add a metered call without a quota check.** Every new upstream call goes through
    the seven-step Edge Function pipeline.
 7. **Never ship a paywall change without re-reading Guideline 3.1.2.** Trial disclosure is the

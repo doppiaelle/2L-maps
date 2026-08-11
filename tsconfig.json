@@ -22,8 +22,12 @@
       "@/components/*": ["./components/*"],
       "@/lib/*": ["./lib/*"],
       "@/types/*": ["./types/*"],
-      "@/types": ["./types/index.ts"]
+      "@/types": ["./types/index.ts"],
+      "@/assets/*": ["./assets/*"]
     },
+    // The coastline is a generated JSON asset imported by `lib/map/landmass.ts`
+    // (ADR-0028). Metro already bundles it; this is what lets `tsc` see it.
+    "resolveJsonModule": true,
     "types": ["jest", "node"]
   },
   "include": [
