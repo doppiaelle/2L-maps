@@ -1,6 +1,6 @@
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
-import { layout } from '@/lib/design/tokens';
+import { layout, radius, space } from '@/lib/design/tokens';
 
 /**
  * The one control the product is built around.
@@ -39,6 +39,17 @@ export type PrimaryActionState =
 export interface PrimaryActionProps {
   readonly state: PrimaryActionState;
   onPress: () => void;
+  /**
+   * How the control sits in its surroundings.
+   *
+   * `block` fills the width, which is right at the foot of a list where it is
+   * the last thing on the page. `pill` is for the canvas: it floats over a
+   * drawing rather than closing a column, so it takes only the width of its own
+   * label and is lifted off the surface it sits on. Same height either way — 56
+   * is what this control is, and a pill that shrank to fit a map would be a
+   * smaller target in the harder place to press.
+   */
+  readonly shape?: 'block' | 'pill';
   /** Overrides the label for screen readers where the visible text is too terse
    *  to stand alone. The label says what happens, never what the element is
    *  (`CLAUDE.md` §10 rule 1). */
@@ -49,15 +60,21 @@ export interface PrimaryActionProps {
 export function PrimaryAction({
   state,
   onPress,
+  shape = 'block',
   accessibilityLabel,
   testID,
 }: PrimaryActionProps): React.JSX.Element {
   const isPressable = state.kind !== 'working' && state.kind !== 'blocked';
+  const isPill = shape === 'pill';
   const note = 'note' in state ? state.note : null;
   const reason = state.kind === 'blocked' ? state.reason : null;
 
   return (
-    <View className="px-screen-padding" testID={testID}>
+    <View
+      className="px-screen-padding"
+      style={isPill ? { alignItems: 'center' } : undefined}
+      testID={testID}
+    >
       {/* The note sits above the control rather than inside it: a degraded
           label crammed into a button is the first thing to be truncated at
           200% Dynamic Type, and it is the part that must survive. */}
@@ -78,12 +95,22 @@ export function PrimaryAction({
         accessibilityHint={reason ?? undefined}
         // 56, not the 44 pt floor: this control is pressed one-handed, in a van,
         // often without looking straight at it (docs/09_COMPONENT_LIBRARY.md §7).
-        style={{ minHeight: layout.actionMinHeight }}
-        className={
-          isPressable
-            ? 'bg-accent active:bg-accent-pressed rounded-lg items-center justify-center px-space-4'
-            : 'bg-accent-subtle rounded-lg items-center justify-center px-space-4'
+        style={
+          isPill
+            ? {
+                minHeight: layout.actionMinHeight,
+                // Lifted off the drawing it floats over. Without it, mint on the
+                // light theme's paper-coloured land is the same weak pairing the
+                // route casing exists to solve (docs/07_DESIGN_SYSTEM.md).
+                ...PILL_ELEVATION,
+              }
+            : { minHeight: layout.actionMinHeight }
         }
+        className={[
+          isPressable ? 'bg-accent active:bg-accent-pressed' : 'bg-accent-subtle',
+          isPill ? 'rounded-full px-space-7' : 'rounded-lg px-space-4',
+          'items-center justify-center',
+        ].join(' ')}
       >
         {state.kind === 'working' ? (
           <View className="flex-row items-center gap-space-2">
@@ -111,3 +138,19 @@ export function PrimaryAction({
     </View>
   );
 }
+
+/**
+ * The pill's shadow, in the one place its numbers live.
+ *
+ * A drop shadow rather than a border: the control has to read as being *above*
+ * the canvas, and a border would read as another shape drawn on it. Android
+ * takes `elevation`; iOS takes the four `shadow*` properties, and giving it only
+ * `elevation` is the usual way a floating control ends up flat on one platform.
+ */
+const PILL_ELEVATION = {
+  elevation: 6,
+  shadowColor: '#000000',
+  shadowOpacity: 0.18,
+  shadowRadius: radius.radiusSm,
+  shadowOffset: { width: 0, height: space.space1 },
+} as const;

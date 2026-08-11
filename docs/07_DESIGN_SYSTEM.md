@@ -233,13 +233,14 @@ goes below 13.
 | `screen-padding` | 20 | Horizontal screen margin |
 | `list-row-gap` | 20 | Between stop rows — generous, no dividers |
 | `touch-min` | **44** | Minimum touch target. Non-negotiable |
+| `rule-width` | 2 | A drawn rule — the menu glyph's three lines. Drawn rather than set as `≡`, because a character inherits the font's weight and spacing (which differ between the two voices and between platforms) and grows into its corner at 200% Dynamic Type. Two points rather than a hairline: one physical pixel disappears on a high-density screen in daylight |
 
 | Radius token | Value | Use |
 |---|---|---|
 | `radius-sm` | 8 | Chips, small controls |
 | `radius-md` | 14 | Cards, inputs |
 | `radius-lg` | 22 | Sheets, primary buttons |
-| `radius-full` | 999 | Pills, avatars, ordinal badges |
+| `radius-full` | 999 | Pills, avatars, ordinal badges. **Confirm takes this shape over the canvas** — it floats on a drawing rather than closing a column, so it takes the width of its own label and a soft shadow. Still 56 pt tall: a pill that shrank to fit a map would be a smaller target in the harder place to press |
 
 Generous radii come from the second reference. `radius-lg` on the sheet's top corners is the
 product's most recognisable shape.
@@ -252,6 +253,14 @@ surface lightness rather than shadow, since shadows are invisible on near-black.
 | `elev-sheet` | `0 −4 24 rgba(0,0,0,0.10)` | `surface` lightness step |
 | `elev-card` | `0 2 12 rgba(0,0,0,0.06)` | `surface-raised` |
 | `elev-marker` | `0 2 8 rgba(0,0,0,0.20)` | same |
+| `elev-pill` | `0 4 8 rgba(0,0,0,0.18)` | same. The floating Confirm. Kept in dark too, unlike the other two: it sits on the canvas rather than on a surface, so there is no lightness step available to express it with |
+
+**One mark for a stop, drawn by one function.** The ordinal badge in the list and the pin on the
+canvas both come from `markerStyle` in `lib/map/style.ts` — same 32 pt disc, same fill, same
+border, same glyph, same spoken word. The row used to keep its own palette, a mint-tinted disc
+with mint digits, so one stop was a mint dot in the list and a white pin on the map, and *every*
+stop looked accented in a system with exactly one accent. Two renderers, one source; a state
+added to one is added to both or to neither.
 
 ---
 

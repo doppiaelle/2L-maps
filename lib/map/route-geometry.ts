@@ -118,25 +118,7 @@ export function planRoute(
 ): DrawnRoute {
   if (geometry === null) return { kind: 'none', reason: 'no-route' };
 
-  if (geometry.isDegraded) {
-    const placed = orderedStops.filter(
-      (stop): stop is PositionedStop & { coordinate: LatLng } => stop.coordinate !== null,
-    );
-    if (placed.length < 2) return { kind: 'none', reason: 'too-few-stops' };
-
-    const segments: RouteSegment[] = [];
-    for (let i = 0; i + 1 < placed.length; i += 1) {
-      const from = placed[i];
-      const to = placed[i + 1];
-      if (from === undefined || to === undefined) continue;
-      segments.push({
-        id: `${from.stopId}→${to.stopId}`,
-        from: from.coordinate,
-        to: to.coordinate,
-      });
-    }
-    return { kind: 'connectors', segments };
-  }
+  if (geometry.isDegraded) return connectorsThrough(orderedStops);
 
   // A road route whose geometry would not decode. The documented behaviour is
   // markers only, logged as a defect (docs/09_COMPONENT_LIBRARY.md §Errors) —
@@ -146,6 +128,44 @@ export function planRoute(
   if (geometry.decodedPolyline.length < 2) return { kind: 'none', reason: 'undecodable' };
 
   return { kind: 'road', path: geometry.decodedPolyline };
+}
+
+/**
+ * Straight segments between consecutive stops, in the order given.
+ *
+ * Two callers, and they mean different things by it. A **T0 result** draws these
+ * because that is all it has — an ordering with no road geometry — and the
+ * canvas renders them in the degraded style so nobody mistakes them for roads.
+ * The **waiting face** draws them because the stops are all that exists yet, and
+ * renders them faint and neutral, claiming nothing at all
+ * ([ADR-0027](../../docs/adr/0027-the-drive-happens-elsewhere.md)).
+ *
+ * Shared rather than duplicated because the geometry is genuinely the same
+ * question — which pairs of placeable stops are consecutive — and what differs
+ * is only what the drawing asserts about them.
+ *
+ * Stops that cannot be placed are skipped rather than breaking the chain: the
+ * line runs past them and the marker plan still reports them, so nothing
+ * disappears without being named.
+ */
+export function connectorsThrough(orderedStops: readonly PositionedStop[]): DrawnRoute {
+  const placed = orderedStops.filter(
+    (stop): stop is PositionedStop & { coordinate: LatLng } => stop.coordinate !== null,
+  );
+  if (placed.length < 2) return { kind: 'none', reason: 'too-few-stops' };
+
+  const segments: RouteSegment[] = [];
+  for (let i = 0; i + 1 < placed.length; i += 1) {
+    const from = placed[i];
+    const to = placed[i + 1];
+    if (from === undefined || to === undefined) continue;
+    segments.push({
+      id: `${from.stopId}→${to.stopId}`,
+      from: from.coordinate,
+      to: to.coordinate,
+    });
+  }
+  return { kind: 'connectors', segments };
 }
 
 /**

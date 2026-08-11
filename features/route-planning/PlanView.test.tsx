@@ -47,6 +47,7 @@ const renderPlan = (
 
   return render(
     <PlanView
+      theme="light"
       state={state}
       intent={actionIntentOf(state, availability)}
       stops={Array.from({ length: count }, (_, i) => stopItem(i))}

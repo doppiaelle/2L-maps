@@ -188,3 +188,59 @@ describe('the drawn town', () => {
     expect(screen.queryAllByTestId('scenery-road')).toHaveLength(0);
   });
 });
+
+describe('the wait for an answer', () => {
+  const preparing = (stops: readonly CanvasStop[]) =>
+    canvas(connectors, stops, { phase: 'preparing' });
+
+  it('draws the same town around the same stops, so nothing moves when the result lands', () => {
+    // The whole difference between a skeleton and a spinner: the canvas is
+    // already about *their* day, at the size the answer will occupy
+    // (`CLAUDE.md` §7 rule 5).
+    laidOut(preparing([stop('a', 1), stop('b', 2), stop('c', 3)]));
+
+    expect(screen.getAllByTestId('route-canvas-pin', visually)).toHaveLength(3);
+    expect(screen.getAllByTestId('scenery-road', visually).length).toBeGreaterThan(0);
+  });
+
+  it('claims nothing about the route it is waiting for', () => {
+    // The degraded style means "straight-line estimate", which is a statement
+    // about a result. There is no result. Reusing it here would announce a
+    // degraded answer for a route that has not been computed at all.
+    laidOut(preparing([stop('a', 1), stop('b', 2)]));
+
+    expect(screen.queryAllByTestId('route-connector', visually)).toHaveLength(0);
+    expect(screen.getAllByTestId('route-pending-connector', visually).length).toBeGreaterThan(0);
+  });
+
+  it('withholds the ordinals, which are the answer', () => {
+    // Showing the entry order and renumbering under the user's eyes would make
+    // the wait look like a result that changed its mind.
+    laidOut(preparing([stop('a', 1), stop('b', 2)]));
+
+    expect(screen.queryByText('1')).toBeNull();
+    expect(screen.queryByText('2')).toBeNull();
+  });
+
+  it('announces work rather than describing a picture', () => {
+    laidOut(preparing([stop('a', 1), stop('b', 2)]));
+    const element = screen.getByTestId('canvas');
+
+    expect(element.props.accessibilityRole).toBe('progressbar');
+    expect(element.props.accessibilityLabel).toContain('Working out the fastest order');
+    expect(element.props.accessibilityLabel).not.toContain('straight-line');
+  });
+
+  it('does not point a navigator triangle at a first stop nobody has chosen yet', () => {
+    // Which stop comes first is precisely the question being asked.
+    laidOut(preparing([stop('a', 1), stop('b', 2)]));
+    expect(screen.queryByTestId('route-canvas-origin', visually)).toBeNull();
+  });
+
+  it('still attributes, because the coordinates are still Google’s', () => {
+    // The obligation attaches to the data being shown, not to how confident the
+    // drawing is about it (ADR-0021).
+    laidOut(preparing([stop('a', 1), stop('b', 2)]));
+    expect(screen.getByTestId('route-canvas-attribution', visually)).toBeTruthy();
+  });
+});

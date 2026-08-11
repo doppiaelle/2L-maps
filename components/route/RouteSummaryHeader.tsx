@@ -1,8 +1,10 @@
 import { Text, View } from 'react-native';
 
 import { MetricPair } from '@/components/primitives/MetricPair';
+import { Skeleton } from '@/components/primitives/Skeleton';
 import { StatusChip } from '@/components/primitives/StatusChip';
 import type { StatusChipKind } from '@/components/primitives/StatusChip';
+import { metrics, space } from '@/lib/design/tokens';
 
 /**
  * The sheet's header: what this route is, in two numbers.
@@ -33,6 +35,16 @@ export interface RouteSummaryHeaderProps {
    *  fastest order". Stated positively, because reordering nothing is a correct
    *  result and the user paid for it (docs/08 §7). */
   readonly note?: string;
+  /**
+   * The two numbers are being computed.
+   *
+   * Their space is held by skeletons of exactly the height they will occupy, so
+   * the header does not grow by forty-four points when the result lands and push
+   * the canvas down under a thumb already moving towards Confirm
+   * ([`docs/09_COMPONENT_LIBRARY.md`](../../docs/09_COMPONENT_LIBRARY.md) §8).
+   */
+  readonly isPending?: boolean;
+  readonly prefersReducedMotion?: boolean;
   readonly testID?: string;
 }
 
@@ -43,6 +55,8 @@ export function RouteSummaryHeader({
   chip,
   chipLabel,
   note,
+  isPending = false,
+  prefersReducedMotion = false,
   testID,
 }: RouteSummaryHeaderProps): React.JSX.Element {
   return (
@@ -51,7 +65,27 @@ export function RouteSummaryHeader({
         {title}
       </Text>
 
-      {(distance !== null || duration !== null) && (
+      {isPending && (
+        <View className="flex-row gap-space-6 mt-space-1" testID="route-metrics-pending">
+          {[0, 1].map((slot) => (
+            <View key={slot}>
+              <Skeleton
+                height={metrics.metricLg.lineHeight}
+                width={96}
+                prefersReducedMotion={prefersReducedMotion}
+              />
+              <View style={{ height: space.space1 }} />
+              <Skeleton
+                height={metrics.labelSm.lineHeight}
+                width={56}
+                prefersReducedMotion={prefersReducedMotion}
+              />
+            </View>
+          ))}
+        </View>
+      )}
+
+      {!isPending && (distance !== null || duration !== null) && (
         <View className="flex-row gap-space-6 mt-space-1">
           {distance !== null && (
             <MetricPair

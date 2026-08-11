@@ -5,6 +5,7 @@ import { StopRow } from '@/components/primitives/StopRow';
 import type { StopText } from '@/lib/route/stop-text';
 import type { StopState } from '@/components/primitives/StopRow';
 import { layout } from '@/lib/design/tokens';
+import type { ThemeName } from '@/lib/design/tokens';
 import { LIST_VIRTUALISATION_THRESHOLD } from '@/types';
 
 /**
@@ -61,6 +62,9 @@ export interface StopListProps {
    */
   onRemoveStop?: ((stopId: string) => void) | undefined;
   onMoveStop?: ((fromIndex: number, toIndex: number) => void) | undefined;
+  /** Which palette the row ordinals are drawn from, so the list dot and the map
+   *  pin are the same mark. Read once by the screen and passed down. */
+  readonly theme: ThemeName;
   /** Rendered between the header and the rows — the ad slot goes here, so the
    *  list does not have to know what advertising is. */
   readonly header?: React.ReactElement | null;
@@ -80,6 +84,7 @@ const Row = memo(
     onSelect,
     onRemove,
     onMove,
+    theme,
   }: {
     item: StopListItem;
     index: number;
@@ -87,12 +92,14 @@ const Row = memo(
     onSelect: (stopId: string) => void;
     onRemove: ((stopId: string) => void) | undefined;
     onMove: ((fromIndex: number, toIndex: number) => void) | undefined;
+    theme: ThemeName;
   }): React.JSX.Element {
     return (
       <StopRow
         position={item.position}
         text={item.text}
         state={item.state}
+        theme={theme}
         hasCoordinate={item.hasCoordinate}
         meta={item.meta}
         onPress={() => {
@@ -143,7 +150,8 @@ const Row = memo(
     a.total === b.total &&
     a.onSelect === b.onSelect &&
     a.onRemove === b.onRemove &&
-    a.onMove === b.onMove,
+    a.onMove === b.onMove &&
+    a.theme === b.theme,
 );
 
 export function StopList({
@@ -151,6 +159,7 @@ export function StopList({
   onSelectStop,
   onRemoveStop,
   onMoveStop,
+  theme,
   header = null,
   rowHeight = DEFAULT_ROW_HEIGHT,
   testID,
@@ -166,9 +175,10 @@ export function StopList({
         onSelect={onSelectStop}
         onRemove={onRemoveStop}
         onMove={onMoveStop}
+        theme={theme}
       />
     ),
-    [onSelectStop, onRemoveStop, onMoveStop, total],
+    [onSelectStop, onRemoveStop, onMoveStop, total, theme],
   );
 
   const getItemLayout = useCallback(

@@ -9,6 +9,7 @@ import { RouteSummaryHeader } from '@/components/route/RouteSummaryHeader';
 import { StatusChip } from '@/components/primitives/StatusChip';
 import type { AddressNotice } from '@/lib/places/notice';
 import { layout, radius, RULE_WIDTH, space } from '@/lib/design/tokens';
+import type { ThemeName } from '@/lib/design/tokens';
 import { metricsAreEstimated } from '@/lib/route/plan-state';
 import type { ActionIntent, PlanState } from '@/lib/route/plan-state';
 import type { RouteView } from '@/lib/route/route-view';
@@ -112,6 +113,9 @@ export interface PlanViewProps {
   readonly addressNotice?: AddressNotice | null;
   onRetryAddresses?: () => void;
 
+  /** Read once by the screen and passed down, so the list ordinal and the map
+   *  pin are drawn from the same palette by the same function. */
+  readonly theme: ThemeName;
   readonly testID?: string;
 }
 
@@ -135,6 +139,7 @@ export function PlanView({
   mapSlot,
   onDismissMap,
   bottomInset = 0,
+  theme,
   testID,
 }: PlanViewProps): React.JSX.Element {
   const actionState = useMemo(() => toActionState(intent, state), [intent, state]);
@@ -154,6 +159,10 @@ export function PlanView({
           title={titleFor(state)}
           distance={distance}
           duration={duration}
+          // The straight-line estimate is not shown while the real numbers are
+          // being fetched: watching 34 km become 41 km is watching the product
+          // correct itself, which is not what happened.
+          isPending={view === 'preparing'}
           {...chipFor(state)}
           {...noteFor(state)}
         />
@@ -192,12 +201,14 @@ export function PlanView({
           do not; the map takes exactly the same space when there is a result to
           show, so nothing around it moves as the section changes face. */}
       <View style={{ flex: 1 }}>
-        {view === 'map' ? (
+        {view !== 'list' ? (
           // No horizontal padding: the drawing is the ground, not a card on it.
+          // The waiting face occupies exactly this space too, so the result
+          // arriving changes what is drawn and never where anything sits.
           <View style={{ flex: 1 }}>
             {mapSlot}
 
-            {onDismissMap !== undefined && (
+            {view === 'map' && onDismissMap !== undefined && (
               // Top right, which is the corner ADR-0018 spent a whole decision
               // moving controls *out* of — and it is right here, because this is
               // not navigation. It dismisses what is on the canvas, it sits on
@@ -229,6 +240,30 @@ export function PlanView({
                 <MenuGlyph />
               </Pressable>
             )}
+
+            {view === 'preparing' && (
+              // The one line of copy on the waiting face, over a canvas already
+              // showing their own stops. Announced when it appears, because the
+              // user pressed Optimize and then looked away
+              // (`CLAUDE.md` §10 rule 7).
+              <View
+                style={{
+                  position: 'absolute',
+                  left: layout.screenPadding,
+                  right: layout.screenPadding,
+                  bottom: space.space5,
+                  alignItems: 'center',
+                }}
+                testID="plan-preparing-note"
+              >
+                <Text
+                  className="text-label-sm text-text-secondary"
+                  accessibilityLiveRegion="polite"
+                >
+                  WORKING OUT THE FASTEST ORDER
+                </Text>
+              </View>
+            )}
           </View>
         ) : (
           <StopList
@@ -236,6 +271,7 @@ export function PlanView({
             onSelectStop={onSelectStop}
             onRemoveStop={onRemoveStop}
             onMoveStop={onMoveStop}
+            theme={theme}
             testID="plan-stop-list"
           />
         )}
@@ -244,11 +280,22 @@ export function PlanView({
       <View
         style={{
           paddingHorizontal: layout.screenPadding,
-          paddingBottom: space.space3 + bottomInset,
+          // Clear of the dock the canvas runs underneath, and clear of it by
+          // more than a hairline: Confirm is pressed one-handed in a van, and a
+          // pill that shares an edge with the navigation is a mis-tap into
+          // Settings.
+          paddingBottom: (view === 'map' ? space.space4 : space.space3) + bottomInset,
         }}
       >
         {actionState !== null && (
-          <PrimaryAction state={actionState} onPress={onPrimaryAction} testID="plan-action" />
+          <PrimaryAction
+            state={actionState}
+            onPress={onPrimaryAction}
+            // Over the canvas it floats rather than closing a column, so it
+            // takes the width of its own label and is lifted off the drawing.
+            shape={view === 'map' ? 'pill' : 'block'}
+            testID="plan-action"
+          />
         )}
 
         {/* Always reachable, in every state that has a list — adding a stop is

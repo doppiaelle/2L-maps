@@ -1,4 +1,4 @@
-import { routeViewAfter, showsMap } from './route-view';
+import { PREPARING_DELAY_MS, routeViewAfter, showsCanvas, showsMap } from './route-view';
 import type { RouteView } from './route-view';
 
 /**
@@ -13,6 +13,36 @@ import type { RouteView } from './route-view';
 
 const listing = { current: 'list' as RouteView, hasResult: false };
 const showing = { current: 'map' as RouteView, hasResult: true };
+const preparing = { current: 'preparing' as RouteView, hasResult: false };
+
+describe('while the answer is being computed', () => {
+  it('takes the waiting face as soon as Optimize is pressed', () => {
+    // The seconds a user is waiting on something they paid for and cannot see.
+    // They used to be spent on the stop list under a button reading
+    // "Optimizing", which is a label rather than a state.
+    expect(routeViewAfter({ kind: 'optimize-started' }, listing)).toBe('preparing');
+  });
+
+  it('replaces a result already on screen rather than leaving it up', () => {
+    // Re-optimizing an edited route must not keep the previous answer visible
+    // while a new one is computed: the old one looks exactly as current as the
+    // new one will.
+    expect(routeViewAfter({ kind: 'optimize-started' }, showing)).toBe('preparing');
+  });
+
+  it('keeps waiting when the section is reopened mid-flight', () => {
+    // The work is happening whether or not this section is on screen.
+    expect(routeViewAfter({ kind: 'section-opened' }, preparing)).toBe('preparing');
+  });
+
+  it('goes back to the list when the attempt fails', () => {
+    // Where the stops are — and they are exactly as they were, which is what a
+    // failed optimization most has to demonstrate. A skeleton of a route that
+    // is not coming is the worst of both.
+    expect(routeViewAfter({ kind: 'failed' }, preparing)).toBe('list');
+    expect(routeViewAfter({ kind: 'failed' }, showing)).toBe('list');
+  });
+});
 
 describe('when a result arrives', () => {
   it('shows the map without asking', () => {
@@ -23,6 +53,10 @@ describe('when a result arrives', () => {
 
   it('shows it again when one arrives while the map is already up', () => {
     expect(routeViewAfter({ kind: 'result-arrived' }, showing)).toBe('map');
+  });
+
+  it('replaces the waiting face, which is what it was standing in for', () => {
+    expect(routeViewAfter({ kind: 'result-arrived' }, preparing)).toBe('map');
   });
 });
 
@@ -83,5 +117,36 @@ describe('the floor under all of it', () => {
   it('never shows it from the list, result or no result', () => {
     expect(showsMap('list', true)).toBe(false);
     expect(showsMap('list', false)).toBe(false);
+  });
+
+  it('refuses the map while the answer is still being computed', () => {
+    // There is nothing to draw yet, which is the whole reason the waiting face
+    // exists.
+    expect(showsMap('preparing', false)).toBe(false);
+    expect(showsMap('preparing', true)).toBe(false);
+  });
+});
+
+describe('what counts as the canvas', () => {
+  it('covers the waiting face and the result alike', () => {
+    // Both occupy the same space, so the layout that depends on the canvas —
+    // running behind the dock, lifting the control clear of it — is the same for
+    // both. One predicate rather than two conditions kept in step by hand.
+    expect(showsCanvas('preparing', false)).toBe(true);
+    expect(showsCanvas('map', true)).toBe(true);
+  });
+
+  it('excludes the list, and a map with nothing on it', () => {
+    expect(showsCanvas('list', true)).toBe(false);
+    expect(showsCanvas('map', false)).toBe(false);
+  });
+});
+
+describe('how long the wait is allowed to be invisible', () => {
+  it('is long enough that a cache hit shows nothing at all', () => {
+    // A cached optimization returns in well under a second, and the user goes
+    // straight from the list to the answer. Anything that flashes for 200 ms
+    // reads as a glitch rather than as progress.
+    expect(PREPARING_DELAY_MS).toBe(1_000);
   });
 });

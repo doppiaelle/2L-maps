@@ -69,6 +69,17 @@ export interface RouteCanvasProps {
    * hold still ([`lib/map/scenery.ts`](../../lib/map/scenery.ts)).
    */
   readonly scenerySeed?: string;
+  /**
+   * Whether this is the answer or the wait for it.
+   *
+   * `preparing` draws the same canvas at the same size from the stops we already
+   * hold, so **nothing moves when the result lands** — which is the whole
+   * difference between a skeleton and a spinner (`CLAUDE.md` §7 rule 5). What it
+   * withholds is every claim: the connectors are neutral rather than the
+   * degraded warning style, the pins carry no ordinals, and the summary says the
+   * route is being worked out rather than describing one.
+   */
+  readonly phase?: 'ready' | 'preparing';
   readonly testID?: string;
 }
 
@@ -97,8 +108,10 @@ export const RouteCanvas = memo(function RouteCanvas({
   theme,
   undrawableStopIds = [],
   scenerySeed = '',
+  phase = 'ready',
   testID,
 }: RouteCanvasProps): React.JSX.Element {
+  const isPreparing = phase === 'preparing';
   const palette = colours[theme];
   const map = mapColours[theme];
   const [size, setSize] = useState({ width: 0, height: 0 });
@@ -160,10 +173,16 @@ export const RouteCanvas = memo(function RouteCanvas({
     return { pins, road: null, segments: [], scenery: EMPTY_SCENERY, heading: [] };
   }, [stops, route, size, scenerySeed]);
 
-  const isDegraded = route.kind === 'connectors';
-  const summary = `Route preview, ${stops.length} ${stops.length === 1 ? 'stop' : 'stops'}${
-    isDegraded ? ', straight-line estimate' : ''
-  }`;
+  // Only a *result* can be degraded. While preparing, the connectors are the
+  // stops in the order they were typed and claim nothing about distance or
+  // traffic — calling that "straight-line estimate" would announce a degraded
+  // answer for a route that has not been computed at all.
+  const isDegraded = !isPreparing && route.kind === 'connectors';
+  const summary = isPreparing
+    ? `Working out the fastest order for ${stops.length} ${stops.length === 1 ? 'stop' : 'stops'}`
+    : `Route preview, ${stops.length} ${stops.length === 1 ? 'stop' : 'stops'}${
+        isDegraded ? ', straight-line estimate' : ''
+      }`;
 
   return (
     <View
@@ -182,7 +201,10 @@ export const RouteCanvas = memo(function RouteCanvas({
       // stop list is the accessible equivalent
       // ([`docs/23_ACCESSIBILITY.md`](../../docs/23_ACCESSIBILITY.md)).
       accessible
-      accessibilityRole="image"
+      // `progressbar` while preparing, so a screen reader says work is happening
+      // rather than describing a picture of a route that does not exist yet
+      // (`CLAUDE.md` §10 rule 7).
+      accessibilityRole={isPreparing ? 'progressbar' : 'image'}
       accessibilityLabel={summary}
       testID={testID}
     >
@@ -262,19 +284,26 @@ export const RouteCanvas = memo(function RouteCanvas({
           {drawn.segments.map((segment) => (
             <Path
               key={segment.id}
-              testID="route-connector"
+              testID={isPreparing ? 'route-pending-connector' : 'route-connector'}
               d={segment.d}
-              stroke={palette.warning}
+              // Warning yellow says "degraded result" and is reserved for one.
+              // While preparing there is no result to describe, so the line is
+              // the quietest thing on the canvas — a placeholder holding the
+              // space the mint route is about to take.
+              stroke={isPreparing ? palette.textTertiary : palette.warning}
               strokeWidth={stroke.routeDegraded}
               strokeDasharray={DEGRADED_DASH}
               strokeLinecap="round"
+              opacity={isPreparing ? PREPARING_OPACITY : 1}
               fill="none"
             />
           ))}
 
           {/* Where the driver sets off, and which way. The one piece of chrome
-              on the canvas that is about them rather than about the route. */}
-          {drawn.heading.length >= 2 && (
+              on the canvas that is about them rather than about the route.
+              Absent while preparing: which stop comes first is precisely the
+              question being asked. */}
+          {drawn.heading.length >= 2 && !isPreparing && (
             <OriginMarker points={drawn.heading} colour={palette.accent} theme={theme} />
           )}
 
@@ -283,8 +312,9 @@ export const RouteCanvas = memo(function RouteCanvas({
               key={pin.stopId}
               point={pin.point}
               state={pin.state}
-              isSelected={pin.stopId === selectedStopId}
+              isSelected={!isPreparing && pin.stopId === selectedStopId}
               theme={theme}
+              opacity={isPreparing ? PREPARING_OPACITY : 1}
             />
           ))}
         </Svg>
@@ -292,16 +322,21 @@ export const RouteCanvas = memo(function RouteCanvas({
 
       {/* The pin numbers, as real text rather than SVG glyphs: `Text` gets
           Dynamic Type and the platform's own font, and an SVG `<Text>` gets
-          neither (`CLAUDE.md` §10 rule 5). */}
-      {drawn.pins.map((pin) => (
-        <PinLabel
-          key={pin.stopId}
-          point={pin.point}
-          position={pin.position}
-          state={pin.state}
-          theme={theme}
-        />
-      ))}
+          neither (`CLAUDE.md` §10 rule 5).
+
+          **Withheld while preparing.** The numbers are the answer: showing the
+          entry order in them and then renumbering under the user's eyes would
+          make the wait look like a result that changed its mind. */}
+      {!isPreparing &&
+        drawn.pins.map((pin) => (
+          <PinLabel
+            key={pin.stopId}
+            point={pin.point}
+            position={pin.position}
+            state={pin.state}
+            theme={theme}
+          />
+        ))}
 
       {undrawableStopIds.length > 0 && (
         // Said rather than left to be counted. A route missing a pin looks like
@@ -342,6 +377,18 @@ export const RouteCanvas = memo(function RouteCanvas({
 const DEGRADED_DASH = '10,8';
 
 /**
+ * How present the placeholder drawing is while the answer is being computed.
+ *
+ * Faint enough that nobody mistakes it for the route, present enough that the
+ * canvas is visibly about *their* stops rather than a generic loading screen —
+ * which is what makes the wait feel like work happening on their day. Not
+ * animated: the shimmer would be the only moving thing on a canvas whose whole
+ * job is to hold still, and under reduced motion it would have to stop anyway
+ * (`CLAUDE.md` §10 rule 6).
+ */
+const PREPARING_OPACITY = 0.35;
+
+/**
  * One stop.
  *
  * The disc only: the ordinal is drawn above it as real text, so it inherits the
@@ -352,11 +399,13 @@ const Pin = memo(function Pin({
   state,
   isSelected,
   theme,
+  opacity = 1,
 }: {
   point: Point;
   state: StopProgressState;
   isSelected: boolean;
   theme: ThemeName;
+  opacity?: number;
 }): React.JSX.Element {
   const style = markerStyle(theme, state, isSelected);
   const size = isSelected ? MARKER_SIZE_SELECTED : MARKER_SIZE;
@@ -370,6 +419,7 @@ const Pin = memo(function Pin({
       fill={style.fill}
       stroke={style.border}
       strokeWidth={2}
+      opacity={opacity}
     />
   );
 });

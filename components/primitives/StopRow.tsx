@@ -1,17 +1,26 @@
 import { Pressable, Text, View } from 'react-native';
 
-import { layout } from '@/lib/design/tokens';
+import { layout, radius } from '@/lib/design/tokens';
+import type { ThemeName } from '@/lib/design/tokens';
+import { MARKER_SIZE, markerStyle } from '@/lib/map/style';
 import type { StopText } from '@/lib/route/stop-text';
+import type { StopProgressState } from '@/lib/route/progress';
 
 /**
  * One stop in the list.
  *
  * The row is where two accessibility rules meet the product's actual data.
  *
- * **Never colour alone** (`CLAUDE.md` §10 rule 4). A completed stop shows a
- * checkmark *and* mint; an unreachable one shows a glyph *and* red. A user with
- * deuteranopia has to be able to work this list, and colour-only state is the
- * single most common way a list stops being usable for them.
+ * **Never colour alone** (`CLAUDE.md` §10 rule 4). An unreachable stop shows a
+ * glyph *and* red. A user with deuteranopia has to be able to work this list,
+ * and colour-only state is the single most common way a list stops being usable
+ * for them.
+ *
+ * **The ordinal is drawn by `markerStyle`, the same function the map pin uses.**
+ * The row used to keep its own palette — a mint-tinted disc with mint digits —
+ * so the same stop was a mint dot in the list and a white pin on the map, and
+ * every stop looked accented in a system with exactly one accent
+ * (`CLAUDE.md` §8 rule 2). One source, two renderers.
  *
  * **A missing coordinate is shown, not hidden.** Coordinates expire at 30 days
  * by design ([ADR-0007](../../docs/adr/0007-place-id-durable-coordinates-perishable.md)).
@@ -26,7 +35,7 @@ import type { StopText } from '@/lib/route/stop-text';
  * when there is neither, the row says so rather than rendering an empty line.
  */
 
-export type StopState = 'pending' | 'completed' | 'skipped' | 'unreachable';
+export type StopState = StopProgressState;
 
 export interface StopRowProps {
   readonly position: number;
@@ -40,6 +49,10 @@ export interface StopRowProps {
    */
   readonly text: StopText;
   readonly state: StopState;
+  /** Which palette the ordinal is drawn from. Passed rather than read here: a
+   *  component that asks the system for the colour scheme answers differently in
+   *  a test and in split screen. */
+  readonly theme: ThemeName;
   /** Null once the 30-day cache has expired. */
   readonly hasCoordinate: boolean;
   /** `2.4 km · 8 min`, once a route has been optimized. */
@@ -62,21 +75,11 @@ export interface StopRowProps {
   readonly testID?: string;
 }
 
-/** Glyph, colour, and the word a screen reader says — together, always. Splitting
- *  them across the file is how one of them gets updated and the others do not. */
-const PRESENTATION: Readonly<
-  Record<StopState, { glyph: string; textClass: string; spoken: string }>
-> = {
-  pending: { glyph: '', textClass: 'text-text-primary', spoken: 'not yet visited' },
-  completed: { glyph: '✓', textClass: 'text-accent', spoken: 'completed' },
-  skipped: { glyph: '→', textClass: 'text-text-secondary', spoken: 'skipped' },
-  unreachable: { glyph: '!', textClass: 'text-danger', spoken: 'unreachable' },
-};
-
 export function StopRow({
   position,
   text,
   state,
+  theme,
   hasCoordinate,
   meta,
   onPress,
@@ -85,7 +88,10 @@ export function StopRow({
   onMoveDown,
   testID,
 }: StopRowProps): React.JSX.Element {
-  const presentation = PRESENTATION[state];
+  // `false` for selection: the row has no selected appearance, and a selected
+  // pin's mint fill would put the accent on a row for a stop the user merely
+  // tapped on the map.
+  const presentation = markerStyle(theme, state, false);
   const { title, subtitle } = text;
 
   return (
@@ -105,30 +111,33 @@ export function StopRow({
       {/* The ordinal is the row's anchor: it is what the user reads out loud to
           themselves while driving, so it is the one number that never moves. */}
       <View
-        className="w-space-6 h-space-6 rounded-full bg-accent-subtle items-center justify-center"
+        style={{
+          width: MARKER_SIZE,
+          height: MARKER_SIZE,
+          borderRadius: radius.radiusFull,
+          backgroundColor: presentation.fill,
+          borderWidth: 2,
+          borderColor: presentation.border,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
         accessibilityElementsHidden
         importantForAccessibility="no"
         testID="stop-ordinal"
       >
-        <Text className="text-label-sm text-accent">{position}</Text>
+        <Text className="text-label-sm" style={{ color: presentation.foreground }}>
+          {presentation.glyph ?? position}
+        </Text>
       </View>
 
       <View className="flex-1">
-        <View className="flex-row items-center gap-space-1">
-          {presentation.glyph !== '' && (
-            // The glyph, not merely the colour. This is the whole rule.
-            <Text
-              className={`text-caption-strong ${presentation.textClass}`}
-              accessibilityElementsHidden
-              importantForAccessibility="no"
-            >
-              {presentation.glyph}
-            </Text>
-          )}
-          <Text className={`text-body-strong ${presentation.textClass} flex-1`} numberOfLines={2}>
-            {title}
-          </Text>
-        </View>
+        <Text
+          className="text-body-strong flex-1"
+          style={{ color: presentation.foreground }}
+          numberOfLines={2}
+        >
+          {title}
+        </Text>
 
         {subtitle !== null && (
           <Text className="text-caption text-text-secondary" numberOfLines={2}>

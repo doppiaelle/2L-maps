@@ -30,8 +30,8 @@ import { colours, space } from '@/lib/design/tokens';
 import { addressNoticeOf } from '@/lib/places/notice';
 import { formatDistance, formatDuration } from '@/lib/format/units';
 import { buildPlanRows, placeIdsToResolve, straightLineMeters } from '@/lib/route/plan-rows';
-import { buildRouteGeometry, planRoute } from '@/lib/map/route-geometry';
-import { routeViewAfter, showsMap } from '@/lib/route/route-view';
+import { buildRouteGeometry, connectorsThrough, planRoute } from '@/lib/map/route-geometry';
+import { PREPARING_DELAY_MS, routeViewAfter, showsCanvas, showsMap } from '@/lib/route/route-view';
 import type { RouteView } from '@/lib/route/route-view';
 import { handoffNoticeOf } from '@/lib/handoff/outcome-notice';
 import { newRouteId } from '@/lib/route/route-id';
@@ -176,6 +176,13 @@ export default function PlanScreen(): React.JSX.Element {
   // jank in this class of app (docs/24_PERFORMANCE.md).
   const geometry = useMemo(() => (result === null ? null : buildRouteGeometry(result)), [result]);
 
+  /** The markers as the geometry functions want them: an id and a place, or the
+   *  admission that we cannot place it. */
+  const positionedStops = useMemo(
+    () => markers.map((marker) => ({ stopId: marker.stopId, coordinate: marker.coordinate })),
+    [markers],
+  );
+
   // Real figures once a result exists; a straight-line total before that,
   // labelled as an estimate by `<RouteSummaryHeader>`. A number is more useful
   // than a blank — but a straight-line *time* would be a road estimate we did
@@ -232,9 +239,48 @@ export default function PlanScreen(): React.JSX.Element {
     setHandoffNotice(null);
   }, [editSignature]);
 
+  /**
+   * The wait between pressing Optimize and seeing an answer.
+   *
+   * **Held back for a second** (`PREPARING_DELAY_MS`). A cached optimization
+   * returns in well under that, and the user goes straight from the list to the
+   * route having seen nothing in between — which is the right experience for
+   * work that did not have to be done again. Anything that flashes for 200 ms
+   * reads as a glitch (`docs/03_USER_JOURNEYS.md` J1).
+   *
+   * The timer is cleared on the way out, so a result that lands at 900 ms never
+   * gets overwritten by a waiting face scheduled before it arrived.
+   */
+  useEffect(() => {
+    if (!isOptimizing) return;
+
+    const timer = setTimeout(() => {
+      setRouteView((current) =>
+        routeViewAfter({ kind: 'optimize-started' }, { current, hasResult: false }),
+      );
+    }, PREPARING_DELAY_MS);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [isOptimizing]);
+
+  // A failure returns to the list, where the stops are — and they are exactly as
+  // they were, which is the thing a failed optimization most has to demonstrate.
+  const hasFailed = failure !== null;
+  useEffect(() => {
+    if (hasFailed) {
+      setRouteView((current) => routeViewAfter({ kind: 'failed' }, { current, hasResult: false }));
+    }
+  }, [hasFailed]);
+
   const theme = scheme === 'dark' ? 'dark' : 'light';
 
   const isMapShowing = showsMap(routeView, result !== null);
+  // Both faces of the canvas occupy the same space, so the layout that depends
+  // on it — running behind the dock, lifting Confirm clear of it — is the same
+  // for both.
+  const isCanvasShowing = showsCanvas(routeView, result !== null);
 
   return (
     <View
@@ -252,7 +298,7 @@ export default function PlanScreen(): React.JSX.Element {
           topInset={insets.top}
           // The drawn route runs the whole height with the dock floating on it;
           // the stop list stops above the dock, or its last row is unreachable.
-          extendsBehindDock={isMapShowing}
+          extendsBehindDock={isCanvasShowing}
           testID="section-itinerary"
         >
           <PlanView
@@ -262,20 +308,23 @@ export default function PlanScreen(): React.JSX.Element {
             // (ADR-0022). `showsMap` is the floor: a view of 'map' with no
             // result would draw an empty canvas, and the drawn map has no tiles
             // to fall back on.
-            view={isMapShowing ? 'map' : 'list'}
-            // Lifts Confirm clear of the dock the map runs underneath.
-            bottomInset={isMapShowing ? DOCK_OUTER_HEIGHT : 0}
+            view={isMapShowing ? 'map' : isCanvasShowing ? 'preparing' : 'list'}
+            // Lifts Confirm clear of the dock the canvas runs underneath.
+            bottomInset={isCanvasShowing ? DOCK_OUTER_HEIGHT : 0}
             mapSlot={
-              result === null ? null : (
+              !isCanvasShowing ? null : (
                 <RouteCanvas
                   stops={markers}
-                  route={planRoute(
-                    geometry,
-                    markers.map((marker) => ({
-                      stopId: marker.stopId,
-                      coordinate: marker.coordinate,
-                    })),
-                  )}
+                  // The result's own geometry once there is one; the stops in the
+                  // order they were typed while there is not. Same canvas, same
+                  // projection, same drawn town — so the answer arriving changes
+                  // what is on screen without moving any of it.
+                  route={
+                    isMapShowing
+                      ? planRoute(geometry, positionedStops)
+                      : connectorsThrough(positionedStops)
+                  }
+                  phase={isMapShowing ? 'ready' : 'preparing'}
                   selectedStopId={selectedStopId}
                   undrawableStopIds={undrawableStopIds}
                   // The route's own id. Stable across renders and across
@@ -377,6 +426,7 @@ export default function PlanScreen(): React.JSX.Element {
               isLoading: places.isLoading,
             })}
             onRetryAddresses={places.retry}
+            theme={theme}
             testID="plan-view"
           />
         </SectionPanel>

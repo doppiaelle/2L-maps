@@ -28,13 +28,17 @@ describe('loading', () => {
     // A spinner is not a loading state (CLAUDE.md §7 rule 5). A skeleton means
     // the list does not jump when the data lands, and the user can already see
     // how much is coming.
-    render(<StopList state={{ kind: 'loading', expectedCount: 5 }} onSelectStop={noop} />);
+    render(
+      <StopList theme="light" state={{ kind: 'loading', expectedCount: 5 }} onSelectStop={noop} />,
+    );
 
     expect(screen.getAllByTestId('stop-skeleton')).toHaveLength(5);
   });
 
   it('gives each skeleton the row height, so nothing reflows on arrival', () => {
-    render(<StopList state={{ kind: 'loading', expectedCount: 3 }} onSelectStop={noop} />);
+    render(
+      <StopList theme="light" state={{ kind: 'loading', expectedCount: 3 }} onSelectStop={noop} />,
+    );
 
     for (const skeleton of screen.getAllByTestId('stop-skeleton')) {
       expect(skeleton.props.style).toMatchObject({ height: DEFAULT_ROW_HEIGHT });
@@ -42,7 +46,9 @@ describe('loading', () => {
   });
 
   it('announces that it is loading', () => {
-    render(<StopList state={{ kind: 'loading', expectedCount: 3 }} onSelectStop={noop} />);
+    render(
+      <StopList theme="light" state={{ kind: 'loading', expectedCount: 3 }} onSelectStop={noop} />,
+    );
     expect(screen.getByLabelText('Loading stops')).toBeTruthy();
   });
 });
@@ -51,7 +57,7 @@ describe('empty', () => {
   it('offers the three ways in rather than only saying there is nothing', () => {
     // An empty state that only reports emptiness leaves the user to find the
     // affordance themselves.
-    render(<StopList state={{ kind: 'empty' }} onSelectStop={noop} />);
+    render(<StopList theme="light" state={{ kind: 'empty' }} onSelectStop={noop} />);
 
     expect(screen.getByText('No stops yet')).toBeTruthy();
     expect(screen.getByText(/paste a list, or photograph one/)).toBeTruthy();
@@ -60,7 +66,9 @@ describe('empty', () => {
 
 describe('ready', () => {
   it('renders the stops it is given', () => {
-    render(<StopList state={{ kind: 'ready', stops: stops(3) }} onSelectStop={noop} />);
+    render(
+      <StopList theme="light" state={{ kind: 'ready', stops: stops(3) }} onSelectStop={noop} />,
+    );
     expect(screen.getByText('Via 0, Bergamo')).toBeTruthy();
     expect(screen.getByText('Via 2, Bergamo')).toBeTruthy();
   });
@@ -71,6 +79,7 @@ describe('ready', () => {
     let selected: string | null = null;
     render(
       <StopList
+        theme="light"
         state={{ kind: 'ready', stops: stops(3) }}
         onSelectStop={(id) => {
           selected = id;
@@ -83,7 +92,9 @@ describe('ready', () => {
   });
 
   it('announces how many stops there are', () => {
-    render(<StopList state={{ kind: 'ready', stops: stops(7) }} onSelectStop={noop} />);
+    render(
+      <StopList theme="light" state={{ kind: 'ready', stops: stops(7) }} onSelectStop={noop} />,
+    );
     expect(screen.getByLabelText('7 stops')).toBeTruthy();
   });
 });
@@ -94,6 +105,7 @@ describe('virtualisation crosses the threshold, not before it', () => {
     // list fits on screen anyway.
     render(
       <StopList
+        theme="light"
         state={{ kind: 'ready', stops: stops(LIST_VIRTUALISATION_THRESHOLD) }}
         onSelectStop={noop}
         testID="list"
@@ -105,6 +117,7 @@ describe('virtualisation crosses the threshold, not before it', () => {
   it('clips one above it', () => {
     render(
       <StopList
+        theme="light"
         state={{ kind: 'ready', stops: stops(LIST_VIRTUALISATION_THRESHOLD + 1) }}
         onSelectStop={noop}
         testID="list"
@@ -117,7 +130,12 @@ describe('virtualisation crosses the threshold, not before it', () => {
     // Measuring is what makes a virtualised list stutter on the first fling.
     // The height is a known function of the Dynamic Type size, not of content.
     render(
-      <StopList state={{ kind: 'ready', stops: stops(25) }} onSelectStop={noop} testID="list" />,
+      <StopList
+        theme="light"
+        state={{ kind: 'ready', stops: stops(25) }}
+        onSelectStop={noop}
+        testID="list"
+      />,
     );
 
     const getItemLayout = screen.getByTestId('list').props.getItemLayout;
@@ -134,6 +152,7 @@ describe('virtualisation crosses the threshold, not before it', () => {
     // to be told, because it refuses to measure.
     render(
       <StopList
+        theme="light"
         state={{ kind: 'ready', stops: stops(25) }}
         onSelectStop={noop}
         rowHeight={140}
@@ -149,7 +168,12 @@ describe('virtualisation crosses the threshold, not before it', () => {
 
   it('keys by stop id so a reorder is not a content change', () => {
     render(
-      <StopList state={{ kind: 'ready', stops: stops(3) }} onSelectStop={noop} testID="list" />,
+      <StopList
+        theme="light"
+        state={{ kind: 'ready', stops: stops(3) }}
+        onSelectStop={noop}
+        testID="list"
+      />,
     );
     expect(screen.getByTestId('list').props.keyExtractor(stop(2))).toBe('stop-2');
   });
@@ -162,6 +186,7 @@ describe('the header slot', () => {
 
     render(
       <StopList
+        theme="light"
         state={{ kind: 'loading', expectedCount: 2 }}
         onSelectStop={noop}
         header={header}
@@ -169,7 +194,9 @@ describe('the header slot', () => {
     );
     expect(screen.getByText('slot')).toBeTruthy();
 
-    screen.rerender(<StopList state={{ kind: 'empty' }} onSelectStop={noop} header={header} />);
+    screen.rerender(
+      <StopList theme="light" state={{ kind: 'empty' }} onSelectStop={noop} header={header} />,
+    );
     expect(screen.getByText('slot')).toBeTruthy();
   });
 });

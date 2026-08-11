@@ -5,6 +5,7 @@ import { StopRow } from './StopRow';
 import type { StopState } from './StopRow';
 import { fallbackAllowances } from '@/lib/entitlement/plans';
 import { layout } from '@/lib/design/tokens';
+import { markerStyle } from '@/lib/map/style';
 import type { AdsProvider } from '@/lib/providers/types';
 
 const noop = () => undefined;
@@ -17,6 +18,7 @@ const renderRow = (overrides: Partial<React.ComponentProps<typeof StopRow>> = {}
       position={3}
       text={{ title: 'Via Roma 12, Bergamo', subtitle: null, needsRefreshing: false }}
       state="pending"
+      theme="light"
       hasCoordinate
       meta={null}
       onPress={noop}
@@ -25,44 +27,50 @@ const renderRow = (overrides: Partial<React.ComponentProps<typeof StopRow>> = {}
   );
 
 /**
- * These query with `includeHiddenElements` on purpose. The glyphs and the
+ * These query with `includeHiddenElements` on purpose. The glyph and the
  * ordinal badge are deliberately hidden from assistive technology — their
- * meaning is already in the row's accessibility label, and announcing a "✓"
- * after the word "completed" is noise. But they must still be *drawn*, because
+ * meaning is already in the row's accessibility label, and announcing a "!"
+ * after the word "unreachable" is noise. But they must still be *drawn*, because
  * that is the whole point of not relying on colour. So the assertion is about
  * what is on screen, and it has to say so.
  */
 describe('a stop is never distinguished by colour alone', () => {
-  it('shows a checkmark as well as mint when completed', () => {
+  it('shows a glyph as well as red when unreachable', () => {
     // A user with deuteranopia must be able to work this list, and colour-only
     // state is the commonest way a list stops being usable for them
     // (CLAUDE.md §10 rule 4).
-    renderRow({ state: 'completed' });
-    expect(screen.getByText('✓', { includeHiddenElements: true })).toBeTruthy();
-  });
-
-  it('shows a glyph as well as red when unreachable', () => {
     renderRow({ state: 'unreachable' });
     expect(screen.getByText('!', { includeHiddenElements: true })).toBeTruthy();
   });
 
-  it('shows a glyph for a skipped stop too', () => {
-    renderRow({ state: 'skipped' });
-    expect(screen.getByText('→', { includeHiddenElements: true })).toBeTruthy();
+  it('shows the ordinal for the ordinary case, so the glyph means something', () => {
+    // The number *is* the distinguishing mark for a pending stop, and it is the
+    // one thing the driver reads aloud to themselves.
+    renderRow({ state: 'pending' });
+    expect(screen.getByText('3', { includeHiddenElements: true })).toBeTruthy();
+    expect(screen.queryByText('!', { includeHiddenElements: true })).toBeNull();
   });
 
-  it('shows no glyph for the ordinary case, so the ones that appear mean something', () => {
-    renderRow({ state: 'pending' });
-    expect(screen.queryByText('✓', { includeHiddenElements: true })).toBeNull();
-    expect(screen.queryByText('!', { includeHiddenElements: true })).toBeNull();
+  it('draws the same mark the map draws, from the same function', () => {
+    // The row used to keep its own palette — a mint-tinted disc with mint digits
+    // — so one stop was a mint dot in the list and a white pin on the map, and
+    // every stop looked accented in a system with one accent (CLAUDE.md §8
+    // rule 2).
+    renderRow({ state: 'pending', theme: 'light' });
+    const expected = markerStyle('light', 'pending', false);
+
+    expect(
+      screen.getByTestId('stop-ordinal', { includeHiddenElements: true }).props.style,
+    ).toMatchObject({
+      backgroundColor: expected.fill,
+      borderColor: expected.border,
+    });
   });
 });
 
 describe('what a screen reader hears', () => {
   const cases: readonly [StopState, string][] = [
-    ['pending', 'not yet visited'],
-    ['completed', 'completed'],
-    ['skipped', 'skipped'],
+    ['pending', 'stop'],
     ['unreachable', 'unreachable'],
   ];
 
@@ -77,9 +85,7 @@ describe('what a screen reader hears', () => {
       position: 7,
       text: { title: 'Warehouse', subtitle: null, needsRefreshing: false },
     });
-    expect(screen.getByRole('button').props.accessibilityLabel).toBe(
-      'Stop 7, Warehouse, not yet visited',
-    );
+    expect(screen.getByRole('button').props.accessibilityLabel).toBe('Stop 7, Warehouse, stop');
   });
 
   it('does not read the ordinal badge twice', () => {
@@ -240,6 +246,7 @@ describe('a stop whose address has been purged', () => {
         position={1}
         text={{ title: 'Warehouse', subtitle: null, needsRefreshing: false }}
         state="pending"
+        theme="light"
         hasCoordinate={false}
         meta={null}
         onPress={() => undefined}
@@ -257,6 +264,7 @@ describe('a stop whose address has been purged', () => {
         position={1}
         text={{ title: 'Address needs refreshing', subtitle: null, needsRefreshing: true }}
         state="pending"
+        theme="light"
         hasCoordinate={false}
         meta={null}
         onPress={() => undefined}
