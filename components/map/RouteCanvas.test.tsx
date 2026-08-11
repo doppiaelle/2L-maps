@@ -147,3 +147,44 @@ describe('an empty route', () => {
     expect(screen.queryAllByTestId('route-canvas-pin')).toHaveLength(0);
   });
 });
+
+describe('the drawn town', () => {
+  it('puts streets and blocks under the route', () => {
+    // The canvas was a dark rectangle with a line on it. The scenery is what
+    // makes it read as a place — invented, and `lib/map/scenery.ts` says so,
+    // but a route floating in a void tells a driver nothing about where they
+    // are going.
+    laidOut(canvas(road, [stop('s1', 1), stop('s2', 2)], { scenerySeed: 'route-1' }));
+
+    expect(screen.getAllByTestId('scenery-road').length).toBeGreaterThan(0);
+    expect(screen.getAllByTestId('scenery-block').length).toBeGreaterThan(0);
+  });
+
+  it('marks where the driver sets off, and which way', () => {
+    // A numbered disc among other numbered discs does not tell anyone where the
+    // day begins.
+    laidOut(canvas(road, [stop('s1', 1), stop('s2', 2)], { scenerySeed: 'route-1' }));
+
+    expect(screen.getByTestId('route-canvas-origin')).toBeTruthy();
+  });
+
+  it('draws the same town twice for the same route', () => {
+    // The property the whole module exists for: scenery that reshuffled between
+    // renders would read as movement on a canvas whose job is to hold still.
+    laidOut(canvas(road, [stop('s1', 1), stop('s2', 2)], { scenerySeed: 'route-1' }));
+    const first = screen.getAllByTestId('scenery-road').map((r) => String(r.props.x1));
+
+    screen.unmount();
+    laidOut(canvas(road, [stop('s1', 1), stop('s2', 2)], { scenerySeed: 'route-1' }));
+    const second = screen.getAllByTestId('scenery-road').map((r) => String(r.props.x1));
+
+    expect(second).toEqual(first);
+  });
+
+  it('draws no town before the canvas has been measured', () => {
+    // Zero-sized means no projection and nothing to fade around; a grid there
+    // would be a hundred SVG nodes at the wrong scale.
+    render(canvas(road, [stop('s1', 1)]));
+    expect(screen.queryAllByTestId('scenery-road')).toHaveLength(0);
+  });
+});

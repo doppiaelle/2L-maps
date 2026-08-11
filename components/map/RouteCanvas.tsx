@@ -1,12 +1,14 @@
 import { memo, useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
-import Svg, { Circle, Path, Rect } from 'react-native-svg';
+import Svg, { Circle, G, Line, Path, Rect } from 'react-native-svg';
 
 import { MapAttribution } from './MapAttribution';
 import { colours, mapColours, radius, space, stroke } from '@/lib/design/tokens';
 import type { ThemeName } from '@/lib/design/tokens';
 import type { LatLng } from '@/lib/geo/haversine';
 import { fitProjection, pathThrough } from '@/lib/map/projection';
+import { sceneryFor } from '@/lib/map/scenery';
+import type { Scenery } from '@/lib/map/scenery';
 import type { Point } from '@/lib/map/projection';
 import { simplify } from '@/lib/map/simplify';
 import { MARKER_SIZE, MARKER_SIZE_SELECTED, markerStyle } from '@/lib/map/style';
@@ -60,6 +62,13 @@ export interface RouteCanvasProps {
   /** Named so the screen can say which stops it could not draw, rather than
    *  leaving the user to count pins and find one short. */
   readonly undrawableStopIds?: readonly string[];
+  /**
+   * Anything stable and route-specific. The drawn town is generated from it, so
+   * the same route draws the same streets on every device and every render —
+   * scenery that reshuffled would read as movement on a canvas whose job is to
+   * hold still ([`lib/map/scenery.ts`](../../lib/map/scenery.ts)).
+   */
+  readonly scenerySeed?: string;
   readonly testID?: string;
 }
 
@@ -72,12 +81,22 @@ export interface RouteCanvasProps {
  */
 const CANVAS_PADDING = MARKER_SIZE_SELECTED / 2 + space.space3;
 
+/** Nothing to draw around. Frozen so the empty case is one object rather than a
+ *  new pair of arrays on every render. */
+const EMPTY_SCENERY: Scenery = { roads: [], blocks: [] };
+
+/** The navigator's triangle, pointing along positive x before rotation. Drawn
+ *  once and turned to the route's first bearing — a shape that says "you start
+ *  here, facing this way" without a word of copy. */
+const ORIGIN_TRIANGLE = 'M 9 0 L -6 6.5 L -3 0 L -6 -6.5 Z';
+
 export const RouteCanvas = memo(function RouteCanvas({
   stops,
   route,
   selectedStopId,
   theme,
   undrawableStopIds = [],
+  scenerySeed = '',
   testID,
 }: RouteCanvasProps): React.JSX.Element {
   const palette = colours[theme];
@@ -109,17 +128,25 @@ export const RouteCanvas = memo(function RouteCanvas({
     if (route.kind === 'road') {
       // Simplified after projection, never before: a tolerance in degrees means
       // a different amount of detail at every latitude and every zoom.
+      const projected = simplify(route.path.map(projection.project));
       return {
         pins,
-        road: pathThrough(simplify(route.path.map(projection.project))),
+        road: pathThrough(projected),
         segments: [],
+        // The town is generated around the *simplified* line, so the scenery and
+        // the route agree about where the route is.
+        scenery: sceneryFor({ path: projected, size, seed: scenerySeed }),
+        heading: projected,
       };
     }
 
     if (route.kind === 'connectors') {
+      const through = pins.map((pin) => pin.point);
       return {
         pins,
         road: null,
+        scenery: sceneryFor({ path: through, size, seed: scenerySeed }),
+        heading: through,
         // Separate paths rather than one dashed line through every stop. A
         // single path would join at the stops and read as continuous, which is
         // the one impression a degraded result must not give.
@@ -130,8 +157,8 @@ export const RouteCanvas = memo(function RouteCanvas({
       };
     }
 
-    return { pins, road: null, segments: [] };
-  }, [stops, route, size]);
+    return { pins, road: null, segments: [], scenery: EMPTY_SCENERY, heading: [] };
+  }, [stops, route, size, scenerySeed]);
 
   const isDegraded = route.kind === 'connectors';
   const summary = `Route preview, ${stops.length} ${stops.length === 1 ? 'stop' : 'stops'}${
@@ -165,6 +192,43 @@ export const RouteCanvas = memo(function RouteCanvas({
               the whole drawing is one surface the SVG owns — and so a future
               snapshot exports what is on screen rather than a transparent hole. */}
           <Rect x={0} y={0} width={size.width} height={size.height} fill={map.land} />
+
+          {/* The invented town, underneath everything. Blocks first, then the
+              minor streets, then the through-roads — the order a real map is
+              printed in, and the order that keeps the route on top of all of it.
+
+              **These streets are not real** and the code that makes them says so
+              (`lib/map/scenery.ts`). Drawing real ones would mean putting
+              Google-derived stops on somebody else's map, which ADR-0012 rejects
+              by name and `CLAUDE.md` §13 rule 5 forbids widening. */}
+          {drawn.scenery.blocks.map((block) => (
+            <Rect
+              key={block.id}
+              testID="scenery-block"
+              x={block.x}
+              y={block.y}
+              width={block.width}
+              height={block.height}
+              rx={2}
+              fill={map.park}
+              opacity={block.opacity}
+            />
+          ))}
+
+          {drawn.scenery.roads.map((road) => (
+            <Line
+              key={road.id}
+              testID="scenery-road"
+              x1={road.from.x}
+              y1={road.from.y}
+              x2={road.to.x}
+              y2={road.to.y}
+              stroke={road.isArterial ? map.road : map.roadMinor}
+              strokeWidth={road.isArterial ? stroke.sceneryArterial : stroke.sceneryMinor}
+              strokeLinecap="round"
+              opacity={road.opacity}
+            />
+          ))}
 
           {drawn.road !== null && (
             <>
@@ -207,6 +271,12 @@ export const RouteCanvas = memo(function RouteCanvas({
               fill="none"
             />
           ))}
+
+          {/* Where the driver sets off, and which way. The one piece of chrome
+              on the canvas that is about them rather than about the route. */}
+          {drawn.heading.length >= 2 && (
+            <OriginMarker points={drawn.heading} colour={palette.accent} theme={theme} />
+          )}
 
           {drawn.pins.map((pin) => (
             <Pin
@@ -338,5 +408,49 @@ function PinLabel({
         {style.glyph ?? position}
       </Text>
     </View>
+  );
+}
+
+/**
+ * The navigator's triangle at the route's start.
+ *
+ * Mint, because it is the accent that means "this is your route"
+ * (`CLAUDE.md` §8 rule 2), and rotated to the bearing of the first leg so it
+ * says which way the day begins as well as where. It carries a halo in the map
+ * colours so it stays legible over a block as well as over open ground.
+ *
+ * It is decoration in the strict sense — no state, no interaction, nothing
+ * derived from it. A driver reading the canvas should be able to find their
+ * starting point in under a second, and a numbered disc among other numbered
+ * discs does not do that.
+ */
+function OriginMarker({
+  points,
+  colour,
+  theme,
+}: {
+  points: readonly Point[];
+  colour: string;
+  theme: ThemeName;
+}): React.JSX.Element | null {
+  const first = points[0];
+  const next = points[1];
+  if (first === undefined || next === undefined) return null;
+
+  const degrees = (Math.atan2(next.y - first.y, next.x - first.x) * 180) / Math.PI;
+
+  return (
+    <G
+      testID="route-canvas-origin"
+      transform={`translate(${first.x} ${first.y}) rotate(${degrees})`}
+    >
+      <Path
+        d={ORIGIN_TRIANGLE}
+        fill={colour}
+        stroke={mapColours[theme].land}
+        strokeWidth={2}
+        strokeLinejoin="round"
+      />
+    </G>
   );
 }

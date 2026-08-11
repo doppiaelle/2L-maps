@@ -302,6 +302,10 @@ export default function PlanScreen(): React.JSX.Element {
                   )}
                   selectedStopId={selectedStopId}
                   undrawableStopIds={undrawableStopIds}
+                  // The route's own id. Stable across renders and across
+                  // devices, so the drawn town is the same every time this
+                  // route is opened — and a different one for a different route.
+                  scenerySeed={draft.routeId}
                   theme={theme}
                   testID="plan-route-canvas"
                 />

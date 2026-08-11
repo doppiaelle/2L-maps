@@ -180,6 +180,11 @@ export const stroke = {
   /** Straight connectors for a T0 result. Thinner than a road line, because it
    *  is claiming less. */
   routeDegraded: 4,
+  /** The drawn town's through-roads. Half the route's weight: the scenery is the
+   *  paper, and paper that competes with the line on it is a worse map
+   *  (`CLAUDE.md` §8 rule 5). */
+  sceneryArterial: 2.5,
+  sceneryMinor: 1.25,
 } as const;
 
 /** On, off — in points. Long enough to read as deliberate at route zoom rather
