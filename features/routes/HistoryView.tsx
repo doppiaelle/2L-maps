@@ -70,9 +70,29 @@ export function HistoryView({
   testID,
 }: HistoryViewProps): React.JSX.Element {
   return (
-    <View className="flex-1 bg-bg px-screen-padding pt-space-6" testID={testID}>
-      <Text accessibilityRole="header" className="text-title-md text-text-primary">
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: colours[theme].bg,
+        paddingHorizontal: layout.screenPadding,
+        paddingTop: space.space2,
+      }}
+      testID={testID}
+    >
+      <Text
+        accessibilityRole="header"
+        style={{
+          color: colours[theme].textPrimary,
+          fontSize: 24,
+          lineHeight: 30,
+          fontWeight: '700',
+          marginTop: space.space3,
+        }}
+      >
         History
+      </Text>
+      <Text style={{ color: colours[theme].textSecondary, fontSize: 12, marginTop: 2 }}>
+        Your confirmed itineraries, ready to restart.
       </Text>
 
       {notice !== null && (
@@ -152,7 +172,7 @@ export function HistoryView({
           // (`CLAUDE.md` §6 rule 3).
           initialNumToRender={LIST_VIRTUALISATION_THRESHOLD}
           contentContainerStyle={{ paddingTop: space.space4, paddingBottom: space.space8 }}
-          renderItem={({ item }) => <RouteRow summary={item} onOpen={onOpen} />}
+          renderItem={({ item }) => <RouteRow summary={item} onOpen={onOpen} theme={theme} />}
           ListFooterComponent={
             locked.length === 0 ? null : (
               <LockedSection count={locked.length} onUpgrade={onUpgrade} />
@@ -179,11 +199,14 @@ export function HistoryView({
 function RouteRow({
   summary,
   onOpen,
+  theme,
 }: {
   summary: SavedRouteSummary;
   onOpen: (routeId: string) => void;
+  theme: ThemeName;
 }): React.JSX.Element {
   const row = historyRowOf(summary);
+  const palette = colours[theme];
 
   return (
     <Pressable
@@ -196,7 +219,15 @@ function RouteRow({
       // four times and cannot tell where one route ends and the next begins.
       accessibilityLabel={`Open ${row.spoken}`}
       accessibilityHint="Loads this route, ready to optimize"
-      style={{ minHeight: layout.touchMin, marginBottom: layout.listRowGap }}
+      style={{
+        minHeight: 92,
+        marginBottom: space.space3,
+        padding: space.space3,
+        borderRadius: radius.radiusMd,
+        backgroundColor: palette.surface,
+        borderWidth: 1,
+        borderColor: palette.border,
+      }}
       testID="history-row"
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.space2 }}>
@@ -210,6 +241,18 @@ function RouteRow({
             label={row.status === 'in-progress' ? 'In progress' : 'Done'}
           />
         )}
+        <View
+          style={{
+            width: 28,
+            height: 28,
+            borderRadius: 8,
+            backgroundColor: palette.textPrimary,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Text style={{ color: palette.bg, fontWeight: '700' }}>›</Text>
+        </View>
       </View>
 
       <Text className="text-label-xs text-text-tertiary" style={{ marginTop: space.space1 }}>
@@ -231,7 +274,9 @@ function RouteRow({
 
       <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: space.space1 }}>
         {row.metrics !== null && (
-          <Text className="text-caption-strong text-text-primary">{row.metrics}</Text>
+          <Text style={{ color: palette.accent, fontSize: 12, fontWeight: '700' }}>
+            {row.metrics}
+          </Text>
         )}
 
         {row.isDegraded && (

@@ -101,10 +101,10 @@ export function Dock({
           // screen reads as a cropped bar.
           borderRadius: radius.radiusFull,
           borderWidth: 1,
-          borderColor: palette.border,
+          borderColor: palette.textPrimary,
           // Translucent rather than opaque: the map moving underneath is what
           // says the dock is above the map rather than a wall at the bottom.
-          backgroundColor: withAlpha(palette.surface, 0.94),
+          backgroundColor: withAlpha(palette.textPrimary, 0.96),
           // The pills breathe inside the container instead of touching its
           // border, which is the difference between four buttons in a box and
           // one dock with four sections in it.
@@ -116,7 +116,6 @@ export function Dock({
         {items.map((item) => (
           <DockButton
             key={item.section}
-            glyph={item.glyph}
             label={item.label}
             accessibilityLabel={item.accessibilityLabel}
             isSelected={item.isSelected}
@@ -142,7 +141,6 @@ export function Dock({
  * (`CLAUDE.md` §10 rule 4).
  */
 function DockButton({
-  glyph,
   label,
   accessibilityLabel,
   isSelected,
@@ -150,7 +148,6 @@ function DockButton({
   theme,
   testID,
 }: {
-  glyph: string;
   label: string;
   accessibilityLabel: string;
   isSelected: boolean;
@@ -159,7 +156,7 @@ function DockButton({
   testID: string;
 }): React.JSX.Element {
   const palette = colours[theme];
-  const tint = isSelected ? palette.accent : palette.textSecondary;
+  const tint = isSelected ? palette.textPrimary : palette.bg;
 
   return (
     <Pressable
@@ -172,26 +169,18 @@ function DockButton({
         minHeight: layout.touchMin - space.space2,
         alignItems: 'center',
         justifyContent: 'center',
-        gap: space.space1,
+        gap: 0,
         borderRadius: radius.radiusFull,
         // The selected pill is a shape, not only a colour. `accentSubtle` is the
         // one tint in the palette quiet enough to sit under mint text without
         // the pair failing contrast in either theme.
-        backgroundColor: isSelected ? palette.accentSubtle : 'transparent',
+        backgroundColor: isSelected ? palette.bg : 'transparent',
       }}
       testID={testID}
     >
       <Text
         style={{ color: tint }}
-        className="text-body"
-        accessibilityElementsHidden
-        importantForAccessibility="no"
-      >
-        {glyph}
-      </Text>
-      <Text
-        style={{ color: tint }}
-        className="text-label-xs uppercase"
+        className="text-caption-strong"
         accessibilityElementsHidden
         importantForAccessibility="no"
         numberOfLines={1}

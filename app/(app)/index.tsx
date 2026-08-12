@@ -1,4 +1,5 @@
 import { router } from 'expo-router';
+import { getLocales } from 'expo-localization';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Linking, Pressable, Text, View } from 'react-native';
 
@@ -41,6 +42,7 @@ import { reorderableCount, routeEndsOf, shapeForEnd } from '@/lib/route/route-en
 import { unreachableIn } from '@/lib/route/progress';
 import { wasAlreadyOptimal } from '@/lib/route/draft';
 import { useAppTheme } from '@/features/preferences/use-app-theme';
+import { InlineStopSearch } from '@/features/places/InlineStopSearch';
 
 /**
  * Plan â€” the primary screen.
@@ -57,6 +59,7 @@ import { useAppTheme } from '@/features/preferences/use-app-theme';
  */
 export default function PlanScreen(): React.JSX.Element {
   const theme = useAppTheme();
+  const locale = getLocales()[0]?.languageTag ?? 'en-GB';
 
   const pending = usePendingDeepLinkContext();
   const { ads } = useMonetisation();
@@ -94,6 +97,7 @@ export default function PlanScreen(): React.JSX.Element {
   // Which hop the driver tapped on the canvas. Null is most of the time and is
   // the whole route.
   const [selectedLegIndex, setSelectedLegIndex] = useState<number | null>(null);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   const destination = useLaunchDestination({
     isStoreHydrated: true,
@@ -235,11 +239,11 @@ export default function PlanScreen(): React.JSX.Element {
     metres === null
       ? null
       : {
-          value: formatDistance(metres, 'metric'),
+          value: formatDistance(metres, locale),
           spoken:
             result !== null && !result.isDegraded
-              ? formatDistance(metres, 'metric')
-              : `${formatDistance(metres, 'metric')} in a straight line`,
+              ? formatDistance(metres, locale)
+              : `${formatDistance(metres, locale)} in a straight line`,
         };
 
   const duration =
@@ -307,14 +311,7 @@ export default function PlanScreen(): React.JSX.Element {
   /**
    * The wait between pressing Optimize and seeing an answer.
    *
-   * **Held back for a second** (`PREPARING_DELAY_MS`). A cached optimization
-   * returns in well under that, and the user goes straight from the list to the
-   * route having seen nothing in between â€” which is the right experience for
-   * work that did not have to be done again. Anything that flashes for 200 ms
-   * reads as a glitch (`docs/03_USER_JOURNEYS.md` J1).
-   *
-   * The timer is cleared on the way out **and the callback checks again before
-   * it acts**. A result landing at 990 ms would otherwise be covered by a
+   * **Held back for a second**×Ž­¢G§²ÚîÆ­yÑcts**. A result landing at 990 ms would otherwise be covered by a
    * waiting face scheduled before it arrived â€” the cleanup and the callback race
    * within the same tick, and one guard cannot be relied on to win.
    */
@@ -537,7 +534,7 @@ export default function PlanScreen(): React.JSX.Element {
               )
             }
             onAddStop={() => {
-              router.push('/add-stop');
+              setIsSearchOpen(true);
             }}
             onImport={() => {
               router.push('/import');
@@ -598,9 +595,13 @@ export default function PlanScreen(): React.JSX.Element {
         testID="open-settings"
       >
         <Text style={{ color: colours[theme].textPrimary }}>
-          {activeSection === 'settings' ? 'â€¹' : 'âš™'}
+          {activeSection === 'settings' ? 'Back' : 'â€¢â€¢'}
         </Text>
       </Pressable>
+
+      {isSearchOpen && activeSection === 'itinerary' && (
+        <InlineStopSearch theme={theme} onClose={() => setIsSearchOpen(false)} />
+      )}
 
       <Dock
         // The gesture bar sits below the dock rather than behind it.

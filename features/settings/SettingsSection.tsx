@@ -29,6 +29,7 @@ export function SettingsSection({ theme }: SettingsSectionProps): React.JSX.Elem
   const provider = usePreferencesStore((store) => store.preferences.navigationProvider);
   const themePreference = usePreferencesStore((store) => store.preferences.theme);
   const chooseTheme = usePreferencesStore((store) => store.chooseTheme);
+  const chooseProvider = usePreferencesStore((store) => store.chooseNavigationProvider);
 
   return (
     <SettingsView
@@ -48,12 +49,14 @@ export function SettingsSection({ theme }: SettingsSectionProps): React.JSX.Elem
           : `${quota.usage.optimizations} of ${allowances.optimizationsPerPeriod} optimizations used, resets ${quota.periodEndsAt}`
       }
       providerLabel={provider === null ? 'Choose a navigation app' : `Navigating with ${provider}`}
+      provider={provider}
       onOpenPaywall={() => {
         router.push('/paywall');
       }}
       onOpenProvider={() => {
         router.push('/provider');
       }}
+      onChooseProvider={(next) => chooseProvider(next, true)}
       onSignOut={() => {
         void signOut();
       }}

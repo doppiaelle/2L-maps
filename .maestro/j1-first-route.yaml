@@ -25,28 +25,30 @@ appId: com.doppiaelle.twolmaps
 
 # Tap 1 — add a stop.
 - tapOn:
-    id: 'plan-add-stop'
+    id: 'route-search-field'
 - assertVisible:
-    id: 'add-stop-input'
+    id: 'route-search-open'
+- assertVisible:
+    id: 'inline-stop-input'
 - inputText: 'Via Roma'
 # Typing costs nothing and finds nothing: the search is submitted by a press, so
 # a free user's ten monthly lookups are not spent on pauses in their typing
 # (ADR-0019).
 - tapOn:
-    id: 'add-stop-search'
+    id: 'inline-stop-submit'
 - assertVisible:
-    id: 'add-stop-option'
+    id: 'inline-stop-option'
 - tapOn:
-    id: 'add-stop-option'
+    id: 'inline-stop-option'
 
 # A second stop, because one stop is not a route.
 - tapOn:
-    id: 'plan-add-stop'
+    id: 'route-search-field'
 - inputText: 'Piazza Vecchia'
 - tapOn:
-    id: 'add-stop-search'
+    id: 'inline-stop-submit'
 - tapOn:
-    id: 'add-stop-option'
+    id: 'inline-stop-option'
 
 # Tap 2 — optimize. The control says what it will do before it does it.
 - assertVisible: 'Optimize'

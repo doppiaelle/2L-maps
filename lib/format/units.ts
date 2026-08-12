@@ -69,10 +69,26 @@ export function formatDistance(meters: number, locale: string): string {
 }
 
 function formatNumber(value: number, locale: string, decimals: number): string {
-  return new Intl.NumberFormat(locale, {
+  return new Intl.NumberFormat(numberLocale(locale), {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
+    // 999 m rounds to 1000 m, but this is still the sub-kilometre presentation.
+    // ICU/CLDR versions disagree about grouping that boundary; disabling it for
+    // whole-number metres keeps Android, Node and CI identical.
+    useGrouping: decimals > 0,
   }).format(value);
+}
+
+/** Keep Italian numeric conventions for an Italian language or region across
+ * ICU versions. Some releases resolve `en-IT` to English decimal punctuation,
+ * while the product contract and road context require the Italian comma. */
+function numberLocale(locale: string): string {
+  try {
+    const parsed = new Intl.Locale(locale);
+    return parsed.language === 'it' || parsed.region === 'IT' ? 'it-IT' : locale;
+  } catch {
+    return locale;
+  }
 }
 
 /**

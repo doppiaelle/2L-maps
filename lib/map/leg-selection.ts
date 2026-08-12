@@ -102,7 +102,7 @@ export function legSummary(
   const leg = legs[index];
   if (leg === undefined) return null;
 
-  const distance = formatDistance(leg.distanceMeters, 'metric');
+  const distance = formatDistance(leg.distanceMeters, 'en-CA');
   const duration = formatDuration(leg.durationSeconds);
 
   return {

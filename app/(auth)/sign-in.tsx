@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { Platform, Pressable, Text, View } from 'react-native';
+import { Image, Platform, Pressable, Text, useColorScheme, View } from 'react-native';
 
 import { useSession } from '@/features/auth/session-provider';
 import { usePendingDeepLinkContext } from '@/features/navigation/deep-link-provider';
-import { layout, radius, space } from '@/lib/design/tokens';
+import { colours, layout, radius, space } from '@/lib/design/tokens';
 
 /**
  * Sign in.
@@ -24,6 +24,8 @@ import { layout, radius, space } from '@/lib/design/tokens';
  */
 export default function SignInScreen(): React.JSX.Element {
   const { signIn } = useSession();
+  const theme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const palette = colours[theme];
   const { target } = usePendingDeepLinkContext();
   const [failure, setFailure] = useState<'unavailable' | 'failed' | null>(null);
   const [isWorking, setIsWorking] = useState(false);
@@ -40,15 +42,66 @@ export default function SignInScreen(): React.JSX.Element {
   };
 
   return (
-    <View className="flex-1 bg-bg justify-end px-screen-padding pb-space-8">
-      <View className="flex-1 justify-center">
-        <Text className="text-title-lg text-text-primary">2L Maps</Text>
-        <Text className="text-body text-text-secondary mt-space-2">
-          Plan a day of stops in the order that actually saves time.
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: palette.bg,
+        padding: layout.screenPadding,
+        justifyContent: 'center',
+      }}
+      testID="sign-in-screen"
+    >
+      <View style={{ alignItems: 'center', paddingHorizontal: space.space2 }}>
+        <Image
+          source={require('../../assets/brand/logo.png')}
+          resizeMode="contain"
+          style={{ width: 132, height: 96 }}
+          accessibilityLabel="2L Maps mascot"
+          testID="brand-logo"
+        />
+        <Text
+          style={{
+            color: palette.textPrimary,
+            fontSize: 26,
+            lineHeight: 32,
+            fontWeight: '700',
+            marginTop: space.space3,
+          }}
+        >
+          2L Maps
+        </Text>
+        <Text
+          style={{
+            color: palette.accent,
+            fontSize: 13,
+            lineHeight: 18,
+            fontWeight: '700',
+            marginTop: space.space1,
+          }}
+        >
+          Get the fastest itinerary.
+        </Text>
+        <Text
+          style={{
+            color: palette.textSecondary,
+            fontSize: 13,
+            lineHeight: 19,
+            textAlign: 'center',
+            marginTop: space.space5,
+          }}
+        >
+          Plan multiple stops.{'\n'}We automatically find the smartest order.
         </Text>
 
         {target !== null && (
-          <Text className="text-caption text-text-secondary mt-space-4">
+          <Text
+            style={{
+              color: palette.textSecondary,
+              fontSize: 13,
+              textAlign: 'center',
+              marginTop: space.space4,
+            }}
+          >
             {target.kind === 'route'
               ? 'Your route will open once you are signed in.'
               : 'You will continue where you were headed once you are signed in.'}
@@ -56,34 +109,63 @@ export default function SignInScreen(): React.JSX.Element {
         )}
       </View>
 
-      {failure !== null && (
-        <Text className="text-caption text-danger mb-space-3" accessibilityLiveRegion="polite">
-          {failure === 'unavailable'
-            ? 'Sign-in is not available in this build.'
-            : 'Sign-in did not complete. Check your connection and try again.'}
+      <View
+        style={{
+          marginTop: space.space6,
+          padding: space.space2,
+          borderRadius: radius.radiusMd,
+          backgroundColor: palette.surface,
+          borderWidth: 1,
+          borderColor: palette.border,
+        }}
+      >
+        <Text style={{ color: palette.textSecondary, fontSize: 10, marginBottom: space.space1 }}>
+          Welcome back
         </Text>
-      )}
+        {failure !== null && (
+          <Text
+            style={{ color: palette.danger, fontSize: 13, marginBottom: space.space2 }}
+            accessibilityLiveRegion="polite"
+          >
+            {failure === 'unavailable'
+              ? 'Sign-in is not available in this build.'
+              : 'Sign-in did not complete. Check your connection and try again.'}
+          </Text>
+        )}
 
-      {/* The controls sit in the lower third, reachable one-handed
+        {/* The controls sit in the lower third, reachable one-handed
           (CLAUDE.md §7 rule 2). */}
-      {Platform.OS === 'ios' && (
+        {Platform.OS === 'ios' && (
+          <SignInButton
+            label="Continue with Apple"
+            onPress={() => {
+              attempt('apple');
+            }}
+            isWorking={isWorking}
+            isPrimary
+            theme={theme}
+          />
+        )}
         <SignInButton
-          label="Continue with Apple"
+          label="Continue with Google"
           onPress={() => {
-            attempt('apple');
+            attempt('google');
           }}
           isWorking={isWorking}
-          isPrimary
+          isPrimary={Platform.OS !== 'ios'}
+          theme={theme}
         />
-      )}
-      <SignInButton
-        label="Continue with Google"
-        onPress={() => {
-          attempt('google');
+      </View>
+      <Text
+        style={{
+          color: palette.textTertiary,
+          fontSize: 11,
+          textAlign: 'center',
+          marginTop: space.space5,
         }}
-        isWorking={isWorking}
-        isPrimary={Platform.OS !== 'ios'}
-      />
+      >
+        Your routes, ordered for less driving.
+      </Text>
     </View>
   );
 }
@@ -93,12 +175,15 @@ function SignInButton({
   onPress,
   isWorking,
   isPrimary,
+  theme,
 }: {
   label: string;
   onPress: () => void;
   isWorking: boolean;
   isPrimary: boolean;
+  theme: 'light' | 'dark';
 }): React.JSX.Element {
+  const palette = colours[theme];
   return (
     <Pressable
       onPress={onPress}
@@ -106,15 +191,25 @@ function SignInButton({
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ disabled: isWorking, busy: isWorking }}
-      className={`items-center justify-center ${isPrimary ? 'bg-accent' : 'bg-surface-raised border border-border'}`}
       style={{
-        minHeight: layout.actionMinHeight,
-        borderRadius: radius.radiusLg,
-        marginTop: space.space3,
+        minHeight: 48,
+        borderRadius: radius.radiusSm,
+        marginTop: space.space1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: isPrimary ? palette.textPrimary : palette.surfaceRaised,
+        borderWidth: isPrimary ? 0 : 1,
+        borderColor: palette.border,
         opacity: isWorking ? 0.6 : 1,
       }}
     >
-      <Text className={`text-body-strong ${isPrimary ? 'text-accent-on' : 'text-text-primary'}`}>
+      <Text
+        style={{
+          color: isPrimary ? palette.bg : palette.textPrimary,
+          fontSize: 13,
+          fontWeight: '700',
+        }}
+      >
         {label}
       </Text>
     </Pressable>

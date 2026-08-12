@@ -162,6 +162,16 @@ describe('the drawn town', () => {
 
     expect(screen.getAllByTestId('scenery-road').length).toBeGreaterThan(0);
     expect(screen.getAllByTestId('scenery-block').length).toBeGreaterThan(0);
+    expect(screen.getAllByTestId('scenery-building').length).toBeGreaterThan(0);
+  });
+
+  it('provides the map controls required by the navigation viewport', () => {
+    laidOut(canvas(road, [stop('s1', 1), stop('s2', 2)], { scenerySeed: 'route-1' }));
+    expect(screen.getByLabelText('Zoom in')).toBeTruthy();
+    expect(screen.getByLabelText('Zoom out')).toBeTruthy();
+    expect(screen.getByLabelText('Recenter route')).toBeTruthy();
+    expect(screen.getByTestId('map-compass', visually)).toBeTruthy();
+    expect(screen.getByTestId('map-scale', visually)).toBeTruthy();
   });
 
   it('marks where the driver sets off, and which way', () => {

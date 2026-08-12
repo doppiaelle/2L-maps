@@ -107,6 +107,8 @@ owning your area (see §Areas below) → [`29`](29_DEFINITION_OF_DONE.md).
 | 36 | [Implementation Plan](36_IMPLEMENTATION_PLAN.md) | **Live status.** Wave order, branches, gates, environment limits |
 | 37 | [Go-Live Runbook](37_GO_LIVE_RUNBOOK.md) | **Instructions.** Every account, key and limit, in the order that caps spend first |
 | 38 | [Quick Start Settings](38_QUICK_START_SETTINGS.md) | **Instructions, short.** The nine steps from nothing to the app on a phone — everything a first test does not need is left out |
+| 39 | [UI Reimplementation Gap](39_UI_REIMPLEMENTATION_GAP.md) | Historical diagnosis of the incomplete first UI pass |
+| 40 | [UI Implementation Audit](40_UI_IMPLEMENTATION_AUDIT.md) | Current requirement-to-code matrix and Android artifact/device acceptance |
 
 ### Architecture Decision Records
 

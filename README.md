@@ -16,10 +16,16 @@ off to Google Maps, Waze or Apple Maps, whichever you already use.
 
 ## Status
 
-**The Android-tested Expo application, Supabase backend, automated tests, and product documentation
-are implemented in this repository.** The current interface follows the 2L Maps mobile design:
-minimal black/white surfaces, mint navigation actions, a two-item Route/History dock, top-right
-Settings, address search results, and a procedural route preview.
+**The Expo application, Supabase backend, automated tests, CI-built Android APK, and product
+documentation are implemented in this repository.** The current interface follows the approved
+2L Maps mobile direction: minimal black/white surfaces, mint navigation actions, a two-item
+Route/History dock, top-right Settings, inline address autocomplete, and a route-conditioned
+procedural navigation environment.
+
+Every push to `main` starts `.github/workflows/android-preview.yml`. Download the
+`2l-maps-standalone` artifact from that run, unzip it, and install the contained ARM64 APK on the
+physical Android phone. Final visual/device acceptance is recorded only after that exact artifact
+is checked against [`docs/40_UI_IMPLEMENTATION_AUDIT.md`](docs/40_UI_IMPLEMENTATION_AUDIT.md).
 
 The documentation in [`docs/`](docs/) describes the implemented product and the remaining release
 work. Start with
@@ -46,7 +52,7 @@ Each exclusion is a decision with a recorded reason, not an omission. See
 
 ```
   MOBILE APP  Expo · React Native · TypeScript · Expo Router · NativeWind
-      │       Facades: <AppMap> · RoutingProvider · GeocodingProvider
+      │       Drawn route preview · RoutingProvider · GeocodingProvider
       │                NavigationProvider · BillingProvider
       │       State:   Zustand (client) · React Query (server)
       │
@@ -57,13 +63,13 @@ Each exclusion is a decision with a recorded reason, not an omission. See
       │       quota → cache → upstream → record
       │
       ▼
-  GOOGLE      Routes API · Route Optimization API · Places API (New) · Maps SDK
+  GOOGLE      Routes API · Route Optimization API · Places API (New)
 ```
 
-**Exactly one Google credential ships in the client** — the Maps SDK rendering key, restricted by
-bundle ID and signing certificate. Every other call is proxied, because the Route Optimization
-API requires a service account that cannot exist on a device, and because quotas enforced in a
-client are not enforced at all.
+**No Google web-service credential ships in the client.** Calls are proxied because the Route
+Optimization API requires a service account that cannot exist on a device, and because quotas
+enforced in a client are not enforced at all. The preview renderer is local SVG: real route
+geometry and numbered stops over deterministic anonymous scenery generated around the route.
 
 ---
 
@@ -121,8 +127,8 @@ owning the area you are changing.
 
 Two practical constraints that catch people out:
 
-- **Expo Go cannot run this app.** `react-native-maps` is a native module, so a development build
-  is required from the first day ([`docs/25_DEPLOYMENT.md`](docs/25_DEPLOYMENT.md)).
+- **Use the CI standalone APK for phone checks.** No local Android Studio is assumed; the APK is
+  emitted as a GitHub Actions artifact ([`docs/25_DEPLOYMENT.md`](docs/25_DEPLOYMENT.md)).
 - **Development happens in ephemeral containers.** Push after every meaningful unit of work; a
   commit that exists only locally is not saved work.
 

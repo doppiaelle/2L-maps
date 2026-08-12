@@ -1,6 +1,6 @@
 # 39 — UI Reimplementation Gap
 
-> **Status:** Open — implementation incomplete  
+> **Status:** Superseded by [`40_UI_IMPLEMENTATION_AUDIT.md`](40_UI_IMPLEMENTATION_AUDIT.md)
 > **Owner:** Mobile / Design  
 > **Last reviewed:** 2026-08-12  
 > **Priority:** The approved Figma layout and supplied visual brief override legacy screen layouts.
@@ -87,3 +87,10 @@ covered; it did not prove visual equivalence.
 The reimplementation is not complete until Android screenshots for Login, Route, Search Open,
 Optimized Map, History, and Settings are compared with the approved references at the same viewport.
 CI success alone cannot close this item.
+
+## 5. Resolution
+
+The missing runtime compositions and procedural map generator were implemented on 2026-08-12.
+Current source/build/device evidence and the physical-phone checklist live in
+[`40_UI_IMPLEMENTATION_AUDIT.md`](40_UI_IMPLEMENTATION_AUDIT.md); this document remains as the
+root-cause record for the first incomplete pass.

@@ -1,8 +1,9 @@
 import { Pressable, Text, View } from 'react-native';
 
-import { colours, layout, space } from '@/lib/design/tokens';
+import { colours, layout, radius, space } from '@/lib/design/tokens';
 import type { ThemeName } from '@/lib/design/tokens';
 import type { ThemePreference } from '@/features/preferences/preferences-store';
+import type { NavigationProviderId } from '@/types';
 
 /**
  * Settings — account, preferences, legal
@@ -31,8 +32,10 @@ export interface SettingsViewProps {
    *  this view should not have to know that one can be absent. */
   readonly usageLabel: string;
   readonly providerLabel: string;
+  readonly provider: NavigationProviderId | null;
   onOpenPaywall: () => void;
   onOpenProvider: () => void;
+  onChooseProvider: (provider: NavigationProviderId) => void;
   onSignOut: () => void;
   readonly themePreference: ThemePreference;
   onChooseTheme: (theme: ThemePreference) => void;
@@ -44,8 +47,10 @@ export function SettingsView({
   planLabel,
   usageLabel,
   providerLabel,
+  provider,
   onOpenPaywall,
   onOpenProvider,
+  onChooseProvider,
   onSignOut,
   themePreference,
   onChooseTheme,
@@ -54,32 +59,100 @@ export function SettingsView({
 }: SettingsViewProps): React.JSX.Element {
   return (
     <View style={{ flex: 1, padding: layout.screenPadding }} testID={testID}>
-      <Text accessibilityRole="header" className="text-title-md text-text-primary">
+      <Text
+        accessibilityRole="header"
+        style={{
+          color: colours[theme].textPrimary,
+          fontSize: 24,
+          lineHeight: 30,
+          fontWeight: '700',
+        }}
+      >
         Settings
       </Text>
 
-      <Section title="Plan" theme={theme}>
-        <Text className="text-body text-text-primary" testID="settings-plan">
-          {planLabel}
-        </Text>
-        <Text className="text-caption text-text-secondary" testID="settings-usage">
-          {usageLabel}
-        </Text>
-        <Row
-          label="See plans"
-          hint="Opens the plans and prices"
-          onPress={onOpenPaywall}
-          theme={theme}
-        />
-      </Section>
-
       <Section title="Navigation" theme={theme}>
-        <Row
-          label={providerLabel}
-          hint="Changes which app your routes are handed to"
+        <Text
+          style={{ color: colours[theme].textSecondary, fontSize: 11, marginBottom: space.space2 }}
+        >
+          Choose which navigator opens after confirmation.
+        </Text>
+        <View
+          style={{
+            borderRadius: radius.radiusMd,
+            backgroundColor: colours[theme].surface,
+            borderWidth: 1,
+            borderColor: colours[theme].border,
+            overflow: 'hidden',
+          }}
+          testID="settings-provider-list"
+        >
+          {PROVIDERS.map((item, index) => {
+            const selected = provider === item.value;
+            return (
+              <Pressable
+                key={item.value}
+                onPress={() => onChooseProvider(item.value)}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: selected }}
+                accessibilityLabel={`Use ${item.label}`}
+                style={{
+                  minHeight: 48,
+                  paddingHorizontal: space.space3,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  backgroundColor: selected ? colours[theme].accentSubtle : 'transparent',
+                  borderTopWidth: index === 0 ? 0 : 1,
+                  borderTopColor: colours[theme].border,
+                }}
+                testID={`settings-provider-${item.value}`}
+              >
+                <Text
+                  style={{
+                    color: selected ? colours[theme].accent : colours[theme].textPrimary,
+                    fontSize: 13,
+                    fontWeight: selected ? '700' : '400',
+                  }}
+                >
+                  {item.label}
+                </Text>
+                <View
+                  style={{
+                    width: 16,
+                    height: 16,
+                    borderRadius: 8,
+                    borderWidth: 2,
+                    borderColor: selected ? colours[theme].accent : colours[theme].border,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {selected && (
+                    <View
+                      style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: 3,
+                        backgroundColor: colours[theme].accent,
+                      }}
+                    />
+                  )}
+                </View>
+              </Pressable>
+            );
+          })}
+        </View>
+        <Pressable
           onPress={onOpenProvider}
-          theme={theme}
-        />
+          accessibilityRole="button"
+          accessibilityLabel="Check installed navigation apps"
+          style={{ minHeight: 44, justifyContent: 'center' }}
+        >
+          <Text style={{ color: colours[theme].textSecondary, fontSize: 11 }}>
+            {providerLabel} · Check availability
+          </Text>
+        </Pressable>
       </Section>
 
       <Section title="Appearance" theme={theme}>
@@ -88,7 +161,7 @@ export function SettingsView({
           style={{
             flexDirection: 'row',
             padding: space.space1,
-            borderRadius: 999,
+            borderRadius: radius.radiusSm,
             borderWidth: 1,
             borderColor: colours[theme].border,
             backgroundColor: colours[theme].surface,
@@ -109,7 +182,7 @@ export function SettingsView({
                   minHeight: layout.touchMin,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  borderRadius: 999,
+                  borderRadius: radius.radiusSm,
                   backgroundColor: isSelected ? colours[theme].textPrimary : 'transparent',
                 }}
                 testID={`settings-theme-${option.label.toLowerCase()}`}
@@ -125,6 +198,37 @@ export function SettingsView({
               </Pressable>
             );
           })}
+        </View>
+      </Section>
+
+      <Section title="Account" theme={theme}>
+        <View
+          style={{
+            borderRadius: radius.radiusMd,
+            padding: space.space3,
+            backgroundColor: colours[theme].surface,
+            borderWidth: 1,
+            borderColor: colours[theme].border,
+          }}
+        >
+          <Text
+            style={{ color: colours[theme].textPrimary, fontSize: 13, fontWeight: '700' }}
+            testID="settings-plan"
+          >
+            {planLabel}
+          </Text>
+          <Text
+            style={{ color: colours[theme].textSecondary, fontSize: 11, marginTop: space.space1 }}
+            testID="settings-usage"
+          >
+            {usageLabel}
+          </Text>
+          <Row
+            label="See plans"
+            hint="Opens the plans and prices"
+            onPress={onOpenPaywall}
+            theme={theme}
+          />
         </View>
       </Section>
 
@@ -145,6 +249,12 @@ const THEME_OPTIONS: readonly { label: string; value: ThemePreference }[] = [
   { label: 'Light', value: 'light' },
   { label: 'System', value: null },
   { label: 'Dark', value: 'dark' },
+];
+
+const PROVIDERS: readonly { label: string; value: NavigationProviderId }[] = [
+  { label: 'Google Maps', value: 'google-maps' },
+  { label: 'Apple Maps', value: 'apple-maps' },
+  { label: 'Waze', value: 'waze' },
 ];
 
 function Section({

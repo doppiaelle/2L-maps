@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { StopList } from '@/components/lists/StopList';
+import { AppHeader } from '@/components/navigation/AppHeader';
 import type { StopListItem } from '@/components/lists/StopList';
 import { PrimaryAction } from '@/components/primitives/PrimaryAction';
 import type { PrimaryActionState } from '@/components/primitives/PrimaryAction';
@@ -182,29 +183,80 @@ export function PlanView({
           them. This used to be three slots of a draggable sheet over a map; the
           map now lives on the screen behind every section, and the sheet is
           gone (ADR-0018). */}
-      <View style={{ paddingHorizontal: layout.screenPadding }}>
-        {/* Above the summary rather than between the list rows: the top of the
+      {view === 'list' && (
+        <View style={{ paddingHorizontal: layout.screenPadding }}>
+          <AppHeader showBrand theme={theme} testID="route-app-header" />
+          <Text
+            style={{
+              color: colours[theme].textPrimary,
+              fontSize: 24,
+              lineHeight: 30,
+              fontWeight: '700',
+              marginTop: space.space4,
+            }}
+          >
+            Your route
+          </Text>
+          <Text style={{ color: colours[theme].textSecondary, fontSize: 12, marginTop: 2 }}>
+            Add the places you need to visit.
+          </Text>
+          <Pressable
+            onPress={onAddStop}
+            accessibilityRole="button"
+            accessibilityLabel="Search an address or place"
+            style={{
+              minHeight: 44,
+              marginTop: space.space4,
+              paddingHorizontal: space.space3,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              borderRadius: radius.radiusMd,
+              backgroundColor: colours[theme].surface,
+              borderWidth: 1,
+              borderColor: colours[theme].border,
+            }}
+            testID="route-search-field"
+          >
+            <Text style={{ color: colours[theme].textTertiary, fontSize: 13 }}>
+              Search an address or place…
+            </Text>
+            <View
+              style={{
+                width: 28,
+                height: 28,
+                borderRadius: 8,
+                backgroundColor: colours[theme].textPrimary,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Text style={{ color: colours[theme].bg, fontWeight: '700' }}>⌕</Text>
+            </View>
+          </Pressable>
+          {/* Above the summary rather than between the list rows: the top of the
             section is the one part of it that does not move under a thumb
             (ADR-0015). `<AdSlot>` hides itself during a route. */}
-        {adSlot}
-        <RouteSummaryHeader
-          title={titleFor(state)}
-          distance={distance}
-          duration={duration}
-          // The straight-line estimate is not shown while the real numbers are
-          // being fetched: watching 34 km become 41 km is watching the product
-          // correct itself, which is not what happened.
-          isPending={view === 'preparing'}
-          {...chipFor(state)}
-          {...noteFor(state)}
-        />
+          {adSlot}
+          <RouteSummaryHeader
+            title={titleFor(state)}
+            distance={distance}
+            duration={duration}
+            // The straight-line estimate is not shown while the real numbers are
+            // being fetched: watching 34 km become 41 km is watching the product
+            // correct itself, which is not what happened.
+            isPending={false}
+            {...chipFor(state)}
+            {...noteFor(state)}
+          />
 
-        {/* Under the metrics and above the list: the two ends of the round are
+          {/* Under the metrics and above the list: the two ends of the round are
             read before Optimize is pressed, not asked about in front of it
             (`CLAUDE.md` §7 rule 8). Hidden on the map, where the question has
             already been answered. */}
-        {ends !== null && view !== 'map' && <RouteEndsControl {...ends} testID="plan-route-ends" />}
-      </View>
+          {ends !== null && <RouteEndsControl {...ends} testID="plan-route-ends" />}
+        </View>
+      )}
 
       {addressNotice !== null && (
         <View
@@ -310,6 +362,63 @@ export function PlanView({
                   >
                     {selectedLeg.value}
                   </Text>
+                </View>
+              </View>
+            )}
+
+            {view === 'map' && (
+              <View
+                style={{
+                  position: 'absolute',
+                  left: layout.screenPadding,
+                  right: layout.screenPadding,
+                  bottom: bottomInset + 78,
+                  padding: space.space3,
+                  borderRadius: radius.radiusMd,
+                  backgroundColor: colours[theme].textPrimary,
+                }}
+                testID="map-itinerary-card"
+              >
+                <Text style={{ color: colours[theme].bg, fontSize: 10, opacity: 0.68 }}>
+                  OPTIMIZED ROUTE
+                </Text>
+                <Text
+                  numberOfLines={1}
+                  style={{
+                    color: colours[theme].bg,
+                    fontSize: 14,
+                    fontWeight: '700',
+                    marginTop: space.space1,
+                  }}
+                >
+                  {stops[1] === undefined
+                    ? 'Your fastest itinerary'
+                    : `Stop 2 · ${stops[1].text.title}`}
+                </Text>
+                <View style={{ flexDirection: 'row', marginTop: space.space2, gap: space.space4 }}>
+                  {distance !== null && (
+                    <Text style={{ color: colours[theme].accent, fontSize: 12, fontWeight: '700' }}>
+                      {distance.value}
+                    </Text>
+                  )}
+                  {duration !== null && (
+                    <Text style={{ color: colours[theme].accent, fontSize: 12, fontWeight: '700' }}>
+                      {duration.value}
+                    </Text>
+                  )}
+                </View>
+                <View
+                  style={{
+                    height: 3,
+                    borderRadius: 2,
+                    backgroundColor: colours[theme].border,
+                    marginTop: space.space2,
+                    overflow: 'hidden',
+                  }}
+                >
+                  <View
+                    style={{ width: '58%', height: 3, backgroundColor: colours[theme].accent }}
+                  />
                 </View>
               </View>
             )}

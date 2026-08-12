@@ -1,5 +1,5 @@
 import { memo, useMemo, useState } from 'react';
-import { Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import Svg, { Circle, G, Line, Path, Rect } from 'react-native-svg';
@@ -109,7 +109,7 @@ const CANVAS_PADDING = MARKER_SIZE_SELECTED / 2 + space.space3;
 
 /** Nothing to draw around. Frozen so the empty case is one object rather than a
  *  new pair of arrays on every render. */
-const EMPTY_SCENERY: Scenery = { roads: [], blocks: [] };
+const EMPTY_SCENERY: Scenery = { roads: [], blocks: [], areas: [] };
 
 /** The navigator's triangle, pointing along positive x before rotation. Drawn
  *  once and turned to the route's first bearing â€” a shape that says "you start
@@ -348,364 +348,9 @@ export const RouteCanvas = memo(function RouteCanvas({
       // stop list is the accessible equivalent
       // ([`docs/23_ACCESSIBILITY.md`](../../docs/23_ACCESSIBILITY.md)).
       accessible
-      // `progressbar` while preparing, so a screen reader says work is happening
-      // rather than describing a picture of a route that does not exist yet
-      // (`CLAUDE.md` Â§10 rule 7).
-      accessibilityRole={isPreparing ? 'progressbar' : 'image'}
-      accessibilityLabel={summary}
-      testID={testID}
-    >
-      {size.width > 0 && size.height > 0 && (
-        <GestureDetector gesture={gestures}>
-          {/* The transform sits on the container rather than on each shape: the
-              whole picture grows, strokes and pins with it, which is the
-              paper-map-under-a-lens model. An SVG that kept its stroke widths
-              while the geometry grew would imply a map that knows more when you
-              look closer, and this one does not (`lib/map/viewport.ts`). */}
-          <Animated.View style={[{ width: size.width, height: size.height }, lens]}>
-            <Svg width={size.width} height={size.height} testID="route-canvas-svg">
-              {/* The ground. A rectangle rather than the container's background so
-              the whole drawing is one surface the SVG owns â€” and so a future
-              snapshot exports what is on screen rather than a transparent hole.
-
-              **Sea, when there is a coastline to lay on it.** At the scale where
-              the invented town would be a lie the rectangle becomes water and
-              the landmasses go over it (ADR-0028); at every other scale it stays
-              land, exactly as before, because a coastline a few kilometres
-              across is one edge of one country and reads as nothing. */}
-              <Rect
-                x={0}
-                y={0}
-                width={size.width}
-                height={size.height}
-                fill={drawn.land.length > 0 ? map.water : map.land}
-              />
-
-              {/* Public-domain geometry under Google-derived stops: the hybrid
-                  ADR-0012 rejects by name, chosen by the product owner with the
-                  risk stated (ADR-0028). Outlines only â€” no borders, no roads,
-                  no names, nothing that would claim to be a map service. */}
-              {drawn.land.map((shape) => (
-                <Path key={shape.id} testID="landmass" d={shape.d} fill={map.land} />
-              ))}
-
-              {/* The invented town, underneath everything. Blocks first, then the
-              minor streets, then the through-roads â€” the order a real map is
-              printed in, and the order that keeps the route on top of all of it.
-
-              **These streets are not real** and the code that makes them says so
-              (`lib/map/scenery.ts`). Drawing real ones would mean putting
-              Google-derived stops on somebody else's map, which ADR-0012 rejects
-              by name and `CLAUDE.md` Â§13 rule 5 forbids widening. */}
-              {drawn.scenery.blocks.map((block) => (
-                <Rect
-                  key={block.id}
-                  testID="scenery-block"
-                  x={block.x}
-                  y={block.y}
-                  width={block.width}
-                  height={block.height}
-                  rx={2}
-                  fill={map.park}
-                  opacity={block.opacity}
-                />
-              ))}
-
-              {drawn.scenery.roads.map((road) => (
-                <Line
-                  key={road.id}
-                  testID="scenery-road"
-                  x1={road.from.x}
-                  y1={road.from.y}
-                  x2={road.to.x}
-                  y2={road.to.y}
-                  stroke={road.isArterial ? map.road : map.roadMinor}
-                  strokeWidth={road.isArterial ? stroke.sceneryArterial : stroke.sceneryMinor}
-                  strokeLinecap="round"
-                  opacity={road.opacity}
-                />
-              ))}
-
-              {drawn.road !== null && (
-                <>
-                  {map.routeCasing !== null && (
-                    // Drawn first, so it sits underneath. SVG has no outline on a
-                    // path; a wider line beneath it is what produces the border, and
-                    // in light theme mint on paper-white is this system's weakest
-                    // pairing without it.
-                    <Path
-                      testID="route-casing"
-                      d={drawn.road}
-                      stroke={map.routeCasing}
-                      strokeWidth={stroke.routeCasing}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      fill="none"
-                    />
-                  )}
-                  <Path
-                    testID="route-line"
-                    d={drawn.road}
-                    stroke={palette.accent}
-                    strokeWidth={stroke.route}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    // Dimmed, not hidden, while one hop is being inspected: the rest
-                    // of the day is still the context that makes the selected hop
-                    // mean anything.
-                    opacity={selectedLegIndex === null ? 1 : DIMMED_ROUTE_OPACITY}
-                    fill="none"
-                  />
-
-                  {/* The hop being inspected, drawn over the dimmed rest of the
-                  route at the casing's width so it reads as the same line
-                  brought forward rather than a different one laid on top. */}
-                  {selectedLeg !== null && (
-                    <Path
-                      testID="route-leg-selected"
-                      d={selectedLeg.d}
-                      stroke={palette.accent}
-                      strokeWidth={stroke.routeCasing}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      fill="none"
-                    />
-                  )}
-                </>
-              )}
-
-              {drawn.segments.map((segment) => (
-                <Path
-                  key={segment.id}
-                  testID={isPreparing ? 'route-pending-connector' : 'route-connector'}
-                  d={segment.d}
-                  // Warning yellow says "degraded result" and is reserved for one.
-                  // While preparing there is no result to describe, so the line is
-                  // the quietest thing on the canvas â€” a placeholder holding the
-                  // space the mint route is about to take.
-                  stroke={isPreparing ? palette.textTertiary : palette.warning}
-                  strokeWidth={stroke.routeDegraded}
-                  strokeDasharray={DEGRADED_DASH}
-                  strokeLinecap="round"
-                  opacity={isPreparing ? PREPARING_OPACITY : 1}
-                  fill="none"
-                />
-              ))}
-
-              {/* Where the driver sets off, and which way. The one piece of chrome
-              on the canvas that is about them rather than about the route.
-              Absent while preparing: which stop comes first is precisely the
-              question being asked. */}
-              {drawn.heading.length >= 2 && !isPreparing && (
-                <OriginMarker points={drawn.heading} colour={palette.accent} theme={theme} />
-              )}
-
-              {drawn.pins.map((pin) => (
-                <Pin
-                  key={pin.stopId}
-                  point={pin.point}
-                  state={pin.state}
-                  isSelected={!isPreparing && pin.stopId === selectedStopId}
-                  theme={theme}
-                  opacity={isPreparing ? PREPARING_OPACITY : 1}
-                />
-              ))}
-            </Svg>
-          </Animated.View>
-        </GestureDetector>
-      )}
-
-      {/* The pin numbers, as real text rather than SVG glyphs: `Text` gets
-          Dynamic Type and the platform's own font, and an SVG `<Text>` gets
-          neither (`CLAUDE.md` Â§10 rule 5).
-
-          **Withheld while preparing.** The numbers are the answer: showing the
-          entry order in them and then renumbering under the user's eyes would
-          make the wait look like a result that changed its mind. */}
-      {!isPreparing &&
-        drawn.pins.map((pin) => (
-          <PinLabel
-            key={pin.stopId}
-            point={pin.point}
-            position={pin.position}
-            state={pin.state}
-            theme={theme}
-          />
-        ))}
-
-      {undrawableStopIds.length > 0 && (
-        // Said rather than left to be counted. A route missing a pin looks like
-        // a route with fewer stops (`CLAUDE.md` Â§0 rule 5).
-        <View
-          style={{
-            position: 'absolute',
-            left: space.space3,
-            top: space.space3,
-            paddingHorizontal: space.space3,
-            paddingVertical: space.space1,
-            borderRadius: radius.radiusFull,
-            backgroundColor: palette.surface,
-            borderWidth: 1,
-            borderColor: palette.border,
-          }}
-          testID="route-canvas-undrawable"
-        >
-          <Text className="text-caption text-text-secondary">
-            {undrawableStopIds.length === 1
-              ? '1 stop could not be placed'
-              : `${undrawableStopIds.length} stops could not be placed`}
-          </Text>
-        </View>
-      )}
-
-      {/* The obligation attaches to Google-derived content being shown, and this
-          canvas is drawn from Google's coordinates and Google's road geometry.
-          The renderer changing does not change where the data came from
-          (ADR-0021). */}
-      <MapAttribution theme={theme} bottomOffset={0} testID="route-canvas-attribution" />
-    </View>
-  );
-});
-
-/** On, off â€” long enough to read as deliberate rather than as a rendering
- *  artefact at route zoom. */
-const DEGRADED_DASH = '10,8';
-
-/**
- * How present the placeholder drawing is while the answer is being computed.
- *
- * Faint enough that nobody mistakes it for the route, present enough that the
- * canvas is visibly about *their* stops rather than a generic loading screen â€”
- * which is what makes the wait feel like work happening on their day. Not
- * animated: the shimmer would be the only moving thing on a canvas whose whole
- * job is to hold still, and under reduced motion it would have to stop anyway
- * (`CLAUDE.md` Â§10 rule 6).
- */
-const PREPARING_OPACITY = 0.35;
-
-/**
- * How far the rest of the route recedes while one hop is being inspected.
- *
- * Dimmed rather than hidden. The other hops are the context that makes the
- * selected one mean anything â€” "eleven minutes" is a different fact on a
- * two-stop route and on a twenty-stop one â€” and a canvas that emptied itself
- * around the tap would lose the shape of the day.
- */
-const DIMMED_ROUTE_OPACITY = 0.3;
-
-/**
- * One stop.
- *
- * The disc only: the ordinal is drawn above it as real text, so it inherits the
- * user's font size instead of being baked into the vector at a fixed one.
- */
-const Pin = memo(function Pin({
-  point,
-  state,
-  isSelected,
-  theme,
-  opacity = 1,
-}: {
-  point: Point;
-  state: StopProgressState;
-  isSelected: boolean;
-  theme: ThemeName;
-  opacity?: number;
-}): React.JSX.Element {
-  const style = markerStyle(theme, state, isSelected);
-  const size = isSelected ? MARKER_SIZE_SELECTED : MARKER_SIZE;
-
-  return (
-    <Circle
-      testID="route-canvas-pin"
-      cx={point.x}
-      cy={point.y}
-      r={size / 2}
-      fill={style.fill}
-      stroke={style.border}
-      strokeWidth={2}
-      opacity={opacity}
-    />
-  );
-});
-
-/** The ordinal, or the glyph that replaces it. Never colour alone: a completed
- *  stop shows a checkmark as well as mint (`CLAUDE.md` Â§10 rule 4). */
-function PinLabel({
-  point,
-  position,
-  state,
-  theme,
-}: {
-  point: Point;
-  position: number;
-  state: StopProgressState;
-  theme: ThemeName;
-}): React.JSX.Element {
-  const style = markerStyle(theme, state, false);
-
-  return (
-    <View
-      pointerEvents="none"
-      style={{
-        position: 'absolute',
-        left: point.x - MARKER_SIZE / 2,
-        top: point.y - MARKER_SIZE / 2,
-        width: MARKER_SIZE,
-        height: MARKER_SIZE,
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
-    >
-      <Text style={{ color: style.foreground, fontSize: 13, fontWeight: '600' }}>
-        {style.glyph ?? position}
-      </Text>
-    </View>
-  );
-}
-
-/**
- * The navigator's triangle at the route's start.
- *
- * Mint, because it is the accent that means "this is your route"
- * (`CLAUDE.md` Â§8 rule 2), and rotated to the bearing of the first leg so it
- * says which way the day begins as well as where. It carries a halo in the map
- * colours so it stays legible over a block as well as over open ground.
- *
- * It is decoration in the strict sense â€” no state, no interaction, nothing
- * derived from it. A driver reading the canvas should be able to find their
- * starting point in under a second, and a numbered disc among other numbered
- * discs does not do that.
- */
-function OriginMarker({
-  points,
-  colour,
-  theme,
-}: {
-  points: readonly Point[];
-  colour: string;
-  theme: ThemeName;
-}): React.JSX.Element | null {
-  const first = points[0];
-  const next = points[1];
-  if (first === undefined || next === undefined) return null;
-
-  const degrees = (Math.atan2(next.y - first.y, next.x - first.x) * 180) / Math.PI;
-
-  return (
-    <G
-      testID="route-canvas-origin"
-      transform={`translate(${first.x} ${first.y}) rotate(${degrees})`}
-    >
-      <Path
-        d={ORIGIN_TRIANGLE}
-        fill={colour}
-        stroke={mapColours[theme].land}
-        strokeWidth={2}
-        strokeLinejoin="round"
-      />
-    </G>
-  );
-}
+      // `progressbar` while prepari×m<¶‰žËkºwµç@€€€€€€€€€€€€€€¡•¥¡Ðõí…É•„¹¡•¥¡Ñô(€€€€€€€€€€€€€€€€€Éàõí…É•„¹­¥¹€ôôô€Á…É¬œ€ü€Ü€è€Éô(€€€€€€€€€€€€€€€€€™¥±°õì(€€€€€€€€€€€€€€€€€€€…É•„¹­¥¹€ôôô€Á…É¬œ(€€€€€€€€€€€€€€€€€€€€€€üµ…À¹Á…É¬(€€€€€€€€€€€€€€€€€€€€€€è…É•„¹­¥¹€ôôô€ÍÅÕ…É”œ(€€€€€€€€€€€€€€€€€€€€€€€€üµ…À¹ÍÅÕ…É”(€€€€€€€€€€€€€€€€€€€€€€€€èµ…À¹‰Õ¥±‘¥¹œ(€€€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€€€ÍÑÉ½­”õí…É•„¹­¥¹€ôôô€‰Õ¥±‘¥¹œœ€üµ…À¹‰±½¬€è€¹½¹”ô(€€€€€€€€€€€€€€€€€ÍÑÉ½­•]¥‘Ñ õí…É•„¹­¥¹€ôôô€‰Õ¥±‘¥¹œœ€ü€À¸à€è€Áô(€€€€€€€€€€€€€€€€€½Á…¥Ñäõí…É•„¹½Á…¥Ñåô(€€€€€€€€€€€€€€€€€ÑÉ…¹Í™½É´õíÉ½Ñ…Ñ” ‘í…É•„¹É½Ñ…Ñ¥½¹ô€‘í…É•„¹à€¬…É•„¹Ý¥‘Ñ €¼€Éô€‘í…É•„¹ä€¬…É•„¹¡•¥¡Ð€¼€Éô¥ô(€€€€€€€€€€€€€€€€¼ø(€€€€€€€€€€€€€€¤¥ô((€€€€€€€€€€€€€í‘É…Ý¸¹Í•¹•Éä¹É½…‘Ì¹µ…À ¡É½…¤€ôø€ (€€€€€€€€€€€€€€€€ñ1¥¹”(€€€€€€€€€€€€€€€€€­•äõíÉ½…¹¥‘ô(€€€€€€€€€€€€€€€€€Ñ•ÍÑ%ô‰Í•¹•ÉäµÉ½…ˆ(€€€€€€€€€€€€€€€€€àÄõíÉ½…¹™É½´¹áô(€€€€€€€€€€€€€€€€€äÄõíÉ½…¹™É½´¹åô(€€€€€€€€€€€€€€€€€àÈõíÉ½…¹Ñ¼¹áô(€€€€€€€€€€€€€€€€€äÈõíÉ½…¹Ñ¼¹åô(€€€€€€€€€€€€€€€€€ÍÑÉ½­”õíÉ½…¹¥ÍÉÑ•É¥…°€üµ…À¹É½…€èµ…À¹É½…‘5¥¹½Éô(€€€€€€€€€€€€€€€€€ÍÑÉ½­•]¥‘Ñ õíÉ½…¹¥ÍÉÑ•É¥…°€üÍÑÉ½­”¹Í•¹•ÉåÉÑ•É¥…°€èÍÑÉ½­”¹Í•¹•Éå5¥¹½Éô(€€€€€€€€€€€€€€€€€ÍÑÉ½­•1¥¹•…Àô‰É½Õ¹ˆ(€€€€€€€€€€€€€€€€€½Á…¥ÑäõíÉ½…¹½Á…¥Ñåô(€€€€€€€€€€€€€€€€¼ø(€€€€€€€€€€€€€€¤¥ô((€€€€€€€€€€€€€í‘É…Ý¸¹É½…€„ôô¹Õ±°€˜˜€ (€€€€€€€€€€€€€€€€ðø(€€€€€€€€€€€€€€€€€íµ…À¹É½ÕÑ•…Í¥¹œ€„ôô¹Õ±°€˜˜€ (€€€€€€€€€€€€€€€€€€€€¼¼É…Ý¸™¥ÉÍÐ°Í¼¥ÐÍ¥ÑÌÕ¹‘•É¹•…Ñ ¸MY¡…Ì¹¼½ÕÑ±¥¹”½¸„(€€€€€€€€€€€€€€€€€€€€¼¼Á…Ñ ì„Ý¥‘•È±¥¹”‰•¹•…Ñ ¥Ð¥ÌÝ¡…ÐÁÉ½‘Õ•ÌÑ¡”‰½É‘•È°…¹(€€€€€€€€€€€€€€€€€€€€¼¼¥¸±¥¡ÐÑ¡•µ”µ¥¹Ð½¸Á…Á•ÈµÝ¡¥Ñ”¥ÌÑ¡¥ÌÍåÍÑ•´ÌÝ•…­•ÍÐ(€€€€€€€€€€€€€€€€€€€€¼¼Á…¥É¥¹œÝ¥Ñ¡½ÕÐ¥Ð¸(€€€€€€€€€€€€€€€€€€€€ñA…Ñ (€€€€€€€€€€€€€€€€€€€€€Ñ•ÍÑ%ô‰É½ÕÑ”µ…Í¥¹œˆ(€€€€€€€€€€€€€€€€€€€€€õí‘É…Ý¸¹É½…‘ô(€€€€€€€€€€€€€€€€€€€€€ÍÑÉ½­”õíµ…À¹É½ÕÑ•…Í¥¹ô(€€€€€€€€€€€€€€€€€€€€€ÍÑÉ½­•]¥‘Ñ õíÍÑÉ½­”¹É½ÕÑ•…Í¥¹ô(€€€€€€€€€€€€€€€€€€€€€ÍÑÉ½­•1¥¹•…Àô‰É½Õ¹ˆ(€€€€€€€€€€€€€€€€€€€€€ÍÑÉ½­•1¥¹•©½¥¸ô‰É½Õ¹ˆ(€€€€€€€€€€€€€€€€€€€€€™¥±°ô‰¹½¹”ˆ(€€€€€€€€€€€€€€€€€€€€¼ø(€€€€€€€€€€€€€€€€€€¥ô(€€€€€€€€€€€€€€€€€€ñA…Ñ (€€€€€€€€€€€€€€€€€€€Ñ•ÍÑ%ô‰É½ÕÑ”µ±¥¹”ˆ(€€€€€€€€€€€€€€€€€€€õí‘É…Ý¸¹É½…‘ô(€€€€€€€€€€€€€€€€€€€ÍÑÉ½­”õíÁ…±•ÑÑ”¹…•¹Ñô(€€€€€€€€€€€€€€€€€€€ÍÑÉ½­•]¥‘Ñ õíÍÑÉ½­”¹É½ÕÑ•ô(€€€€€€€€€€€€€€€€€€€ÍÑÉ½­•1¥¹•…Àô‰É½Õ¹ˆ(€€€€€€€€€€€€€€€€€€€ÍÑÉ½­•1¥¹•©½¥¸ô‰É½Õ¹ˆ(€€€€€€€€€€€€€€€€€€€€¼¼¥µµ•°¹½Ð¡¥‘‘•¸°Ý¡¥±”½¹”¡½À¥Ì‰•¥¹œ¥¹ÍÁ•Ñ•èÑ¡”É•ÍÐ(€€€€€€€€€€€€€€€€€€€€¼¼½˜Ñ¡”‘…ä¥ÌÍÑ¥±°Ñ¡”½¹Ñ•áÐÑ¡…Ðµ…­•ÌÑ¡”Í•±•Ñ•¡½À(€€€€€€€€€€€€€€€€€€€€¼¼µ•…¸…¹åÑ¡¥¹œ¸(€€€€€€€€€€€€€€€€€€€½Á…¥ÑäõíÍ•±•Ñ•‘1•%¹‘•à€ôôô¹Õ±°€ü€Ä€è%55}I=UQ}=A%Qeô(€€€€€€€€€€€€€€€€€€€™¥±°ô‰¹½¹”ˆ(€€€€€€€€€€€€€€€€€€¼ø((€€€€€€€€€€€€€€€€€ì¼¨Q¡”¡½À‰•¥¹œ¥¹ÍÁ•Ñ•°‘É…Ý¸½Ù•ÈÑ¡”‘¥µµ•É•ÍÐ½˜Ñ¡”(€€€€€€€€€€€€€€€€€É½ÕÑ”…ÐÑ¡”…Í¥¹œÌÝ¥‘Ñ Í¼¥ÐÉ•…‘Ì…ÌÑ¡”Í…µ”±¥¹”(€€€€€€€€€€€€€€€€€‰É½Õ¡Ð™½ÉÝ…ÉÉ…Ñ¡•ÈÑ¡…¸„‘¥™™•É•¹Ð½¹”±…¥½¸Ñ½À¸€¨½ô(€€€€€€€€€€€€€€€€€íÍ•±•Ñ•‘1•œ€„ôô¹Õ±°€˜˜€ (€€€€€€€€€€€€€€€€€€€€ñA…Ñ (€€€€€€€€€€€€€€€€€€€€€Ñ•ÍÑ%ô‰É½ÕÑ”µ±•œµÍ•±•Ñ•ˆ(€€€€€€€€€€€€€€€€€€€€€õíÍ•±•Ñ•‘1•œ¹‘ô(€€€€€€€€€€€€€€€€€€€€€ÍÑÉ½­”õíÁ…±•ÑÑ”¹…•¹Ñô(€€€€€€€€€€€€€€€€€€€€€ÍÑÉ½­•]¥‘Ñ õíÍÑÉ½­”¹É½ÕÑ•…Í¥¹ô(€€€€€€€€€€€€€€€€€€€€€ÍÑÉ½­•1¥¹•…Àô‰É½Õ¹ˆ(€€€€€€€€€€€€€€€€€€€€€ÍÑÉ½­•1¥¹•©½¥¸ô‰É½Õ¹ˆ(€€€€€€€€€€€€€€€€€€€€€™¥±°ô‰¹½¹”ˆ(€€€€€€€€€€€€€€€€€€€€¼ø(€€€€€€€€€€€€€€€€€€¥ô(€€€€€€€€€€€€€€€€ð¼ø(€€€€€€€€€€€€€€¥ô((€€€€€€€€€€€€€í‘É…Ý¸¹Í•µ•¹ÑÌ¹µ…À ¡Í•µ•¹Ð¤€ôø€ (€€€€€€€€€€€€€€€€ñA…Ñ (€€€€€€€€€€€€€€€€€­•äõíÍ•µ•¹Ð¹¥‘ô(€€€€€€€€€€€€€€€€€Ñ•ÍÑ%õí¥ÍAÉ•Á…É¥¹œ€ü€É½ÕÑ”µÁ•¹‘¥¹œµ½¹¹•Ñ½Èœ€è€É½ÕÑ”µ½¹¹•Ñ½Èô(€€€€€€€€€€€€€€€€€õíÍ•µ•¹Ð¹‘ô(€€€€€€€€€€€€€€€€€€¼¼]…É¹¥¹œå•±±½ÜÍ…åÌ€‰‘•É…‘•É•ÍÕ±Ðˆ…¹¥ÌÉ•Í•ÉÙ•™½È½¹”¸(€€€€€€€€€€€€€€€€€€¼¼]¡¥±”ÁÉ•Á…É¥¹œÑ¡•É”¥Ì¹¼É•ÍÕ±ÐÑ¼‘•ÍÉ¥‰”°Í¼Ñ¡”±¥¹”¥Ì(€€€€€€€€€€€€€€€€€€¼¼Ñ¡”ÅÕ¥•Ñ•ÍÐÑ¡¥¹œ½¸Ñ¡”…¹Ù…ÌƒŠP„Á±…•¡½±‘•È¡½±‘¥¹œÑ¡”(€€€€€€€€€€€€€€€€€€¼¼ÍÁ…”Ñ¡”µ¥¹ÐÉ½ÕÑ”¥Ì…‰½ÕÐÑ¼Ñ…­”¸(€€€€€€€€€€€€€€€€€ÍÑÉ½­”õí¥ÍAÉ•Á…É¥¹œ€üÁ…±•ÑÑ”¹Ñ•áÑQ•ÉÑ¥…Éä€èÁ…±•ÑÑ”¹Ý…É¹¥¹ô(€€€€€€€€€€€€€€€€€ÍÑÉ½­•]¥‘Ñ õíÍÑÉ½­”¹É½ÕÑ••É…‘•‘ô(€€€€€€€€€€€€€€€€€ÍÑÉ½­•…Í¡…ÉÉ…äõíI}M!ô(€€€€€€€€€€€€€€€€€ÍÑÉ½­•1¥¹•…Àô‰É½Õ¹ˆ(€€€€€€€€€€€€€€€€€½Á…¥Ñäõí¥ÍAÉ•Á…É¥¹œ€üAIAI%9}=A%Qd€è€Åô(€€€€€€€€€€€€€€€€€™¥±°ô‰¹½¹”ˆ(€€€€€€€€€€€€€€€€¼ø(€€€€€€€€€€€€€€¤¥ô((€€€€€€€€€€€€€ì¼¨]¡•É”Ñ¡”‘É¥Ù•ÈÍ•ÑÌ½™˜°…¹Ý¡¥ Ý…ä¸Q¡”½¹”Á¥•”½˜¡É½µ”(€€€€€€€€€€€€€½¸Ñ¡”…¹Ù…ÌÑ¡…Ð¥Ì…‰½ÕÐÑ¡•´É…Ñ¡•ÈÑ¡…¸…‰½ÕÐÑ¡”É½ÕÑ”¸(€€€€€€€€€€€€€‰Í•¹ÐÝ¡¥±”ÁÉ•Á…É¥¹œèÝ¡¥ ÍÑ½À½µ•Ì™¥ÉÍÐ¥ÌÁÉ•¥Í•±äÑ¡”(€€€€€€€€€€€€€ÅÕ•ÍÑ¥½¸‰•¥¹œ…Í­•¸€¨½ô(€€€€€€€€€€€€€í‘É…Ý¸¹¡•…‘¥¹œ¹±•¹Ñ €øô€È€˜˜€…¥ÍAÉ•Á…É¥¹œ€˜˜€ (€€€€€€€€€€€€€€€€ñ=É¥¥¹5…É­•ÈÁ½¥¹ÑÌõí‘É…Ý¸¹¡•…‘¥¹ô½±½ÕÈõíÁ…±•ÑÑ”¹…•¹ÑôÑ¡•µ”õíÑ¡•µ•ô€¼ø(€€€€€€€€€€€€€€¥ô((€€€€€€€€€€€€€í‘É…Ý¸¹Á¥¹Ì¹µ…À ¡Á¥¸¤€ôø€ (€€€€€€€€€€€€€€€€ñA¥¸(€€€€€€€€€€€€€€€€€­•äõíÁ¥¸¹ÍÑ½Á%‘ô(€€€€€€€€€€€€€€€€€Á½¥¹ÐõíÁ¥¸¹Á½¥¹Ñô(€€€€€€€€€€€€€€€€€ÍÑ…Ñ”õíÁ¥¸¹ÍÑ…Ñ•ô(€€€€€€€€€€€€€€€€€¥ÍM•±•Ñ•õì…¥ÍAÉ•Á…É¥¹œ€˜˜Á¥¸¹ÍÑ½Á%€ôôôÍ•±•Ñ•‘MÑ½Á%‘ô(€€€€€€€€€€€€€€€€€Ñ¡•µ”õíÑ¡•µ•ô(€€€€€€€€€€€€€€€€€½Á…¥Ñäõí¥ÍAÉ•Á…É¥¹œ€üAIAI%9}=A%Qd€è€Åô(€€€€€€€€€€€€€€€€¼ø(€€€€€€€€€€€€€€¤¥ô(€€€€€€€€€€€€ð½MÙœø(€€€€€€€€€€ð½¹¥µ…Ñ•¹Y¥•Üø(€€€€€€€€ð½•ÍÑÕÉ••Ñ•Ñ½Èø(€€€€€€¥ô((€€€€€ì¼¨Q¡”Á¥¸¹Õµ‰•ÉÌ°…ÌÉ•…°Ñ•áÐÉ…Ñ¡•ÈÑ¡…¸MY±åÁ¡ÌèQ•áÑ€•ÑÌ(€€€€€€€€€å¹…µ¥ŒQåÁ”…¹Ñ¡”Á±…Ñ™½É´Ì½Ý¸™½¹Ð°…¹…¸MY€ñQ•áÐù€•ÑÌ(€€€€€€€€€¹•¥Ñ¡•È€¡1U¹µ‘€ƒ
+œÄÀÉÕ±”€Ô¤¸((€€€€€€€€€€¨©]¥Ñ¡¡•±Ý¡¥±”ÁÉ•Á…É¥¹œ¸¨¨Q¡”¹Õµ‰•ÉÌ…É”Ñ¡”…¹ÍÝ•ÈèÍ¡½Ý¥¹œÑ¡”(€€€€€€€€€•¹ÑÉä½É‘•È¥¸Ñ¡•´…¹Ñ¡•¸É•¹Õµ‰•É¥¹œÕ¹‘•ÈÑ¡”ÕÍ•ÈÌ•å•ÌÝ½Õ±(€€€€€€€€€µ…­”Ñ¡”Ý…¥Ð±½½¬±¥­”„É•ÍÕ±ÐÑ¡…Ð¡…¹•¥ÑÌµ¥¹¸€¨½ô(€€€€€ì…¥ÍAÉ•Á…É¥¹œ€˜˜(€€€€€€€‘É…Ý¸¹Á¥¹Ì¹µ…À ¡Á¥¸¤€ôø€ (€€€€€€€€€€ñA¥¹1…‰•°(€€€€€€€€€€€­•äõíÁ¥¸¹ÍÑ½Á%‘ô(€€€€€€€€€€€Á½¥¹ÐõíÁ¥¸¹Á½¥¹Ñô(€€€€€€€€€€€Á½Í¥Ñ¥½¸õíÁ¥¸¹Á½Í¥Ñ¥½¹ô(€€€€€€€€€€€ÍÑ…Ñ”õíÁ¥¸¹ÍÑ…Ñ•ô(€€€€€€€€€€€Ñ¡•µ”õíÑ¡•µ•ô(€€€€€€€€€€¼ø(€€€€€€€€¤¥ô((€€€€€ì…¥ÍAÉ•Á…É¥¹œ€˜˜€ (€€€€€€€€ðø(€€€€€€€€€€ñY¥•Ü(€€€€€€€€€€€ÍÑå±”õíì(€€€€€€€€€€€€€Á½Í¥Ñ¥½¸è€…‰Í½±ÕÑ”œ°(€€€€€€€€€€€€€Ñ½ÀèÍÁ…”¹ÍÁ…”Ì°(€€€€€€€€€€€€€±•™ÐèÍÁ…”¹ÍÁ…”Ì°(€€€€€€€€€€€€€Ý¥‘Ñ è€ÌØ°(€€€€€€€€€€€€€¡•¥¡Ðè€ÌØ°(€€€€€€€€€€€€€‰½É‘•ÉI…‘¥ÕÌè€Äà°(€€€€€€€€€€€€€‰…­É½Õ¹‘½±½ÈèÁ…±•ÑÑ”¹ÍÕÉ™…”°(€€€€€€€€€€€€€‰½É‘•É]¥‘Ñ è€Ä°(€€€€€€€€€€€€€‰½É‘•É½±½ÈèÁ…±•ÑÑ”¹‰½É‘•È°(€€€€€€€€€€€€€…±¥¹%Ñ•µÌè€•¹Ñ•Èœ°(€€€€€€€€€€€€€©ÕÍÑ¥™å½¹Ñ•¹Ðè€•¹Ñ•Èœ°(€€€€€€€€€€€õô(€€€€€€€€€€€Á½¥¹Ñ•ÉÙ•¹ÑÌô‰¹½¹”ˆ(€€€€€€€€€€€Ñ•ÍÑ%ô‰µ…Àµ½µÁ…ÍÌˆ(€€€€€€€€€€ø(€€€€€€€€€€€€ñQ•áÐÍÑå±”õíì½±½ÈèÁ…±•ÑÑ”¹Ñ•áÑAÉ¥µ…Éä°™½¹ÑM¥é”è€ÄÄ°™½¹Ñ]•¥¡Ðè€œÜÀÀœõôù8ð½Q•áÐø(€€€€€€€€€€ð½Y¥•Üø(€€€€€€€€€€ñY¥•Ü(€€€€€€€€€€€ÍÑå±”õíìÁ½Í¥Ñ¥½¸è€…‰Í½±ÕÑ”œ°É¥¡ÐèÍÁ…”¹ÍÁ…”Ì°Ñ½Àè€ÜÈ°…ÀèÍÁ…”¹ÍÁ…”Èõô(€€€€€€€€€€€Ñ•ÍÑ%ô‰µ…Àµ½¹ÑÉ½±Ìˆ(€€€€€€€€€€ø(€€€€€€€€€€€€ñAÉ•ÍÍ…‰±”(€€€€€€€€€€€€€½¹AÉ•ÍÌõì ¤€ôøì(€€€€€€€€€€€€€€€½¹ÍÐ¹•áÐ€ô5…Ñ ¹µ¥¸¡5a}M1°é½½´¹Ù…±Õ”€¨€Ä¸ÌÔ¤ì(€€€€€€€€€€€€€€€é½½´¹Ù…±Õ”€ô¹•áÐì(€€€€€€€€€€€€€€€Í•ÑY¥•ÝÁ½ÉÐ¡ìÍ…±”è¹•áÐ°ÑÉ…¹Í±…Ñ•`è½™™Í•Ñ`¹Ù…±Õ”°ÑÉ…¹Í±…Ñ•dè½™™Í•Ñd¹Ù…±Õ”ô¤ì(€€€€€€€€€€€€€õô(€€€€€€€€€€€€€…•ÍÍ¥‰¥±¥ÑåI½±”ô‰‰ÕÑÑ½¸ˆ(€€€€€€€€€€€€€…•ÍÍ¥‰¥±¥Ñå1…‰•°ô‰i½½´¥¸ˆ(€€€€€€€€€€€€€ÍÑå±”õíì(€€€€€€€€€€€€€€€Ý¥‘Ñ è€ÐÀ°(€€€€€€€€€€€€€€€¡•¥¡Ðè€ÐÀ°(€€€€€€€€€€€€€€€‰½É‘•ÉI…‘¥ÕÌè€ÈÀ°(€€€€€€€€€€€€€€€‰…­É½Õ¹‘½±½ÈèÁ…±•ÑÑ”¹ÍÕÉ™…”°(€€€€€€€€€€€€€€€‰½É‘•É]¥‘Ñ è€Ä°(€€€€€€€€€€€€€€€‰½É‘•É½±½ÈèÁ…±•ÑÑ”¹‰½É‘•È°(€€€€€€€€€€€€€€€…±¥¹%Ñ•µÌè€•¹Ñ•Èœ°(€€€€€€€€€€€€€€€©ÕÍÑ¥™å½¹Ñ•¹Ðè€•¹Ñ•Èœ°(€€€€€€€€€€€€€õô(€€€€€€€€€€€€ø(€€€€€€€€€€€€€€ñQ•áÐÍÑå±”õíì½±½ÈèÁ…±•ÑÑ”¹Ñ•áÑAÉ¥µ…Éä°™½¹ÑM¥é”è€ÈÀõôø¬ð½Q•áÐø(€€€€€€€€€€€€ð½AÉ•ÍÍ…‰±”ø(€€€€€€€€€€€€ñAÉ•ÍÍ…‰±”(€€€€€€€€€€€€€½¹AÉ•ÍÌõì ¤€ôøì(€€€€€€€€€€€€€€€½¹ÍÐ¹•áÐ€ô5…Ñ ¹µ…à¡5%9}M1°é½½´¹Ù…±Õ”€¼€Ä¸ÌÔ¤ì(€€€€€€€€€€€€€€€é½½´¹Ù…±Õ”€ô¹•áÐì(€€€€€€€€€€€€€€€½™™Í•Ñ`¹Ù…±Õ”€ô€Àì(€€€€€€€€€€€€€€€½™™Í•Ñd¹Ù…±Õ”€ô€Àì(€€€€€€€€€€€€€€€Í•ÑY¥•ÝÁ½ÉÐ¡ìÍ…±”è¹•áÐ°ÑÉ…¹Í±…Ñ•`è€À°ÑÉ…¹Í±…Ñ•dè€Àô¤ì(€€€€€€€€€€€€€õô(€€€€€€€€€€€€€…•ÍÍ¥‰¥±¥ÑåI½±”ô‰‰ÕÑÑ½¸ˆ(€€€€€€€€€€€€€…•ÍÍ¥‰¥±¥Ñå1…‰•°ô‰i½½´½ÕÐˆ(€€€€€€€€€€€€€ÍÑå±”õíì(€€€€€€€€€€€€€€€Ý¥‘Ñ è€ÐÀ°(€€€€€€€€€€€€€€€¡•¥¡Ðè€ÐÀ°(€€€€€€€€€€€€€€€‰½É‘•ÉI…‘¥ÕÌè€ÈÀ°(€€€€€€€€€€€€€€€‰…­É½Õ¹‘½±½ÈèÁ…±•ÑÑ”¹ÍÕÉ™…”°(€€€€€€€€€€€€€€€‰½É‘•É]¥‘Ñ è€Ä°(€€€€€€€€€€€€€€€‰½É‘•É½±½ÈèÁ…±•ÑÑ”¹‰½É‘•È°(€€€€€€€€€€€€€€€…±¥¹%Ñ•µÌè€•¹Ñ•Èœ°(€€€€€€€€€€€€€€€©ÕÍÑ¥™å½¹Ñ•¹Ðè€•¹Ñ•Èœ°(€€€€€€€€€€€€€õô(€€€€€€€€€€€€ø(€€€€€€€€€€€€€€ñQ•áÐÍÑå±”õíì½±½ÈèÁ…±•ÑÑ”¹Ñ•áÑAÉ¥µ…Éä°™½¹ÑM¥é”è€ÈÀõôûŠ"Hð½Q•áÐø(€€€€€€€€€€€€ð½AÉ•ÍÍ…‰±”ø(€€€€€€€€€€€€ñAÉ•ÍÍ…‰±”(€€€€€€€€€€€€€½¹AÉ•ÍÌõì ¤€ôøì(€€€€€€€€€€€€€€€é½½´¹Ù…±Õ”€ô%QQ¹Í…±”ì(€€€€€€€€€€€€€€€½™™Í•Ñ`¹Ù…±Õ”€ô%QQ¹ÑÉ…¹Í±…Ñ•`ì(€€€€€€€€€€€€€€€½™™Í•Ñd¹Ù…±Õ”€ô%QQ¹ÑÉ…¹Í±…Ñ•dì(€€€€€€€€€€€€€€€Í•ÑY¥•ÝÁ½ÉÐ¡%QQ¤ì(€€€€€€€€€€€€€õô(€€€€€€€€€€€€€…•ÍÍ¥‰¥±¥ÑåI½±”ô‰‰ÕÑÑ½¸ˆ(€€€€€€€€€€€€€…•ÍÍ¥‰¥±¥Ñå1…‰•°ô‰I••¹Ñ•ÈÉ½ÕÑ”ˆ(€€€€€€€€€€€€€ÍÑå±”õíì(€€€€€€€€€€€€€€€Ý¥‘Ñ è€ÐÀ°(€€€€€€€€€€€€€€€¡•¥¡Ðè€ÐÀ°(€€€€€€€€€€€€€€€‰½É‘•ÉI…‘¥ÕÌè€ÈÀ°(€€€€€€€€€€€€€€€‰…­É½Õ¹‘½±½ÈèÁ…±•ÑÑ”¹ÍÕÉ™…”°(€€€€€€€€€€€€€€€‰½É‘•É]¥‘Ñ è€Ä°(€€€€€€€€€€€€€€€‰½É‘•É½±½ÈèÁ…±•ÑÑ”¹‰½É‘•È°(€€€€€€€€€€€€€€€…±¥¹%Ñ•µÌè€•¹Ñ•Èœ°(€€€€€€€€€€€€€€€©ÕÍÑ¥™å½¹Ñ•¹Ðè€•¹Ñ•Èœ°(€€€€€€€€€€€€€õô(€€€€€€€€€€€€ø(€€€€€€€€€€€€€€ñQ•áÐÍÑå±”õíì½±½ÈèÁ…±•ÑÑ”¹…•¹Ð°™½¹ÑM¥é”è€ÄØõôûŠ^8ð½Q•áÐø(€€€€€€€€€€€€ð½AÉ•ÍÍ…‰±”ø(€€€€€€€€€€ð½Y¥•Üø(€€€€€€€€€€ñY¥•Ü(€€€€€€€€€€€ÍÑå±”õíì(€€€€€€€€€€€€€Á½Í¥Ñ¥½¸è€…‰Í½±ÕÑ”œ°(€€€€€€€€€€€€€±•™ÐèÍÁ…”¹ÍÁ…”Ì°(€€€€€€€€€€€€€‰½ÑÑ½´è€ÈØ°(€€€€€€€€€€€€€™±•á¥É•Ñ¥½¸è€É½Üœ°(€€€€€€€€€€€€€…±¥¹%Ñ•µÌè€•¹Ñ•Èœ°(€€€€€€€€€€€€€…Àè€Ð°(€€€€€€€€€€€õô(€€€€€€€€€€€Á½¥¹Ñ•ÉÙ•¹ÑÌô‰¹½¹”ˆ(€€€€€€€€€€€Ñ•ÍÑ%ô‰µ…ÀµÍ…±”ˆ(€€€€€€€€€€ø(€€€€€€€€€€€€ñY¥•ÜÍÑå±”õíìÝ¥‘Ñ è€Ìà°¡•¥¡Ðè€È°‰…­É½Õ¹‘½±½ÈèÁ…±•ÑÑ”¹Ñ•áÑM•½¹‘…Éäõô€¼ø(€€€€€€€€€€€€ñQ•áÐÍÑå±”õíì½±½ÈèÁ…±•ÑÑ”¹Ñ•áÑM•½¹‘…Éä°™½¹ÑM¥é”è€ÄÀõôùÍ…±”ð½Q•áÐø(€€€€€€€€€€ð½Y¥•Üø(€€€€€€€€ð¼ø(€€€€€€¥ô((€€€€€íÕ¹‘É…Ý…‰±•MÑ½Á%‘Ì¹±•¹Ñ €ø€À€˜˜€ (€€€€€€€€¼¼M…¥É…Ñ¡•ÈÑ¡…¸±•™ÐÑ¼‰”½Õ¹Ñ•¸É½ÕÑ”µ¥ÍÍ¥¹œ„Á¥¸±½½­Ì±¥­”(€€€€€€€€¼¼„É½ÕÑ”Ý¥Ñ ™•Ý•ÈÍÑ½ÁÌ€¡1U¹µ‘€ƒ
+œÀÉÕ±”€Ô¤¸(€€€€€€€€ñY¥•Ü(€€€€€€€€€ÍÑå±”õíì(€€€€€€€€€€€Á½Í¥Ñ¥½¸è€…‰Í½±ÕÑ”œ°(€€€€€€€€€€€±•™ÐèÍÁ…”¹ÍÁ…”Ì°(€€€€€€€€€€€Ñ½ÀèÍÁ…”¹ÍÁ…”Ì°(€€€€€€€€€€€Á…‘‘¥¹!½É¥é½¹Ñ…°èÍÁ…”¹ÍÁ…”Ì°(€€€€€€€€€€€Á…‘‘¥¹Y•ÉÑ¥…°èÍÁ…”¹ÍÁ…”Ä°(€€€€€€€€€€€‰½É‘•ÉI…‘¥ÕÌèÉ…‘¥ÕÌ¹É…‘¥ÕÍÕ±°°(€€€€€€€€€€€‰…­É½Õ¹‘½±½ÈèÁ…±•ÑÑ”¹ÍÕÉ™…”°(€€€€€€€€€€€‰½É‘•É]¥‘Ñ è€Ä°(€€€€€€€€€€€‰½É‘•É½±½ÈèÁ…±•ÑÑ”¹‰½É‘•È°(€€€€€€€€€õô(€€€€€€€€€Ñ•ÍÑ%ô‰É½ÕÑ”µ…¹Ù…ÌµÕ¹‘É…Ý…‰±”ˆ(€€€€€€€€ø(€€€€€€€€€€ñQ•áÐ±…ÍÍ9…µ”ô‰Ñ•áÐµ…ÁÑ¥½¸Ñ•áÐµÑ•áÐµÍ•½¹‘…Éäˆø(€€€€€€€€€€€íÕ¹‘É…Ý…‰±•MÑ½Á%‘Ì¹±•¹Ñ €ôôô€Ä(€€€€€€€€€€€€€€ü€œÄÍÑ½À½Õ±¹½Ð‰”Á±…•œ(€€€€€€€€€€€€€€è€‘íÕ¹‘É…Ý…‰±•MÑ½Á%‘Ì¹±•¹Ñ¡ôÍÑ½ÁÌ½Õ±¹½Ð‰”Á±…•‘ô(€€€€€€€€€€ð½Q•áÐø(€€€€€€€€ð½Y¥•Üø(€€€€€€¥ô((€€€€€ì¼¨Q¡”½‰±¥…Ñ¥½¸…ÑÑ…¡•ÌÑ¼½½±”µ‘•É¥Ù•½¹Ñ•¹Ð‰•¥¹œÍ¡½Ý¸°…¹Ñ¡¥Ì(€€€€€€€€€…¹Ù…Ì¥Ì‘É…Ý¸™É½´½½±”Ì½½É‘¥¹…Ñ•Ì…¹½½±”ÌÉ½…•½µ•ÑÉä¸(€€€€€€€€€Q¡”É•¹‘•É•È¡…¹¥¹œ‘½•Ì¹½Ð¡…¹”Ý¡•É”Ñ¡”‘…Ñ„…µ”™É½´(€€€€€€€€€€¡H´ÀÀÈÄ¤¸€¨½ô(€€€€€€ñ5…ÁÑÑÉ¥‰ÕÑ¥½¸Ñ¡•µ”õíÑ¡•µ•ô‰½ÑÑ½µ=™™Í•ÐõìÁôÑ•ÍÑ%ô‰É½ÕÑ”µ…¹Ù…Ìµ…ÑÑÉ¥‰ÕÑ¥½¸ˆ€¼ø(€€€€ð½Y¥•Üø(€€¤ì)ô¤ì((¼¨¨=¸°½™˜ƒŠP±½¹œ•¹½Õ Ñ¼É•……Ì‘•±¥‰•É…Ñ”É…Ñ¡•ÈÑ¡…¸…Ì„É•¹‘•É¥¹œ(€¨€…ÉÑ•™…Ð…ÐÉ½ÕÑ”é½½´¸€¨¼)½¹ÍÐI}M €ô€œÄÀ°àœì((¼¨¨(€¨!½ÜÁÉ•Í•¹ÐÑ¡”Á±…•¡½±‘•È‘É…Ý¥¹œ¥ÌÝ¡¥±”Ñ¡”…¹ÍÝ•È¥Ì‰•¥¹œ½µÁÕÑ•¸(€¨(€¨…¥¹Ð•¹½Õ Ñ¡…Ð¹½‰½‘äµ¥ÍÑ…­•Ì¥Ð™½ÈÑ¡”É½ÕÑ”°ÁÉ•Í•¹Ð•¹½Õ Ñ¡…ÐÑ¡”(€¨…¹Ù…Ì¥ÌÙ¥Í¥‰±ä…‰½ÕÐ€©Ñ¡•¥È¨ÍÑ½ÁÌÉ…Ñ¡•ÈÑ¡…¸„•¹•É¥Œ±½…‘¥¹œÍÉ••¸ƒŠP(€¨Ý¡¥ ¥ÌÝ¡…Ðµ…­•ÌÑ¡”Ý…¥Ð™••°±¥­”Ý½É¬¡…ÁÁ•¹¥¹œ½¸Ñ¡•¥È‘…ä¸9½Ð(€¨…¹¥µ…Ñ•èÑ¡”Í¡¥µµ•ÈÝ½Õ±‰”Ñ¡”½¹±äµ½Ù¥¹œÑ¡¥¹œ½¸„…¹Ù…ÌÝ¡½Í”Ý¡½±”(€¨©½ˆ¥ÌÑ¼¡½±ÍÑ¥±°°…¹Õ¹‘•ÈÉ•‘Õ•µ½Ñ¥½¸¥ÐÝ½Õ±¡…Ù”Ñ¼ÍÑ½À…¹åÝ…ä(€¨€¡1U¹µ‘€ƒ
+œÄÀÉÕ±”€Ø¤¸(€¨¼)½¹ÍÐAIAI%9}=A%Qd€ô€À¸ÌÔì((¼¨¨(€¨!½Ü™…ÈÑ¡”É•ÍÐ½˜Ñ¡”É½ÕÑ”É••‘•ÌÝ¡¥±”½¹”¡½À¥Ì‰•¥¹œ¥¹ÍÁ•Ñ•¸(€¨(€¨¥µµ•É…Ñ¡•ÈÑ¡…¸¡¥‘‘•¸¸Q¡”½Ñ¡•È¡½ÁÌ…É”Ñ¡”½¹Ñ•áÐÑ¡…Ðµ…­•ÌÑ¡”(€¨Í•±•Ñ•½¹”µ•…¸…¹åÑ¡¥¹œƒŠP€‰•±•Ù•¸µ¥¹ÕÑ•Ìˆ¥Ì„‘¥™™•É•¹Ð™…Ð½¸„(€¨ÑÝ¼µÍÑ½ÀÉ½ÕÑ”…¹½¸„ÑÝ•¹ÑäµÍÑ½À½¹”ƒŠP…¹„…¹Ù…ÌÑ¡…Ð•µÁÑ¥•¥ÑÍ•±˜(€¨…É½Õ¹Ñ¡”Ñ…ÀÝ½Õ±±½Í”Ñ¡”Í¡…Á”½˜Ñ¡”‘…ä¸(€¨¼)½¹ÍÐ%55}I=UQ}=A%Qd€ô€À¸Ìì((¼¨¨(€¨=¹”ÍÑ½À¸(€¨(€¨Q¡”‘¥ÍŒ½¹±äèÑ¡”½É‘¥¹…°¥Ì‘É…Ý¸…‰½Ù”¥Ð…ÌÉ•…°Ñ•áÐ°Í¼¥Ð¥¹¡•É¥ÑÌÑ¡”(€¨ÕÍ•ÈÌ™½¹ÐÍ¥é”¥¹ÍÑ•…½˜‰•¥¹œ‰…­•¥¹Ñ¼Ñ¡”Ù•Ñ½È…Ð„™¥á•½¹”¸(€¨¼)½¹ÍÐA¥¸€ôµ•µ¼¡™Õ¹Ñ¥½¸A¥¸¡ì(€Á½¥¹Ð°(€ÍÑ…Ñ”°(€¥ÍM•±•Ñ•°(€Ñ¡•µ”°(€½Á…¥Ñä€ô€Ä°)ôèì(€Á½¥¹ÐèA½¥¹Ðì(€ÍÑ…Ñ”èMÑ½ÁAÉ½É•ÍÍMÑ…Ñ”ì(€¥ÍM•±•Ñ•è‰½½±•…¸ì(€Ñ¡•µ”èQ¡•µ•9…µ”ì(€½Á…¥Ñäüè¹Õµ‰•Èì)ô¤èI•…Ð¹)M`¹±•µ•¹Ðì(€½¹ÍÐÍÑå±”€ôµ…É­•ÉMÑå±”¡Ñ¡•µ”°ÍÑ…Ñ”°¥ÍM•±•Ñ•¤ì(€½¹ÍÐÍ¥é”€ô¥ÍM•±•Ñ•€ü5I-I}M%i}M1Q€è5I-I}M%iì((€É•ÑÕÉ¸€ (€€€€ñ¥É±”(€€€€€Ñ•ÍÑ%ô‰É½ÕÑ”µ…¹Ù…ÌµÁ¥¸ˆ(€€€€€àõíÁ½¥¹Ð¹áô(€€€€€äõíÁ½¥¹Ð¹åô(€€€€€ÈõíÍ¥é”€¼€Éô(€€€€€™¥±°õíÍÑå±”¹™¥±±ô(€€€€€ÍÑÉ½­”õíÍÑå±”¹‰½É‘•Éô(€€€€€ÍÑÉ½­•]¥‘Ñ õìÉô(€€€€€½Á…¥Ñäõí½Á…¥Ñåô(€€€€¼ø(€€¤ì)ô¤ì((¼¨¨Q¡”½É‘¥¹…°°½ÈÑ¡”±åÁ Ñ¡…ÐÉ•Á±…•Ì¥Ð¸9•Ù•È½±½ÕÈ…±½¹”è„½µÁ±•Ñ•(€¨€ÍÑ½ÀÍ¡½ÝÌ„¡•­µ…É¬…ÌÝ•±°…Ìµ¥¹Ð€¡1U¹µ‘€ƒ
+œÄÀÉÕ±”€Ð¤¸€¨¼)™Õ¹Ñ¥½¸A¥¹1…‰•°¡ì(€Á½¥¹Ð°(€Á½Í¥Ñ¥½¸°(€ÍÑ…Ñ”°(€Ñ¡•µ”°)ôèì(€Á½¥¹ÐèA½¥¹Ðì(€Á½Í¥Ñ¥½¸è¹Õµ‰•Èì(€ÍÑ…Ñ”èMÑ½ÁAÉ½É•ÍÍMÑ…Ñ”ì(€Ñ¡•µ”èQ¡•µ•9…µ”ì)ô¤èI•…Ð¹)M`¹±•µ•¹Ðì(€½¹ÍÐÍÑå±”€ôµ…É­•ÉMÑå±”¡Ñ¡•µ”°ÍÑ…Ñ”°™…±Í”¤ì((€É•ÑÕÉ¸€ (€€€€ñY¥•Ü(€€€€€Á½¥¹Ñ•ÉÙ•¹ÑÌô‰¹½¹”ˆ(€€€€€ÍÑå±”õíì(€€€€€€€Á½Í¥Ñ¥½¸è€…‰Í½±ÕÑ”œ°(€€€€€€€±•™ÐèÁ½¥¹Ð¹à€´5I-I}M%i€¼€È°(€€€€€€€Ñ½ÀèÁ½¥¹Ð¹ä€´5I-I}M%i€¼€È°(€€€€€€€Ý¥‘Ñ è5I-I}M%i°(€€€€€€€¡•¥¡Ðè5I-I}M%i°(€€€€€€€…±¥¹%Ñ•µÌè€•¹Ñ•Èœ°(€€€€€€€©ÕÍÑ¥™å½¹Ñ•¹Ðè€•¹Ñ•Èœ°(€€€€€õô(€€€€€…•ÍÍ¥‰¥±¥Ñå±•µ•¹ÑÍ!¥‘‘•¸(€€€€€¥µÁ½ÉÑ…¹Ñ½É•ÍÍ¥‰¥±¥Ñäô‰¹¼µ¡¥‘”µ‘•Í•¹‘…¹ÑÌˆ(€€€€ø(€€€€€€ñQ•áÐÍÑå±”õíì½±½ÈèÍÑå±”¹™½É•É½Õ¹°™½¹ÑM¥é”è€ÄÌ°™½¹Ñ]•¥¡Ðè€œØÀÀœõôø(€€€€€€€íÍÑå±”¹±åÁ €üüÁ½Í¥Ñ¥½¹ô(€€€€€€ð½Q•áÐø(€€€€ð½Y¥•Üø(€€¤ì)ô((¼¨¨(€¨Q¡”¹…Ù¥…Ñ½ÈÌÑÉ¥…¹±”…ÐÑ¡”É½ÕÑ”ÌÍÑ…ÉÐ¸(€¨(€¨5¥¹Ð°‰•…ÕÍ”¥Ð¥ÌÑ¡”…•¹ÐÑ¡…Ðµ•…¹Ì€‰Ñ¡¥Ì¥Ìå½ÕÈÉ½ÕÑ”ˆ(€¨€¡1U¹µ‘€ƒ
+œàÉÕ±”€È¤°…¹É½Ñ…Ñ•Ñ¼Ñ¡”‰•…É¥¹œ½˜Ñ¡”™¥ÉÍÐ±•œÍ¼¥Ð(€¨Í…åÌÝ¡¥ Ý…äÑ¡”‘…ä‰•¥¹Ì…ÌÝ•±°…ÌÝ¡•É”¸%Ð…ÉÉ¥•Ì„¡…±¼¥¸Ñ¡”µ…À(€¨½±½ÕÉÌÍ¼¥ÐÍÑ…åÌ±•¥‰±”½Ù•È„‰±½¬…ÌÝ•±°…Ì½Ù•È½Á•¸É½Õ¹¸(€¨(€¨%Ð¥Ì‘•½É…Ñ¥½¸¥¸Ñ¡”ÍÑÉ¥ÐÍ•¹Í”ƒŠP¹¼ÍÑ…Ñ”°¹¼¥¹Ñ•É…Ñ¥½¸°¹½Ñ¡¥¹œ(€¨‘•É¥Ù•™É½´¥Ð¸‘É¥Ù•ÈÉ•…‘¥¹œÑ¡”…¹Ù…ÌÍ¡½Õ±‰”…‰±”Ñ¼™¥¹Ñ¡•¥È(€¨ÍÑ…ÉÑ¥¹œÁ½¥¹Ð¥¸Õ¹‘•È„Í•½¹°…¹„¹Õµ‰•É•‘¥ÍŒ…µ½¹œ½Ñ¡•È¹Õµ‰•É•(€¨‘¥ÍÌ‘½•Ì¹½Ð‘¼Ñ¡…Ð¸(€¨¼)™Õ¹Ñ¥½¸=É¥¥¹5…É­•È¡ì(€Á½¥¹ÑÌ°(€½±½ÕÈ°(€Ñ¡•µ”°)ôèì(€Á½¥¹ÑÌèÉ•…‘½¹±äA½¥¹Ñmtì(€½±½ÕÈèÍÑÉ¥¹œì(€Ñ¡•µ”èQ¡•µ•9…µ”ì)ô¤èI•…Ð¹)M`¹±•µ•¹Ðð¹Õ±°ì(€½¹ÍÐ™¥ÉÍÐ€ôÁ½¥¹ÑÍlÁtì(€½¹ÍÐ¹•áÐ€ôÁ½¥¹ÑÍlÅtì(€¥˜€¡™¥ÉÍÐ€ôôôÕ¹‘•™¥¹•ñð¹•áÐ€ôôôÕ¹‘•™¥¹•¤É•ÑÕÉ¸¹Õ±°ì((€½¹ÍÐ‘•É••Ì€ô€¡5…Ñ ¹…Ñ…¸È¡¹•áÐ¹ä€´™¥ÉÍÐ¹ä°¹•áÐ¹à€´™¥ÉÍÐ¹à¤€¨€ÄàÀ¤€¼5…Ñ ¹A$ì((€É•ÑÕÉ¸€ (€€€€ñ(€€€€€Ñ•ÍÑ%ô‰É½ÕÑ”µ…¹Ù…Ìµ½É¥¥¸ˆ(€€€€€ÑÉ…¹Í™½É´õíÑÉ…¹Í±…Ñ” ‘í™¥ÉÍÐ¹áô€‘í™¥ÉÍÐ¹åô¤É½Ñ…Ñ” ‘í‘•É••Íô¥ô(€€€€ø(€€€€€€ñA…Ñ (€€€€€€€õí=I%%9}QI%91ô(€€€€€€€™¥±°õí½±½ÕÉô(€€€€€€€ÍÑÉ½­”õíµ…Á½±½ÕÉÍmÑ¡•µ•t¹±…¹‘ô(€€€€€€€ÍÑÉ½­•]¥‘Ñ õìÉô(€€€€€€€ÍÑÉ½­•1¥¹•©½¥¸ô‰É½Õ¹ˆ(€€€€€€¼ø(€€€€ð½ø(€€¤ì)ô(

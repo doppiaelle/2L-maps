@@ -194,13 +194,42 @@ describe('the grid follows the route', () => {
     expect(scenery.roads.some((r) => r.isArterial)).toBe(true);
     expect(scenery.roads.some((r) => !r.isArterial)).toBe(true);
   });
+
+  it('builds urban contents inside route-conditioned blocks', () => {
+    const scenery = sceneryFor({ path: diagonalPath, size: canvas, seed: 'urban-graph' });
+    expect(scenery.blocks.length).toBeGreaterThan(0);
+    expect(scenery.areas.some((area) => area.kind === 'building')).toBe(true);
+
+    for (const area of scenery.areas) {
+      const block = scenery.blocks.find((candidate) => candidate.id === area.blockId);
+      expect(block).toBeDefined();
+      if (block === undefined) continue;
+      expect(area.x).toBeGreaterThanOrEqual(block.x);
+      expect(area.y).toBeGreaterThanOrEqual(block.y);
+      expect(area.x + area.width).toBeLessThanOrEqual(block.x + block.width);
+      expect(area.y + area.height).toBeLessThanOrEqual(block.y + block.height);
+    }
+  });
+
+  it('connects cross streets to both route-following corridors', () => {
+    const scenery = sceneryFor({ path: diagonalPath, size: canvas, seed: 'connections' });
+    const cross = scenery.roads.filter((road) => road.id.startsWith('cross-'));
+    expect(cross.length).toBeGreaterThan(1);
+    for (const road of cross)
+      expect(Math.hypot(road.to.x - road.from.x, road.to.y - road.from.y)).toBeGreaterThan(
+        CROSS_STREET_MIN_LENGTH,
+      );
+  });
 });
+
+const CROSS_STREET_MIN_LENGTH = 150;
 
 describe('when there is nothing to draw around', () => {
   it('returns an empty town for a zero-sized canvas', () => {
     expect(sceneryFor({ path: diagonalPath, size: { width: 0, height: 0 }, seed: 's' })).toEqual({
       roads: [],
       blocks: [],
+      areas: [],
     });
   });
 
@@ -208,8 +237,13 @@ describe('when there is nothing to draw around', () => {
     expect(sceneryFor({ path: [{ x: 1, y: 1 }], size: canvas, seed: 's' })).toEqual({
       roads: [],
       blocks: [],
+      areas: [],
     });
-    expect(sceneryFor({ path: [], size: canvas, seed: 's' })).toEqual({ roads: [], blocks: [] });
+    expect(sceneryFor({ path: [], size: canvas, seed: 's' })).toEqual({
+      roads: [],
+      blocks: [],
+      areas: [],
+    });
   });
 });
 
@@ -267,7 +301,7 @@ describe('it only draws streets where streets are believable', () => {
       metresPerPoint: spanOf(900_000),
     });
 
-    expect(scenery).toEqual({ roads: [], blocks: [] });
+    expect(scenery).toEqual({ roads: [], blocks: [], areas: [] });
   });
 
   it('stops abruptly rather than fading into a quieter lie', () => {

@@ -124,7 +124,7 @@ function shortAddress(stop: SavedRouteStop | undefined): string | null {
 
 function metricsOf(summary: SavedRouteSummary): string | null {
   const distance =
-    summary.distanceMeters === null ? null : formatDistance(summary.distanceMeters, 'metric');
+    summary.distanceMeters === null ? null : formatDistance(summary.distanceMeters, 'en-CA');
   // Null for a degraded route, which has an ordering and no road timing. Showing
   // a blank rather than a number is the honest half of the same rule the chip
   // states out loud (`CLAUDE.md` §7 rule 6).

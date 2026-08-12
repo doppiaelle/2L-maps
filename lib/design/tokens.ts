@@ -127,6 +127,9 @@ export interface MapColourTokens {
    *  route zoom where most of the mesh is minor roads. */
   readonly roadMinor: string;
   readonly park: string;
+  readonly block: string;
+  readonly building: string;
+  readonly square: string;
   readonly label: string;
   /** Behind label text, so a place name stays readable over any of the above
    *  without the map needing a lighter base to accommodate it. */
@@ -141,6 +144,9 @@ export const mapColours: Readonly<Record<ThemeName, MapColourTokens>> = {
     road: '#FFFFFF',
     roadMinor: '#F8F8F6',
     park: '#E8EDE6',
+    block: '#ECEDEA',
+    building: '#FFFFFF',
+    square: '#E2E3DF',
     label: '#6B6B70',
     labelHalo: '#F7F7F5',
   },
@@ -162,6 +168,9 @@ export const mapColours: Readonly<Record<ThemeName, MapColourTokens>> = {
     road: '#33333A',
     roadMinor: '#242428',
     park: '#141C17',
+    block: '#19191C',
+    building: '#242429',
+    square: '#202024',
     label: '#9A9AA0',
     labelHalo: '#101012',
   },
