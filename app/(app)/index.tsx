@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Linking, View, useColorScheme } from 'react-native';
+import { Linking, Pressable, Text, View } from 'react-native';
 
 import { useHandoff } from '@/features/handoff/use-handoff';
 import { useMonetisation } from '@/features/monetisation/monetisation-provider';
@@ -40,6 +40,7 @@ import { actionIntentOf, planStateOf } from '@/lib/route/plan-state';
 import { reorderableCount, routeEndsOf, shapeForEnd } from '@/lib/route/route-ends';
 import { unreachableIn } from '@/lib/route/progress';
 import { wasAlreadyOptimal } from '@/lib/route/draft';
+import { useAppTheme } from '@/features/preferences/use-app-theme';
 
 /**
  * Plan — the primary screen.
@@ -55,7 +56,7 @@ import { wasAlreadyOptimal } from '@/lib/route/draft';
  * optimized route reachable at all (`CLAUDE.md` §7 rule 1).
  */
 export default function PlanScreen(): React.JSX.Element {
-  const scheme = useColorScheme();
+  const theme = useAppTheme();
 
   const pending = usePendingDeepLinkContext();
   const { ads } = useMonetisation();
@@ -76,6 +77,7 @@ export default function PlanScreen(): React.JSX.Element {
   const moveStopTo = useDraftRouteStore((store) => store.moveStopTo);
   const setRouteShape = useDraftRouteStore((store) => store.setRouteShape);
   const resetDraft = useDraftRouteStore((store) => store.reset);
+  const resetOptimization = useDraftRouteStore((store) => store.resetOptimization);
   const applyResolvedCoordinates = useDraftRouteStore((store) => store.applyResolvedCoordinates);
 
   // What the undo toast is offering. Null means nothing was just removed —
@@ -343,8 +345,6 @@ export default function PlanScreen(): React.JSX.Element {
     }
   }, [hasFailed]);
 
-  const theme = scheme === 'dark' ? 'dark' : 'light';
-
   const isMapShowing = showsMap(routeView, result !== null);
   // Both faces of the canvas occupy the same space, so the layout that depends
   // on it — running behind the dock, lifting Confirm clear of it — is the same
@@ -480,6 +480,11 @@ export default function PlanScreen(): React.JSX.Element {
               resetDraft(newRouteId());
               clearSelection();
             }}
+            onResetOptimization={() => {
+              resetOptimization();
+              setRouteView('list');
+              setSelectedLegIndex(null);
+            }}
             onPrimaryAction={() => {
               // The control's own state already says which of the two this is; the
               // screen only has to route the tap. `planStateOf` decided that, and
@@ -572,6 +577,30 @@ export default function PlanScreen(): React.JSX.Element {
           <SettingsSection theme={theme} />
         </SectionPanel>
       )}
+
+      <Pressable
+        onPress={() => openSection(activeSection === 'settings' ? 'itinerary' : 'settings')}
+        accessibilityRole="button"
+        accessibilityLabel={activeSection === 'settings' ? 'Return to route' : 'Open settings'}
+        style={{
+          position: 'absolute',
+          top: insets.top + space.space2,
+          right: space.space3,
+          width: 44,
+          height: 44,
+          borderRadius: 22,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: colours[theme].surfaceRaised,
+          borderWidth: 1,
+          borderColor: colours[theme].border,
+        }}
+        testID="open-settings"
+      >
+        <Text style={{ color: colours[theme].textPrimary }}>
+          {activeSection === 'settings' ? '‹' : '⚙'}
+        </Text>
+      </Pressable>
 
       <Dock
         // The gesture bar sits below the dock rather than behind it.

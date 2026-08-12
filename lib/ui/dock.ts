@@ -6,7 +6,7 @@
  * them, and for a while the map was one of its sections
  * ([ADR-0020](../../docs/adr/0020-four-section-dock.md)).
  *
- * **Three sections now, and the map is not one of them**
+ * **Two dock sections now, and the map is not one of them**
  * ([ADR-0022](../../docs/adr/0022-one-route-section.md)). Making the map a
  * destination fixed a real problem — a dock that changed width — and created a
  * worse one on the device: the app opened on an empty rectangle of somebody
@@ -16,8 +16,8 @@
  * draw.
  *
  * The row still never changes width, which is what ADR-0020 was really about.
- * Three fixed items, no close control, nothing added or removed while the app is
- * running.
+ * Route and History remain fixed. Settings is the persistent top-right utility,
+ * so it stays reachable without competing with the two primary destinations.
  *
  * **Route is leftmost and is where the app opens.** It is the product.
  */
@@ -64,12 +64,6 @@ const SECTIONS: readonly Omit<DockItem, 'isSelected'>[] = [
     label: 'History',
     glyph: '🕒',
     accessibilityLabel: 'Open your saved routes',
-  },
-  {
-    section: 'settings',
-    label: 'Settings',
-    glyph: '⚙',
-    accessibilityLabel: 'Open settings',
   },
 ];
 

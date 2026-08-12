@@ -27,6 +27,8 @@ export function SettingsSection({ theme }: SettingsSectionProps): React.JSX.Elem
   const { signOut } = useSession();
   const { quota, allowances } = useUsageQuota();
   const provider = usePreferencesStore((store) => store.preferences.navigationProvider);
+  const themePreference = usePreferencesStore((store) => store.preferences.theme);
+  const chooseTheme = usePreferencesStore((store) => store.chooseTheme);
 
   return (
     <SettingsView
@@ -55,6 +57,8 @@ export function SettingsSection({ theme }: SettingsSectionProps): React.JSX.Elem
       onSignOut={() => {
         void signOut();
       }}
+      themePreference={themePreference}
+      onChooseTheme={chooseTheme}
       theme={theme}
       testID="settings-screen"
     />
