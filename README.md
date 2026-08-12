@@ -16,12 +16,10 @@ off to Google Maps, Waze or Apple Maps, whichever you already use.
 
 ## Status
 
-**The Android-tested Expo application, Supabase backend, and automated tests are implemented.**
-The Figma-led UI reimplementation is **not complete**: the current native screens still use the
-legacy component composition and typography. The two-item dock, theme preference, top-right
-Settings access, and optimization reset exist, but they must not be mistaken for the requested
-full visual redesign. The remaining work is tracked in
-[`docs/39_UI_REIMPLEMENTATION_GAP.md`](docs/39_UI_REIMPLEMENTATION_GAP.md).
+**The Android-tested Expo application, Supabase backend, automated tests, and product documentation
+are implemented in this repository.** The current interface follows the 2L Maps mobile design:
+minimal black/white surfaces, mint navigation actions, a two-item Route/History dock, top-right
+Settings, address search results, and a procedural route preview.
 
 The documentation in [`docs/`](docs/) describes the implemented product and the remaining release
 work. Start with
