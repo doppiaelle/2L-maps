@@ -9,7 +9,7 @@ import type { DockItem, DockSection } from '@/lib/ui/dock';
  * ([ADR-0018](../../docs/adr/0018-bottom-dock-navigation.md),
  * [ADR-0020](../../docs/adr/0020-four-section-dock.md)).
  *
- * **One object, four pills inside it.** The first version was a full-bleed bar
+ * **One object, two pills inside it.** The first version was a full-bleed bar
  * welded to the bottom edge, with a border only along its top — which read as a
  * wall the map ended at rather than as a control floating above it, and left the
  * outermost items' touch targets running off the side of the screen. It is now

@@ -10,7 +10,7 @@ import type { RouteEndsControlProps } from '@/components/route/RouteEndsControl'
 import { RouteSummaryHeader } from '@/components/route/RouteSummaryHeader';
 import { StatusChip } from '@/components/primitives/StatusChip';
 import type { AddressNotice } from '@/lib/places/notice';
-import { layout, radius, RULE_WIDTH, space } from '@/lib/design/tokens';
+import { colours, layout, radius, RULE_WIDTH, space } from '@/lib/design/tokens';
 import type { ThemeName } from '@/lib/design/tokens';
 import { metricsAreEstimated } from '@/lib/route/plan-state';
 import type { ActionIntent, PlanState } from '@/lib/route/plan-state';
@@ -112,6 +112,7 @@ export interface PlanViewProps {
   onRemoveStop: (stopId: string) => void;
   onMoveStop: (fromIndex: number, toIndex: number) => void;
   onClearRoute: () => void;
+  onResetOptimization?: () => void;
 
   onPrimaryAction: () => void;
   onAddStop: () => void;
@@ -157,6 +158,7 @@ export function PlanView({
   onRemoveStop,
   onMoveStop,
   onClearRoute,
+  onResetOptimization,
   onPrimaryAction,
   onAddStop,
   onImport,
@@ -359,14 +361,44 @@ export function PlanView({
         }}
       >
         {actionState !== null && (
-          <PrimaryAction
-            state={actionState}
-            onPress={onPrimaryAction}
-            // Over the canvas it floats rather than closing a column, so it
-            // takes the width of its own label and is lifted off the drawing.
-            shape={view === 'map' ? 'pill' : 'block'}
-            testID="plan-action"
-          />
+          <View style={{ flexDirection: 'row', alignItems: 'flex-end' }}>
+            <View style={{ flex: 1 }}>
+              <PrimaryAction
+                state={actionState}
+                onPress={onPrimaryAction}
+                // Over the canvas it floats rather than closing a column, so it
+                // takes the width of its own label and is lifted off the drawing.
+                shape={view === 'map' ? 'pill' : 'block'}
+                testID="plan-action"
+              />
+            </View>
+            {view === 'list' && state.kind === 'optimized' && onResetOptimization !== undefined && (
+              <Pressable
+                onPress={onResetOptimization}
+                accessibilityRole="button"
+                accessibilityLabel="Restore the stop order from before optimization"
+                style={{
+                  width: layout.actionMinHeight,
+                  height: layout.actionMinHeight,
+                  marginLeft: space.space2,
+                  borderRadius: radius.radiusLg,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: colours[theme].textPrimary,
+                }}
+                testID="plan-reset-optimization"
+              >
+                <Text
+                  className="text-title-sm"
+                  style={{ color: colours[theme].bg }}
+                  accessibilityElementsHidden
+                  importantForAccessibility="no"
+                >
+                  ↻
+                </Text>
+              </Pressable>
+            )}
+          </View>
         )}
 
         {/* Always reachable, in every state that has a list — adding a stop is
@@ -493,9 +525,9 @@ function toActionState(intent: ActionIntent, state: PlanState): PrimaryActionSta
     case 'hidden':
       return null;
     case 'optimize':
-      return { kind: 'ready', label: 'Optimize' };
+      return { kind: 'ready', label: 'Optimize route' };
     case 'optimizing':
-      return { kind: 'working', label: 'Optimizing' };
+      return { kind: 'working', label: 'Optimizing route' };
     case 'start':
       // "Confirm" rather than "Start": it sits under a drawn route the user is
       // being asked to accept, and what it does is hand the day to a navigation
@@ -507,16 +539,16 @@ function toActionState(intent: ActionIntent, state: PlanState): PrimaryActionSta
     case 'blocked':
       return { kind: 'blocked', label: labelFor(state), reason: intent.reason };
     case 'degraded-only':
-      return { kind: 'degraded', label: 'Optimize', note: intent.note };
+      return { kind: 'degraded', label: 'Optimize route', note: intent.note };
     case 'unlockable':
-      return { kind: 'unlockable', label: 'Optimize', note: intent.note };
+      return { kind: 'unlockable', label: 'Optimize route', note: intent.note };
   }
 }
 
 /** What a blocked control still says. Keeping the verb means the user learns
  *  what the button is *for* even while they cannot use it. */
 function labelFor(state: PlanState): string {
-  return state.kind === 'optimized' ? 'Confirm' : 'Optimize';
+  return state.kind === 'optimized' ? 'Confirm' : 'Optimize route';
 }
 
 function titleFor(state: PlanState): string {

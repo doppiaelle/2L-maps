@@ -2,6 +2,7 @@ import { Pressable, Text, View } from 'react-native';
 
 import { colours, layout, space } from '@/lib/design/tokens';
 import type { ThemeName } from '@/lib/design/tokens';
+import type { ThemePreference } from '@/features/preferences/preferences-store';
 
 /**
  * Settings — account, preferences, legal
@@ -33,6 +34,8 @@ export interface SettingsViewProps {
   onOpenPaywall: () => void;
   onOpenProvider: () => void;
   onSignOut: () => void;
+  readonly themePreference: ThemePreference;
+  onChooseTheme: (theme: ThemePreference) => void;
   readonly theme: ThemeName;
   readonly testID?: string;
 }
@@ -44,6 +47,8 @@ export function SettingsView({
   onOpenPaywall,
   onOpenProvider,
   onSignOut,
+  themePreference,
+  onChooseTheme,
   theme,
   testID,
 }: SettingsViewProps): React.JSX.Element {
@@ -77,6 +82,52 @@ export function SettingsView({
         />
       </Section>
 
+      <Section title="Appearance" theme={theme}>
+        <View
+          accessibilityRole="radiogroup"
+          style={{
+            flexDirection: 'row',
+            padding: space.space1,
+            borderRadius: 999,
+            borderWidth: 1,
+            borderColor: colours[theme].border,
+            backgroundColor: colours[theme].surface,
+          }}
+          testID="settings-theme-selector"
+        >
+          {THEME_OPTIONS.map((option) => {
+            const isSelected = option.value === themePreference;
+            return (
+              <Pressable
+                key={option.label}
+                onPress={() => onChooseTheme(option.value)}
+                accessibilityRole="radio"
+                accessibilityLabel={`Use ${option.label.toLowerCase()} theme`}
+                accessibilityState={{ checked: isSelected }}
+                style={{
+                  flex: 1,
+                  minHeight: layout.touchMin,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: 999,
+                  backgroundColor: isSelected ? colours[theme].textPrimary : 'transparent',
+                }}
+                testID={`settings-theme-${option.label.toLowerCase()}`}
+              >
+                <Text
+                  className="text-label-xs uppercase"
+                  style={{
+                    color: isSelected ? colours[theme].bg : colours[theme].textSecondary,
+                  }}
+                >
+                  {option.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </Section>
+
       <View style={{ flex: 1 }} />
 
       <Row
@@ -89,6 +140,12 @@ export function SettingsView({
     </View>
   );
 }
+
+const THEME_OPTIONS: readonly { label: string; value: ThemePreference }[] = [
+  { label: 'Light', value: 'light' },
+  { label: 'System', value: null },
+  { label: 'Dark', value: 'dark' },
+];
 
 function Section({
   title,

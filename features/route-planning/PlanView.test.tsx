@@ -80,7 +80,7 @@ describe('the empty state', () => {
 describe('stops added, not optimized', () => {
   it('offers Optimize', () => {
     renderPlan({});
-    expect(screen.getByText('Optimize')).toBeTruthy();
+    expect(screen.getByText('Optimize route')).toBeTruthy();
   });
 
   it('marks the metrics as a straight-line estimate', () => {
@@ -97,7 +97,7 @@ describe('optimizing', () => {
     // must be able to see what they are waiting on.
     renderPlan({ isOptimizing: true });
 
-    expect(screen.getByText('Optimizing')).toBeTruthy();
+    expect(screen.getByText('Optimizing route')).toBeTruthy();
     expect(screen.getByText('Via 0, Bergamo')).toBeTruthy();
   });
 });
@@ -157,7 +157,7 @@ describe('quota exhausted', () => {
   it('keeps the verb on a blocked control', () => {
     // The user still learns what the button is for while they cannot use it.
     renderPlan({}, { kind: 'blocked', canUnlockWithAd: false });
-    expect(screen.getByText('Optimize')).toBeTruthy();
+    expect(screen.getByText('Optimize route')).toBeTruthy();
   });
 });
 
