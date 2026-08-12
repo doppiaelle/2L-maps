@@ -311,7 +311,14 @@ export default function PlanScreen(): React.JSX.Element {
   /**
    * The wait between pressing Optimize and seeing an answer.
    *
-   * **Held back for a second**◊é≠¢Gß≤⁄Óù∆≠y—cts**. A result landing at 990 ms would otherwise be covered by a
+   * **Held back for a second** (`PREPARING_DELAY_MS`). A cached optimization
+   * returns in well under that, and the user goes straight from the list to the
+   * route having seen nothing in between ‚Äî which is the right experience for
+   * work that did not have to be done again. Anything that flashes for 200 ms
+   * reads as a glitch (`docs/03_USER_JOURNEYS.md` J1).
+   *
+   * The timer is cleared on the way out **and the callback checks again before
+   * it acts**. A result landing at 990 ms would otherwise be covered by a
    * waiting face scheduled before it arrived ‚Äî the cleanup and the callback race
    * within the same tick, and one guard cannot be relied on to win.
    */

@@ -1,8 +1,8 @@
 # 39 — UI Reimplementation Gap
 
 > **Status:** Superseded by [`40_UI_IMPLEMENTATION_AUDIT.md`](40_UI_IMPLEMENTATION_AUDIT.md)
-> **Owner:** Mobile / Design  
-> **Last reviewed:** 2026-08-12  
+> **Owner:** Mobile / Design
+> **Last reviewed:** 2026-08-12
 > **Priority:** The approved Figma layout and supplied visual brief override legacy screen layouts.
 
 ## 1. Why this document exists
