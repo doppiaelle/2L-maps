@@ -1,6 +1,7 @@
 import { FlatList, Pressable, Text, View } from 'react-native';
 
 import { StateView } from '@/components/feedback/StateView';
+import { AppHeader } from '@/components/navigation/AppHeader';
 import { Skeleton } from '@/components/primitives/Skeleton';
 import { StatusChip } from '@/components/primitives/StatusChip';
 import { colours, layout, radius, space } from '@/lib/design/tokens';
@@ -75,23 +76,31 @@ export function HistoryView({
         flex: 1,
         backgroundColor: colours[theme].bg,
         paddingHorizontal: layout.screenPadding,
-        paddingTop: space.space2,
+        paddingTop: 0,
       }}
       testID={testID}
     >
+      <AppHeader showBrand theme={theme} testID="history-app-header" />
       <Text
         accessibilityRole="header"
         style={{
           color: colours[theme].textPrimary,
-          fontSize: 24,
-          lineHeight: 30,
+          fontSize: 44,
+          lineHeight: 52,
           fontWeight: '700',
-          marginTop: space.space3,
+          marginTop: space.space5,
         }}
       >
         History
       </Text>
-      <Text style={{ color: colours[theme].textSecondary, fontSize: 12, marginTop: 2 }}>
+      <Text
+        style={{
+          color: colours[theme].textSecondary,
+          fontSize: 20,
+          lineHeight: 28,
+          marginTop: space.space1,
+        }}
+      >
         Your confirmed itineraries, ready to restart.
       </Text>
 
@@ -171,7 +180,7 @@ export function HistoryView({
           // costing frames on the hardware this is built for
           // (`CLAUDE.md` §6 rule 3).
           initialNumToRender={LIST_VIRTUALISATION_THRESHOLD}
-          contentContainerStyle={{ paddingTop: space.space4, paddingBottom: space.space8 }}
+          contentContainerStyle={{ paddingTop: 82, paddingBottom: space.space8 }}
           renderItem={({ item }) => <RouteRow summary={item} onOpen={onOpen} theme={theme} />}
           ListFooterComponent={
             locked.length === 0 ? null : (
@@ -220,10 +229,11 @@ function RouteRow({
       accessibilityLabel={`Open ${row.spoken}`}
       accessibilityHint="Loads this route, ready to optimize"
       style={{
-        minHeight: 92,
-        marginBottom: space.space3,
-        padding: space.space3,
-        borderRadius: radius.radiusMd,
+        minHeight: 112,
+        marginBottom: space.space5,
+        paddingHorizontal: space.space4,
+        paddingVertical: space.space4,
+        borderRadius: 28,
         backgroundColor: palette.surface,
         borderWidth: 1,
         borderColor: palette.border,
@@ -231,7 +241,11 @@ function RouteRow({
       testID="history-row"
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.space2 }}>
-        <Text className="text-body-strong text-text-primary flex-1" numberOfLines={1}>
+        <Text
+          style={{ color: palette.textPrimary, fontSize: 22, lineHeight: 28, fontWeight: '700' }}
+          className="flex-1"
+          numberOfLines={1}
+        >
           {row.title}
         </Text>
 
@@ -243,19 +257,19 @@ function RouteRow({
         )}
         <View
           style={{
-            width: 28,
-            height: 28,
-            borderRadius: 8,
+            width: 52,
+            height: 52,
+            borderRadius: 18,
             backgroundColor: palette.textPrimary,
             alignItems: 'center',
             justifyContent: 'center',
           }}
         >
-          <Text style={{ color: palette.bg, fontWeight: '700' }}>›</Text>
+          <Text style={{ color: palette.bg, fontSize: 34, fontWeight: '700' }}>›</Text>
         </View>
       </View>
 
-      <Text className="text-label-xs text-text-tertiary" style={{ marginTop: space.space1 }}>
+      <Text style={{ color: palette.textSecondary, fontSize: 16, marginTop: space.space2 }}>
         {row.meta}
       </Text>
 
@@ -264,8 +278,7 @@ function RouteRow({
         // rows are different heights are two routes the eye has to measure
         // before it can compare them.
         <Text
-          className="text-caption text-text-secondary"
-          style={{ marginTop: space.space1 }}
+          style={{ color: palette.textSecondary, fontSize: 15, marginTop: space.space1 }}
           numberOfLines={1}
         >
           {row.journey}
@@ -274,7 +287,7 @@ function RouteRow({
 
       <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: space.space1 }}>
         {row.metrics !== null && (
-          <Text style={{ color: palette.accent, fontSize: 12, fontWeight: '700' }}>
+          <Text style={{ color: palette.accent, fontSize: 16, fontWeight: '700' }}>
             {row.metrics}
           </Text>
         )}

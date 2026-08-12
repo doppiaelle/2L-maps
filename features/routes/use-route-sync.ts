@@ -5,6 +5,7 @@ import { useServices } from '@/features/api/services-provider';
 import { useSession } from '@/features/auth/session-provider';
 import { useDraftRouteStore, useRouteProgressStore } from '@/features/stores';
 import { queryKeys } from '@/lib/query/client';
+import type { DraftRoute } from '@/lib/route/draft';
 import {
   canTransition,
   completeSupersededRoute,
@@ -14,6 +15,7 @@ import {
 } from '@/lib/route/persistence';
 import { unreachableIn } from '@/lib/route/progress';
 import type { SaveFailure } from '@/lib/supabase/routes-adapter';
+import type { OptimizationResult } from '@/types';
 
 /**
  * Keeping the server's copy of a route in step with the user's.
@@ -51,6 +53,13 @@ export interface RouteSync {
   sync: () => void;
 }
 
+interface RouteWriteSnapshot {
+  readonly draft: DraftRoute;
+  readonly result: OptimizationResult | null;
+  readonly status: RouteStatus;
+  readonly optimizedAt: string;
+}
+
 export function useRouteSync(): RouteSync {
   const services = useServices();
   const { session } = useSession();
@@ -64,6 +73,7 @@ export function useRouteSync(): RouteSync {
   // What the server last accepted. The transition guard needs a *from*, and
   // deriving it from the current draft would compare a status to itself.
   const lastWrittenStatus = useRef<RouteStatus | null>(null);
+  const activeRouteId = useRef(draft.routeId);
   // Which write is in flight, so two status changes in quick succession do not
   // produce overlapping upserts that land out of order.
   const inFlight = useRef<Promise<void> | null>(null);
@@ -72,77 +82,95 @@ export function useRouteSync(): RouteSync {
    *  close a day. */
   const previousRoute = useRef<{ routeId: string; status: RouteStatus } | null>(null);
 
+  const routeId = draft.routeId;
+  if (activeRouteId.current !== routeId) {
+    activeRouteId.current = routeId;
+    lastWrittenStatus.current = null;
+  }
+
+  const progressForCurrentRoute = progress?.routeId === draft.routeId ? progress : null;
   const status = statusFor({
     isOptimized: draft.isOptimized,
-    isUnderway: progress !== null,
+    isUnderway: progressForCurrentRoute !== null,
   });
 
-  const write = useCallback(async (): Promise<void> => {
-    const userId = session?.userId;
-    if (services === null || userId === undefined) return;
+  const latestSnapshot = useRef<RouteWriteSnapshot>({
+    draft,
+    result,
+    status,
+    optimizedAt: new Date().toISOString(),
+  });
+  latestSnapshot.current = {
+    draft,
+    result,
+    status,
+    optimizedAt:
+      latestSnapshot.current.status === status
+        ? latestSnapshot.current.optimizedAt
+        : new Date().toISOString(),
+  };
 
-    const from = lastWrittenStatus.current;
-    // A transition the lifecycle forbids is a defect upstream, and writing it
-    // would let a completed day be reopened. Refused here rather than sent.
-    if (from !== null && !canTransition(from, status)) return;
+  const writeSnapshot = useCallback(
+    async (snapshot: RouteWriteSnapshot): Promise<void> => {
+      const userId = session?.userId;
+      if (services === null || userId === undefined) return;
 
-    const outcome = await services.routes.save(
-      toRows(draft, userId, {
-        status,
-        unreachableStopIds: unreachableIn(result),
-        totals:
-          result === null
-            ? null
-            : {
-                tier: result.tier,
-                distanceMeters: result.totalDistanceMeters,
-                durationSeconds: result.isDegraded ? null : result.totalDurationSeconds,
-                optimizedAt: new Date().toISOString(),
-              },
-      }),
-    );
+      const from = lastWrittenStatus.current;
+      // A transition the lifecycle forbids is a defect upstream, and writing it
+      // would let a completed day be reopened. Refused here rather than sent.
+      if (from !== null && !canTransition(from, snapshot.status)) return;
 
-    if (outcome.ok) {
-      setFailure(null);
-      lastWrittenStatus.current = status;
-      // History is now stale. Invalidating rather than writing into the cache
-      // by hand: the list carries a stop count and an updated timestamp that
-      // only the server knows.
-      void queryClient.invalidateQueries({ queryKey: queryKeys.savedRoutes() });
-      return;
-    }
+      const outcome = await services.routes.save(
+        toRows(snapshot.draft, userId, {
+          status: snapshot.status,
+          unreachableStopIds: unreachableIn(snapshot.result),
+          totals:
+            snapshot.result === null
+              ? null
+              : {
+                  tier: snapshot.result.tier,
+                  distanceMeters: snapshot.result.totalDistanceMeters,
+                  durationSeconds: snapshot.result.isDegraded
+                    ? null
+                    : snapshot.result.totalDurationSeconds,
+                  optimizedAt: snapshot.optimizedAt,
+                },
+        }),
+      );
 
-    /**
-     * Named in a log line, because "it can't be failing" has to be checkable.
-     *
-     * The **kind only** — no address, no place id, no route id. Which of the
-     * five it is decides whether this is a connection, an unresolved place, a
-     * policy refusal or our own state machine, and those have entirely different
-     * fixes (`CLAUDE.md` §9 rule 7).
-     */
-    console.warn(`[route-sync] save failed, kind=${outcome.failure.kind}`);
-    setFailure(outcome.failure);
-  }, [services, session?.userId, draft, result, status, queryClient]);
+      if (outcome.ok) {
+        setFailure(null);
+        lastWrittenStatus.current = snapshot.status;
+        // History is now stale. Invalidating rather than writing into the cache
+        // by hand: the list carries a stop count and an updated timestamp that
+        // only the server knows.
+        void queryClient.invalidateQueries({ queryKey: queryKeys.savedRoutes() });
+        return;
+      }
 
-  /**
-   * The newest `write`, held so `sync` can stay stable.
-   *
-   * `write` closes over the draft and so changes identity on every edit. If the
-   * effect below depended on it, a typed label would re-run the effect and
-   * produce exactly the write-per-keystroke this hook exists to avoid — while
-   * still *looking* like it was triggered by a status change.
-   */
-  const writeRef = useRef(write);
-  writeRef.current = write;
+      /**
+       * Named in a log line, because "it can't be failing" has to be checkable.
+       *
+       * The **kind only** — no address, no place id, no route id. Which of the
+       * five it is decides whether this is a connection, an unresolved place, a
+       * policy refusal or our own state machine, and those have entirely different
+       * fixes (`CLAUDE.md` §9 rule 7).
+       */
+      console.warn(`[route-sync] save failed, kind=${outcome.failure.kind}`);
+      setFailure(outcome.failure);
+    },
+    [services, session?.userId, queryClient],
+  );
 
   const sync = useCallback(() => {
+    const snapshot = latestSnapshot.current;
     // Serialised. Two upserts of the same route racing would be harmless for the
     // route row and wrong for the stops, where the second delete can land after
     // the first insert.
     const previous = inFlight.current ?? Promise.resolve();
-    const run = () => writeRef.current();
+    const run = () => writeSnapshot(snapshot);
     inFlight.current = previous.then(run, run);
-  }, []);
+  }, [writeSnapshot]);
 
   /**
    * The trigger.
@@ -174,15 +202,17 @@ export function useRouteSync(): RouteSync {
    * optimized and then abandoned was never driven, and marking it completed
    * would put a day in History that never happened.
    */
-  const routeId = draft.routeId;
   useEffect(() => {
-    const superseded = completeSupersededRoute(
-      previousRoute.current === null || previousRoute.current.routeId === routeId
-        ? null
-        : previousRoute.current,
-    );
+    const previous = previousRoute.current;
+    const hasChangedRoute = previous !== null && previous.routeId !== routeId;
+    const superseded = completeSupersededRoute(hasChangedRoute ? previous : null);
 
     previousRoute.current = { routeId, status };
+    if (hasChangedRoute) {
+      lastWrittenStatus.current = null;
+      setFailure(null);
+    }
+
     if (superseded === null || services === null) return;
 
     void services.routes
@@ -194,11 +224,7 @@ export function useRouteSync(): RouteSync {
           void queryClient.invalidateQueries({ queryKey: queryKeys.savedRoutes() });
         }
       });
-    // `status` is read, not depended on: this fires when the *route* changes,
-    // and re-running it on a status change would try to close a route that is
-    // still the current one.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [routeId, services, queryClient]);
+  }, [routeId, status, services, queryClient]);
 
   return { failure, sync };
 }

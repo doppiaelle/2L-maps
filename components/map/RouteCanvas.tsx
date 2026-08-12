@@ -132,6 +132,7 @@ export const RouteCanvas = memo(function RouteCanvas({
   const isInspectable = onSelectLeg !== undefined && !isPreparing;
   const palette = colours[theme];
   const map = mapColours[theme];
+  const depth = depthFor(theme);
   const [size, setSize] = useState({ width: 0, height: 0 });
 
   const drawn = useMemo(() => {
@@ -398,60 +399,108 @@ export const RouteCanvas = memo(function RouteCanvas({
               Google-derived stops on somebody else's map, which ADR-0012 rejects
               by name and `CLAUDE.md` §13 rule 5 forbids widening. */}
               {drawn.scenery.blocks.map((block) => (
-                <Rect
+                <G
                   key={block.id}
-                  testID="scenery-block"
-                  x={block.x}
-                  y={block.y}
-                  width={block.width}
-                  height={block.height}
-                  rx={4}
-                  fill={map.block}
-                  opacity={block.opacity}
                   transform={`rotate(${block.rotation} ${block.x + block.width / 2} ${block.y + block.height / 2})`}
-                />
+                >
+                  <Rect
+                    x={block.x + depth.x}
+                    y={block.y + depth.y}
+                    width={block.width}
+                    height={block.height}
+                    rx={4}
+                    fill={depth.blockShadow}
+                    opacity={block.opacity}
+                  />
+                  <Rect
+                    testID="scenery-block"
+                    x={block.x}
+                    y={block.y}
+                    width={block.width}
+                    height={block.height}
+                    rx={4}
+                    fill={map.block}
+                    opacity={block.opacity}
+                  />
+                </G>
               ))}
 
               {drawn.scenery.areas.map((area) => (
-                <Rect
+                <G
                   key={area.id}
-                  testID={`scenery-${area.kind}`}
-                  x={area.x}
-                  y={area.y}
-                  width={area.width}
-                  height={area.height}
-                  rx={area.kind === 'park' ? 7 : 2}
-                  fill={
-                    area.kind === 'park'
-                      ? map.park
-                      : area.kind === 'square'
-                        ? map.square
-                        : map.building
-                  }
-                  stroke={area.kind === 'building' ? map.block : 'none'}
-                  strokeWidth={area.kind === 'building' ? 0.8 : 0}
-                  opacity={area.opacity}
                   transform={`rotate(${area.rotation} ${area.x + area.width / 2} ${area.y + area.height / 2})`}
-                />
+                >
+                  <Rect
+                    x={area.x + depth.x}
+                    y={area.y + depth.y}
+                    width={area.width}
+                    height={area.height}
+                    rx={area.kind === 'park' ? 7 : 2}
+                    fill={area.kind === 'building' ? depth.buildingShadow : depth.blockShadow}
+                    opacity={area.opacity * 0.8}
+                  />
+                  <Rect
+                    testID={`scenery-${area.kind}`}
+                    x={area.x}
+                    y={area.y}
+                    width={area.width}
+                    height={area.height}
+                    rx={area.kind === 'park' ? 7 : 2}
+                    fill={
+                      area.kind === 'park'
+                        ? map.park
+                        : area.kind === 'square'
+                          ? map.square
+                          : map.building
+                    }
+                    stroke={area.kind === 'building' ? map.block : 'none'}
+                    strokeWidth={area.kind === 'building' ? 0.8 : 0}
+                    opacity={area.opacity}
+                  />
+                </G>
               ))}
 
-              {drawn.scenery.roads.map((road) => (
-                <Line
-                  key={road.id}
-                  testID="scenery-road"
-                  x1={road.from.x}
-                  y1={road.from.y}
-                  x2={road.to.x}
-                  y2={road.to.y}
-                  stroke={road.isArterial ? map.road : map.roadMinor}
-                  strokeWidth={road.isArterial ? stroke.sceneryArterial : stroke.sceneryMinor}
-                  strokeLinecap="round"
-                  opacity={road.opacity}
-                />
-              ))}
+              {drawn.scenery.roads.map((road) => {
+                const width = road.isArterial ? stroke.sceneryArterial : stroke.sceneryMinor;
+                return (
+                  <G key={road.id}>
+                    <Line
+                      x1={road.from.x + depth.x}
+                      y1={road.from.y + depth.y}
+                      x2={road.to.x + depth.x}
+                      y2={road.to.y + depth.y}
+                      stroke={depth.roadShadow}
+                      strokeWidth={width + 3}
+                      strokeLinecap="round"
+                      opacity={road.opacity}
+                    />
+                    <Line
+                      testID="scenery-road"
+                      x1={road.from.x}
+                      y1={road.from.y}
+                      x2={road.to.x}
+                      y2={road.to.y}
+                      stroke={road.isArterial ? map.road : map.roadMinor}
+                      strokeWidth={width}
+                      strokeLinecap="round"
+                      opacity={road.opacity}
+                    />
+                  </G>
+                );
+              })}
 
               {drawn.road !== null && (
                 <>
+                  <Path
+                    d={drawn.road}
+                    stroke={depth.routeShadow}
+                    strokeWidth={stroke.routeCasing + 5}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    fill="none"
+                    opacity={0.82}
+                    transform={`translate(${depth.x} ${depth.y})`}
+                  />
                   {map.routeCasing !== null && (
                     // Drawn first, so it sits underneath. SVG has no outline on a
                     // path; a wider line beneath it is what produces the border, and
@@ -485,15 +534,26 @@ export const RouteCanvas = memo(function RouteCanvas({
                   route at the casing's width so it reads as the same line
                   brought forward rather than a different one laid on top. */}
                   {selectedLeg !== null && (
-                    <Path
-                      testID="route-leg-selected"
-                      d={selectedLeg.d}
-                      stroke={palette.accent}
-                      strokeWidth={stroke.routeCasing}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      fill="none"
-                    />
+                    <>
+                      <Path
+                        d={selectedLeg.d}
+                        stroke={depth.routeShadow}
+                        strokeWidth={stroke.routeCasing + 6}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        fill="none"
+                        transform={`translate(${depth.x} ${depth.y})`}
+                      />
+                      <Path
+                        testID="route-leg-selected"
+                        d={selectedLeg.d}
+                        stroke={palette.accent}
+                        strokeWidth={stroke.routeCasing}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        fill="none"
+                      />
+                    </>
                   )}
                 </>
               )}
@@ -727,6 +787,35 @@ const PREPARING_OPACITY = 0.35;
  */
 const DIMMED_ROUTE_OPACITY = 0.3;
 
+function depthFor(theme: ThemeName): {
+  readonly x: number;
+  readonly y: number;
+  readonly blockShadow: string;
+  readonly buildingShadow: string;
+  readonly roadShadow: string;
+  readonly routeShadow: string;
+} {
+  if (theme === 'dark') {
+    return {
+      x: 5,
+      y: 7,
+      blockShadow: 'rgba(0, 0, 0, 0.28)',
+      buildingShadow: 'rgba(0, 0, 0, 0.38)',
+      roadShadow: 'rgba(0, 0, 0, 0.36)',
+      routeShadow: 'rgba(0, 0, 0, 0.55)',
+    };
+  }
+
+  return {
+    x: 4,
+    y: 6,
+    blockShadow: 'rgba(17, 17, 18, 0.08)',
+    buildingShadow: 'rgba(17, 17, 18, 0.14)',
+    roadShadow: 'rgba(17, 17, 18, 0.12)',
+    routeShadow: 'rgba(5, 58, 44, 0.24)',
+  };
+}
+
 /**
  * One stop.
  *
@@ -750,16 +839,25 @@ const Pin = memo(function Pin({
   const size = isSelected ? MARKER_SIZE_SELECTED : MARKER_SIZE;
 
   return (
-    <Circle
-      testID="route-canvas-pin"
-      cx={point.x}
-      cy={point.y}
-      r={size / 2}
-      fill={style.fill}
-      stroke={style.border}
-      strokeWidth={2}
-      opacity={opacity}
-    />
+    <>
+      <Circle
+        cx={point.x + 4}
+        cy={point.y + 5}
+        r={size / 2}
+        fill="rgba(0, 0, 0, 0.28)"
+        opacity={opacity}
+      />
+      <Circle
+        testID="route-canvas-pin"
+        cx={point.x}
+        cy={point.y}
+        r={size / 2}
+        fill={style.fill}
+        stroke={style.border}
+        strokeWidth={2}
+        opacity={opacity}
+      />
+    </>
   );
 });
 

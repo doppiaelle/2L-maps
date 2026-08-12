@@ -1,4 +1,4 @@
-import { Pressable, Text, View } from 'react-native';
+import { Image, Pressable, Text, View } from 'react-native';
 
 import { colours, radius, space } from '@/lib/design/tokens';
 import type { ThemeName } from '@/lib/design/tokens';
@@ -28,7 +28,7 @@ export function AppHeader({
   return (
     <View
       style={{
-        minHeight: 44,
+        minHeight: 72,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -36,25 +36,30 @@ export function AppHeader({
       testID={testID}
     >
       {showBrand ? (
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.space2 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.space3 }}>
           <View
             style={{
-              width: 34,
-              height: 34,
-              borderRadius: radius.radiusSm,
+              width: 62,
+              height: 62,
+              borderRadius: radius.radiusMd,
               alignItems: 'center',
               justifyContent: 'center',
-              backgroundColor: palette.textPrimary,
             }}
           >
-            <Text style={{ color: palette.accent, fontSize: 12, fontWeight: '700' }}>2L</Text>
+            <Image
+              source={require('../../assets/brand/logo.png')}
+              resizeMode="contain"
+              style={{ width: 62, height: 50 }}
+              accessibilityLabel="2L Maps"
+              testID="brand-logo"
+            />
           </View>
-          <Text style={{ color: palette.textPrimary, fontSize: 16, fontWeight: '700' }}>Maps</Text>
+          <Text style={{ color: palette.textPrimary, fontSize: 28, fontWeight: '700' }}>Maps</Text>
         </View>
       ) : (
         <Text
           accessibilityRole="header"
-          style={{ color: palette.textPrimary, fontSize: 16, fontWeight: '700' }}
+          style={{ color: palette.textPrimary, fontSize: 28, fontWeight: '700' }}
         >
           {title}
         </Text>
@@ -66,9 +71,9 @@ export function AppHeader({
           accessibilityRole="button"
           accessibilityLabel={actionLabel}
           style={{
-            minWidth: 44,
-            minHeight: 44,
-            borderRadius: 22,
+            minWidth: 56,
+            minHeight: 56,
+            borderRadius: 28,
             alignItems: 'center',
             justifyContent: 'center',
             backgroundColor: palette.surface,
@@ -76,12 +81,12 @@ export function AppHeader({
             borderColor: palette.border,
           }}
         >
-          <Text style={{ color: palette.textPrimary, fontSize: 12, fontWeight: '700' }}>
+          <Text style={{ color: palette.textPrimary, fontSize: 22, fontWeight: '700' }}>
             {actionGlyph}
           </Text>
         </Pressable>
       ) : (
-        <View style={{ width: 44 }} />
+        <View style={{ width: 56 }} />
       )}
     </View>
   );
