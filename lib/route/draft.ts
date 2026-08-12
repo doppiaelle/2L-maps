@@ -273,6 +273,17 @@ export function applyOptimizedOrder(
   return { ...draft, stops: renumber(ordered), isOptimized: true, isDegraded };
 }
 
+/** Restores the order the driver entered before optimization. */
+export function restoreEntryOrder(draft: DraftRoute): DraftRoute {
+  const entered = [...draft.stops].sort((a, b) => a.entryOrder - b.entryOrder);
+  return {
+    ...draft,
+    stops: renumber(entered),
+    isOptimized: false,
+    isDegraded: false,
+  };
+}
+
 /** Toggling round trip invalidates any cached result: the optimal order genuinely
  *  differs between the two (docs/15_ROUTE_OPTIMIZATION.md). */
 export function setShape(draft: DraftRoute, shape: RouteShape): DraftRoute {
