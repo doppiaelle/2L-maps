@@ -5,7 +5,6 @@ import * as Linking from 'expo-linking';
 import { SplashScreen, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo } from 'react';
-import { useColorScheme } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
@@ -31,6 +30,7 @@ import {
   createSupabaseRoutes,
 } from '@/lib/supabase/client';
 import { functionsBaseUrl, readSupabaseConfig } from '@/lib/supabase/config';
+import { useAppTheme } from '@/features/preferences/use-app-theme';
 
 /**
  * Root layout.
@@ -90,7 +90,7 @@ export default function RootLayout(): React.JSX.Element {
   // The device's setting, which is what every screen already reads for its
   // inline colours. Binding the class-name variables from the same source is
   // what stops the two halves of the palette disagreeing.
-  const scheme = useColorScheme();
+  const theme = useAppTheme();
 
   const linking = useMemo<DeepLinkPort>(
     () => ({
@@ -118,7 +118,7 @@ export default function RootLayout(): React.JSX.Element {
           is what gives `text-primary` and every other colour class a value, and
           what makes those values follow the theme. Without it they resolve to
           nothing (`components/design/ThemeVariables.tsx`). */}
-        <ThemeVariables theme={scheme === 'dark' ? 'dark' : 'light'}>
+        <ThemeVariables theme={theme}>
           <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
             <ConnectivityProvider port={connectivity}>
               <SessionProvider auth={auth}>

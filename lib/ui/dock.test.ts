@@ -21,23 +21,22 @@ const driving = { isRouteInProgress: true };
 const parked = { isRouteInProgress: false };
 
 describe('what the dock offers', () => {
-  it('offers three sections, Route first', () => {
+  it('offers the two primary sections, Route first', () => {
     // The map is no longer one of them: it is what an optimization produces,
     // shown inside Route (ADR-0022).
     expect(dockItems('itinerary', parked).map((item) => item.section)).toEqual([
       'itinerary',
       'history',
-      'settings',
     ]);
   });
 
-  it('offers the same three whatever is open', () => {
+  it('offers the same two whatever is open', () => {
     // The property the close control broke, and the one part of ADR-0020 that
     // stands: a dock whose width depends on state is a dock whose items move,
     // and an item that moves is not learned.
     const sections: ActiveSection[] = ['itinerary', 'history', 'settings'];
     for (const active of sections) {
-      expect(dockItems(active, parked)).toHaveLength(3);
+      expect(dockItems(active, parked)).toHaveLength(2);
     }
   });
 

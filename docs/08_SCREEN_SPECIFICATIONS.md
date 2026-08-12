@@ -1,5 +1,18 @@
 # 08 — Screen Specifications
 
+> **UI implementation note (2026-08-12).** The current mobile design has six visual states in
+> order: Login, Route, Route/Search Open, Optimized Map, History, and Settings. Route and History
+> are the only bottom-dock destinations; Settings is always available from the top-right utility.
+> The palette is black/white by theme with mint reserved for navigation and confirmation. Settings
+> exposes Light, System, and Dark choices. The Route action is paired with a square reset utility
+> after optimization; reset restores the manually entered stop order and clears optimized geometry.
+> Address search remains an overlay/modal over Route so the underlying planning context is retained.
+
+> The Optimized Map is a synthetic procedural navigation environment: real stop coordinates and
+> routed polyline determine its geometry, while a deterministic, anonymous street grid and urban
+> blocks are generated around that route. It never fetches or copies map tiles. Pan, pinch zoom,
+> numbered stops, route-leg selection, and route emphasis are implemented by the drawn canvas.
+
 > **Status:** Approved
 > **Owner:** Design
 > **Last reviewed:** 2026-08-06

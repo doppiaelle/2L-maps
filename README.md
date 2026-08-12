@@ -16,10 +16,13 @@ off to Google Maps, Waze or Apple Maps, whichever you already use.
 
 ## Status
 
-**This repository currently contains specifications only. No application code has been written.**
+**The Android-tested Expo application, Supabase backend, automated tests, and product documentation
+are implemented in this repository.** The current interface follows the 2L Maps mobile design:
+minimal black/white surfaces, mint navigation actions, a two-item Route/History dock, top-right
+Settings, address search results, and a procedural route preview.
 
-The documentation in [`docs/`](docs/) is the complete technical specification, written to be
-authoritative for the implementation that follows. Start with
+The documentation in [`docs/`](docs/) describes the implemented product and the remaining release
+work. Start with
 [`docs/00_PROJECT_OVERVIEW.md`](docs/00_PROJECT_OVERVIEW.md), then read
 [`CLAUDE.md`](CLAUDE.md) before writing any code.
 
