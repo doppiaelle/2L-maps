@@ -41,7 +41,6 @@ describe('what the dock shows', () => {
 
     expect(screen.getByTestId('dock-itinerary')).toBeTruthy();
     expect(screen.getByTestId('dock-history')).toBeTruthy();
-    expect(screen.getByTestId('dock-settings')).toBeTruthy();
   });
 
   it('has no Map item, because the map is not a destination', () => {
@@ -50,32 +49,30 @@ describe('what the dock shows', () => {
     expect(screen.queryByTestId('dock-map')).toBeNull();
   });
 
-  it('shows the same three items whatever is open', () => {
+  it('shows the same two items whatever is open', () => {
     // The property the close control broke: the row's width is a constant, so an
     // item is where the user last saw it (ADR-0020).
     const sections: DockSection[] = ['itinerary', 'history', 'settings'];
 
     for (const active of sections) {
       const { unmount } = renderDock(active);
-      expect(screen.getAllByRole('tab')).toHaveLength(3);
+      expect(screen.getAllByRole('tab')).toHaveLength(2);
       unmount();
     }
   });
 
-  it('keeps History and Settings reachable while a route is in progress', () => {
+  it('keeps History reachable while a route is in progress', () => {
     // The controls this replaces returned null mid-route, so the driver was the
     // one person who could reach neither (ADR-0018).
     renderDock('itinerary', driving);
 
     expect(screen.getByTestId('dock-history')).toBeTruthy();
-    expect(screen.getByTestId('dock-settings')).toBeTruthy();
   });
 
   it('announces which section is open, not only by colour', () => {
     renderDock('history');
 
     expect(screen.getByTestId('dock-history').props.accessibilityState.selected).toBe(true);
-    expect(screen.getByTestId('dock-settings').props.accessibilityState.selected).toBe(false);
   });
 
   it('says what each item does rather than what it is', () => {

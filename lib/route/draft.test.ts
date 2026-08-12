@@ -10,6 +10,7 @@ import {
   readiness,
   remainingCapacity,
   removeStop,
+  restoreEntryOrder,
   restoreStop,
   setShape,
   wasAlreadyOptimal,
@@ -41,6 +42,18 @@ const draftWith = (ids: string[]) =>
   }, emptyDraft('r1'));
 
 const ids = (draft: { stops: readonly Stop[] }) => draft.stops.map((s) => s.id);
+
+describe('resetting optimization', () => {
+  it('restores entry order and clears optimized state', () => {
+    const optimized = applyOptimizedOrder(draftWith(['a', 'b', 'c']), ['c', 'a', 'b'], false);
+    const restored = restoreEntryOrder(optimized);
+
+    expect(ids(restored)).toEqual(['a', 'b', 'c']);
+    expect(restored.stops.map((item) => item.position)).toEqual([0, 1, 2]);
+    expect(restored.isOptimized).toBe(false);
+    expect(restored.isDegraded).toBe(false);
+  });
+});
 
 describe('adding stops', () => {
   it('appends and numbers positions from zero', () => {

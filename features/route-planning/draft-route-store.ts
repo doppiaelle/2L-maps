@@ -12,6 +12,7 @@ import {
   readiness,
   remainingCapacity,
   removeStop,
+  restoreEntryOrder,
   restoreStop,
   setShape,
   type DraftRefusal,
@@ -100,6 +101,8 @@ export interface DraftRouteState {
    * to the typed one would discard work the user paid for.
    */
   clearResult: () => void;
+  /** Restore the manually entered stop order and discard optimized geometry. */
+  resetOptimization: () => void;
   /**
    * Keep the coordinates a lookup just returned.
    *
@@ -283,6 +286,10 @@ export function createDraftRouteStore(storage?: DraftStorage) {
             draft: { ...get().draft, isOptimized: false, isDegraded: false },
             result: null,
           });
+        },
+
+        resetOptimization: () => {
+          set({ draft: restoreEntryOrder(get().draft), result: null });
         },
 
         applyResult: (result) => {
