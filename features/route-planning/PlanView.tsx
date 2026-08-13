@@ -27,6 +27,10 @@ export interface PlanViewProps {
     readonly stopNumber?: number;
   } | null;
   readonly bottomInset?: number;
+  readonly controlsSlot?: React.ReactNode;
+  readonly noticeSlot?: React.ReactNode;
+  onOpenSearch: () => void;
+  onSearchLayout?: (y: number) => void;
   onSelectStop: (stopId: string) => void;
   onRemoveStop: (stopId: string) => void;
   onPrimaryAction: () => void;
@@ -43,6 +47,10 @@ export function PlanView({
   onDismissMap,
   selectedLeg = null,
   bottomInset = 0,
+  controlsSlot,
+  noticeSlot,
+  onOpenSearch,
+  onSearchLayout,
   onSelectStop,
   onRemoveStop,
   onPrimaryAction,
@@ -62,7 +70,12 @@ export function PlanView({
           <Text style={subtitleStyle(palette.textSecondary)}>
             Add the places you need to visit.
           </Text>
-          <View
+          <Pressable
+            onPress={onOpenSearch}
+            onLayout={(event) => onSearchLayout?.(event.nativeEvent.layout.y)}
+            accessibilityRole="search"
+            accessibilityLabel="Search an address or place"
+            accessibilityHint="Opens address suggestions over this route"
             style={{
               minHeight: 60,
               marginTop: space.space5,
@@ -93,7 +106,9 @@ export function PlanView({
             >
               <Text style={{ color: palette.bg, fontSize: 22, fontWeight: '700' }}>⌕</Text>
             </View>
-          </View>
+          </Pressable>
+          {controlsSlot}
+          {noticeSlot}
         </View>
       )}
 

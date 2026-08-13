@@ -145,15 +145,14 @@ History**, **import**, and **offline detection** with a persisted query cache.
 | Address book | Add-stop passed two hard-coded empty arrays where reuse belonged, so the largest cost lever was inert | 8b |
 | Offline | `isOffline` was the literal `false` and `mapStatus` the literal `"ready"`; the persisted query cache `11_STATE_MANAGEMENT.md` §6 depends on did not exist; React Query's own online state used a browser heuristic that is always true in React Native | 8c |
 | Import | The modal was a heading over an empty view, and "add manually" pushed to it | 8d |
-| Ads and billing | `<AdSlot>` was never rendered; the paywall hard-coded two null offers and a no-op buy | 8e |
+| Ads and billing | The former ad seam was never user-visible; billing had no runtime store provider | 8e |
 
 **Still specified and not built:**
 
 | Thing | Where specified | Consequence today | What it needs |
 |---|---|---|---|
 | Analytics events | [`21_ANALYTICS.md`](21_ANALYTICS.md) | No `lib/analytics` exists; nothing is measured | A Firebase project and `google-services.json` in the build |
-| Real advertising | [ADR-0015](adr/0015-ad-supported-free-tier.md) | The seam exists and the provider is null, so the free tier shows nothing | An AdMob account and a certified CMP for the EEA |
-| Real billing | [`20_SUBSCRIPTIONS.md`](20_SUBSCRIPTIONS.md) | The paywall states the reason and offers the free plan; there are no products | RevenueCat and three products on Play Console |
+| Real billing | [`20_SUBSCRIPTIONS.md`](20_SUBSCRIPTIONS.md) | Settings compares the live plan and allowances honestly; selection cannot purchase | A chosen billing provider, configured store products and sandbox verification |
 | Offline mutation queue, drained | [ADR-0008](adr/0008-offline-scope.md) | Reconnection re-syncs the route and re-reads; individual edits made offline are not yet queued and replayed | The queue store is complete and tested; wiring it is a wave of its own |
 | iOS | [ADR-0014](adr/0014-android-first-verification.md) | Unverified on hardware and deliberately so | A Mac, or a paid build service |
 
@@ -582,7 +581,7 @@ authenticated, so `useServices()` returns null until there is a session. A clien
 is not a usable service.
 
 **An unmentioned limit is unknown, never zero.** `/usage-quota` returns limits by name, and the
-server tunes the free tier against realised ad revenue ([ADR-0015](adr/0015-ad-supported-free-tier.md))
+server tunes the free tier against its measured acquisition budget ([ADR-0029](adr/0029-single-driver-wedge-and-subscription-first-freemium.md))
 — so it must be able to move one number without restating the rest. Reading an absent limit as
 zero would tell a paying user they had run out of something nobody had measured.
 

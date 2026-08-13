@@ -90,7 +90,7 @@ owning your area (see §Areas below) → [`29`](29_DEFINITION_OF_DONE.md).
 | 17 | [Offline Mode](17_OFFLINE_MODE.md) | What works without a network, and what honestly cannot |
 | 18 | [Permissions](18_PERMISSIONS.md) | Location, notifications, app-scheme queries |
 | 19 | [Security](19_SECURITY.md) | Keys, RLS, secrets, rotation, threat model |
-| 20 | [Subscriptions](20_SUBSCRIPTIONS.md) | Trial, entitlements, RevenueCat, restore |
+| 20 | [Subscriptions](20_SUBSCRIPTIONS.md) | Plans, entitlements, future checkout, restore |
 | 21 | [Analytics](21_ANALYTICS.md) | Events, funnels, crash reporting, privacy limits |
 | 24 | [Performance](24_PERFORMANCE.md) | Budgets and how they are held |
 | 32 | [Legal & Compliance](32_LEGAL_COMPLIANCE.md) | Google terms, GDPR, EU auto-renewal law |
@@ -115,7 +115,7 @@ owning your area (see §Areas below) → [`29`](29_DEFINITION_OF_DONE.md).
 | ID | Decision |
 |---|---|
 | [0001](adr/0001-documentation-language-and-structure.md) | English documentation, 42 files, 14-section template |
-| [0002](adr/0002-target-segment-and-monetization.md) | Single professional, 5–25 stops; 7-day trial to paid |
+| [0002](adr/0002-target-segment-and-monetization.md) | Historical single-professional scope and hard-paywall economics; partly superseded |
 | [0003](adr/0003-tiered-optimization-cascade.md) | Cost-aware cascade T0–T3, not a single engine |
 | [0004](adr/0004-external-navigation-handoff.md) | No in-app navigation; multi-provider handoff |
 | [0005](adr/0005-map-engine-and-route-preview.md) | `react-native-maps` behind an `<AppMap>` facade |
@@ -128,7 +128,7 @@ owning your area (see §Areas below) → [`29`](29_DEFINITION_OF_DONE.md).
 | [0012](adr/0012-long-term-osm-exit-path.md) | MapLibre + Valhalla recorded as the exit path |
 | [0013](adr/0013-implementation-execution-model.md) | Implementation in waves, one branch each, status in the repository |
 | [0014](adr/0014-android-first-verification.md) | Android-first verification through a CI-built development build; iOS unverified |
-| [0015](adr/0015-ad-supported-free-tier.md) | Ad-supported free tier capped on address search, day pass, Pro; amends ADR-0002 |
+| [0015](adr/0015-ad-supported-free-tier.md) | Free / Day pass / Pro ladder; advertising portion superseded by ADR-0029 |
 | [0016](adr/0016-ai-assisted-stop-entry.md) | Paste, photo and dictation parsed to stops by a model, behind the Edge Function |
 | [0017](adr/0017-parse-provider-switch.md) | The parse provider is a switch, not a choice made once — Anthropic by default, OpenRouter opt-in |
 | [0018](adr/0018-bottom-dock-navigation.md) | A bottom dock replaces the sheet and the floating controls |
@@ -142,6 +142,7 @@ owning your area (see §Areas below) → [`29`](29_DEFINITION_OF_DONE.md).
 | [0026](adr/0026-google-tells-us-what-is-wrong.md) | Every upstream refusal is read and logged with Google's own message; autocomplete sends no type filter, so search matches Google Maps. **Read before writing any Google request field** |
 | [0028](adr/0028-a-coastline-under-the-route.md) | A bundled public-domain coastline is drawn under the route at national scale, where the invented town would be claiming detail it does not have. **Widens the C3 exposure** and amends `CLAUDE.md` §13 rule 5 and ADR-0012 |
 | [0027](adr/0027-the-drive-happens-elsewhere.md) | Done and Skip removed and J2/J3 withdrawn: the navigation app drives the whole route, so nobody returns between stops. Confirm records the departure and puts the route in History; the next route closes the last. Time saved is withdrawn rather than estimated |
+| [0029](adr/0029-single-driver-wedge-and-subscription-first-freemium.md) | Single last-mile driver, 10–25 stops, fastest unstructured input, saved-route reuse and advertising-free freemium |
 
 ---
 
@@ -156,7 +157,7 @@ When changing code, read the owning document and its ADRs first.
 | Navigation handoff | [`16`](16_INTERNAL_NAVIGATION.md), [`18`](18_PERMISSIONS.md) | 0004 |
 | Database, migrations | [`12`](12_DATABASE.md) | 0007 |
 | Edge Functions, upstream calls | [`13`](13_BACKEND.md), [`33`](33_API_CONTRACTS.md) | 0006, 0011 |
-| Billing, paywall, entitlements | [`20`](20_SUBSCRIPTIONS.md), [`26`](26_APP_STORE.md), [`32`](32_LEGAL_COMPLIANCE.md) | 0002, 0011 |
+| Billing, paywall, entitlements | [`20`](20_SUBSCRIPTIONS.md), [`26`](26_APP_STORE.md), [`32`](32_LEGAL_COMPLIANCE.md) | 0011, 0029 |
 | UI components, styling | [`07`](07_DESIGN_SYSTEM.md), [`09`](09_COMPONENT_LIBRARY.md), [`23`](23_ACCESSIBILITY.md) | 0009, 0010 |
 | Screens, flows | [`08`](08_SCREEN_SPECIFICATIONS.md), [`10`](10_NAVIGATION_FLOW.md), [`05`](05_INFORMATION_ARCHITECTURE.md) | 0010 |
 | State, offline | [`11`](11_STATE_MANAGEMENT.md), [`17`](17_OFFLINE_MODE.md) | 0008 |

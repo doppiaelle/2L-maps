@@ -102,6 +102,21 @@ describe('what is shown before anything is typed', () => {
   });
 });
 
+describe('current location suggestion', () => {
+  it('is offered first before typing', () => {
+    expect(offersCurrentLocation('')).toBe(true);
+  });
+
+  it('stays while the query can still match its label', () => {
+    expect(offersCurrentLocation('my loc')).toBe(true);
+    expect(offersCurrentLocation('la mia pos')).toBe(true);
+  });
+
+  it('disappears when the query is clearly an address', () => {
+    expect(offersCurrentLocation('Via Roma')).toBe(false);
+  });
+});
+
 describe('searching', () => {
   const typed = 'Via Roma';
 

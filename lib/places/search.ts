@@ -156,9 +156,9 @@ export function canSubmitSearch(inputs: {
 /**
  * Whether "My location" is offered at the top of the list.
  *
- * It is the first row while the field is empty and disappears the moment the
- * user types, because at that point they have told us where they want to go and
- * a suggestion about where they already are is in the way. Free in every sense:
+ * It is the first row while the field is empty and stays there while what the
+ * user types can still mean “My location”. It disappears as soon as the text no
+ * longer matches, so it never competes with a real address. Free in every sense:
  * the device answers, nothing is billed, and it works with no signal.
  *
  * It sets the route's **origin**, not a stop. The draft has carried
@@ -168,7 +168,8 @@ export function canSubmitSearch(inputs: {
  * set your starting point".
  */
 export function offersCurrentLocation(query: string): boolean {
-  return query.trim().length === 0;
+  const needle = query.trim().toLocaleLowerCase();
+  return needle === '' || 'my location'.startsWith(needle) || 'la mia posizione'.startsWith(needle);
 }
 
 /**

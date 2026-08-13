@@ -255,6 +255,12 @@ export function fromRows(route: RouteRow, stops: readonly StopRow[]): DraftRoute
     originPlaceId: route.origin_place_id,
     originIsCurrentLocation: route.origin_is_current_location,
     shape: route.is_round_trip ? 'round-trip' : ('one-way' as RouteShape),
+    routeStart: route.origin_is_current_location ? 'current-location' : 'first-stop',
+    routeEnd: route.is_round_trip
+      ? route.origin_is_current_location
+        ? 'current-location'
+        : 'return-to-start'
+      : 'last-stop',
     stops: ordered.map((row, index): Stop => ({
       id: row.id,
       placeId: row.place_id,
@@ -352,29 +358,4 @@ export function displayName(summary: SavedRouteSummary, locale = 'en-GB'): strin
 
   const stops = `${summary.stopCount} ${summary.stopCount === 1 ? 'stop' : 'stops'}`;
   return date === null ? stops : `${date} · ${stops}`;
-}
-
-/**
- * Which saved routes a plan keeps.
- *
- * Free keeps the last three; history beyond a handful is one of the things Pro
- * sells ([ADR-0015](../../docs/adr/0015-ad-supported-free-tier.md)). This
- * **partitions rather than filters**: the routes over the limit are still the
- * user's own work, and History shows them as locked rather than pretending they
- * were never there. A product that silently deletes a driver's records to sell
- * them back is a different product.
- */
-export function partitionByAllowance(
-  summaries: readonly SavedRouteSummary[],
-  keep: number,
-): {
-  readonly visible: readonly SavedRouteSummary[];
-  readonly locked: readonly SavedRouteSummary[];
-} {
-  // Already ordered newest-first by the query; the slice trusts that rather than
-  // re-sorting, so one ordering rule lives in one place.
-  return {
-    visible: summaries.slice(0, Math.max(0, keep)),
-    locked: summaries.slice(Math.max(0, keep)),
-  };
 }

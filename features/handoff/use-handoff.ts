@@ -64,35 +64,69 @@ export interface HandoffOptions {
   readonly routeId: string;
   readonly stops: readonly Stop[];
   readonly resolved: ReadonlyMap<string, ResolvedPlace>;
+  readonly originIsCurrentLocation?: boolean;
+  readonly originCoordinate?: LatLng | null;
+  readonly isRoundTrip?: boolean;
+  /** Persist the just-started route before another app backgrounds us. */
+  beforeOpen?: () => Promise<unknown>;
   /** Opens a URL, reporting whether the other app came up. Injected so the whole
    *  flow is testable without a device — the same seam `NavigationProvider`
    *  already uses. */
   open: (url: string) => Promise<boolean>;
 }
 
-export function useHandoff({ routeId, stops, resolved, open }: HandoffOptions): HandoffState {
+export function useHandoff({
+  routeId,
+  stops,
+  resolved,
+  originIsCurrentLocation = false,
+  originCoordinate = null,
+  isRoundTrip = false,
+  beforeOpen,
+  open,
+}: HandoffOptions): HandoffState {
   const preferredProvider = usePreferencesStore((store) => store.preferences.navigationProvider);
   const beginAndHandOff = useRouteProgressStore((store) => store.beginAndHandOff);
 
   const [lastOutcome, setLastOutcome] = useState<HandoffOutcome | null>(null);
 
-  const places = useMemo<readonly HandoffPlace[]>(
-    () =>
-      stops.map((stop) => {
-        const fresh = resolved.get(stop.placeId);
-        const cached = stop.coordinate;
+  const prepared = useMemo(() => {
+    const stopPlaces = stops.map((stop) => {
+      const fresh = resolved.get(stop.placeId);
+      const cached = stop.coordinate;
 
-        return {
+      return {
+        stopId: stop.id,
+        place: {
           placeId: stop.placeId,
           coordinate:
             cached === null
               ? (fresh?.coordinate ?? null)
               : { latitude: cached.latitude, longitude: cached.longitude },
           address: cached?.formattedAddress ?? fresh?.address ?? null,
-        };
-      }),
-    [stops, resolved],
-  );
+        } satisfies HandoffPlace,
+      };
+    });
+
+    const routePlaces = originIsCurrentLocation
+      ? [
+          {
+            stopId: 'current-location',
+            place: {
+              placeId: 'current-location',
+              coordinate: originCoordinate,
+              address: null,
+            } satisfies HandoffPlace,
+          },
+          ...stopPlaces,
+        ]
+      : stopPlaces;
+
+    const first = routePlaces[0];
+    return isRoundTrip && first !== undefined ? [...routePlaces, first] : routePlaces;
+  }, [stops, resolved, originIsCurrentLocation, originCoordinate, isRoundTrip]);
+
+  const places = useMemo(() => prepared.map((item) => item.place), [prepared]);
 
   const start = useCallback(async (): Promise<HandoffOutcome> => {
     const record = (outcome: HandoffOutcome): HandoffOutcome => {
@@ -108,7 +142,7 @@ export function useHandoff({ routeId, stops, resolved, open }: HandoffOptions): 
     // `stops` and `place_id` can legitimately repeat within one route.
     if (requiresCoordinates(preferredProvider)) {
       const missing = places
-        .map((place, index) => (place.coordinate === null ? stops[index]?.id : undefined))
+        .map((place, index) => (place.coordinate === null ? prepared[index]?.stopId : undefined))
         .filter((id): id is string => id !== undefined);
 
       if (missing.length > 0) return record({ kind: 'needs-coordinates', stopIds: missing });
@@ -140,6 +174,7 @@ export function useHandoff({ routeId, stops, resolved, open }: HandoffOptions): 
      */
     let opened = false;
     await beginAndHandOff(routeId, async () => {
+      await beforeOpen?.();
       opened = await open(first.url);
     });
 
@@ -149,7 +184,7 @@ export function useHandoff({ routeId, stops, resolved, open }: HandoffOptions): 
     return record(
       opened ? { kind: 'handed-off', chunkCount: planned.plan.chunks.length } : { kind: 'failed' },
     );
-  }, [places, stops, routeId, preferredProvider, beginAndHandOff, open]);
+  }, [places, prepared, routeId, preferredProvider, beginAndHandOff, beforeOpen, open]);
 
   return { start, lastOutcome, preferredProvider };
 }

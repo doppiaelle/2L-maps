@@ -210,7 +210,7 @@ export interface BillingState {
    *  change — and when they do, the server is right (ADR-0011). */
   readonly status: EntitlementStatus;
   /** Which rung of the ladder the interface should present. Distinct from
-   *  `status`: a lapsed subscriber is on `free`, not locked out (ADR-0015). */
+   *  `status`: a lapsed subscriber is on `free`, not locked out (ADR-0029). */
   readonly plan: PlanTier;
   readonly trialEndsAt: string | null;
   readonly renewsAt: string | null;
@@ -227,53 +227,12 @@ export interface BillingProvider {
   startTrial: (productId: string) => Promise<PurchaseOutcome>;
   /** Buy a day pass. Consumable, so the balance is held server-side and keyed to
    *  the user — a store receipt alone cannot restore it to a second device
-   *  (ADR-0015, ADR-0011). */
+   *  (ADR-0029, ADR-0011). */
   buyDayPass: (productId: string) => Promise<PurchaseOutcome>;
   /** Re-reads entitlement from the server rather than trusting the local receipt
    *  cache: a reinstalled or handed-over device must converge on the same answer,
    *  and only the server can be right about it. */
   restore: () => Promise<BillingState>;
-}
-
-// ─── Advertising ─────────────────────────────────────────────────────────────
-
-/**
- * What the user has agreed to. Absent consent is not refusal — it is a question
- * not yet asked — and the three states behave differently, so a boolean would
- * lose the only distinction that matters (ADR-0015, docs/32_LEGAL_COMPLIANCE.md).
- */
-export type AdConsentState = 'not-asked' | 'personalised' | 'non-personalised';
-
-/** How an offered rewarded ad ended. `unavailable` is our failure, not the
- *  user's, and is treated as a grant (ADR-0015 rule 6). */
-export type RewardedOutcome = 'watched' | 'dismissed' | 'unavailable';
-
-/**
- * Advertising, behind a facade like every other external capability.
- *
- * This one earns the facade twice over. An ad SDK exists to collect exactly the
- * data this product is built not to collect, so the narrow surface here *is*
- * the enforcement of `CLAUDE.md` §9 rule 7: there is no method that accepts a
- * coordinate, an address, a `place_id` or a route, which means no call site can
- * pass one.
- *
- * Nothing here throws or blocks. A failed load, an empty fill and a missing
- * network all resolve to an outcome the caller can continue from — the user's
- * route does not depend on our ad server being reachable.
- */
-export interface AdsProvider {
-  /** Current consent. Read, never assumed: in the EEA a certified CMP owns this
-   *  and can change it outside the app's flow. */
-  consent: () => Promise<AdConsentState>;
-  /** Present the consent flow. Declining costs the user nothing — they get
-   *  non-personalised ads and the same allowances (ADR-0015 rule 5). */
-  requestConsent: () => Promise<AdConsentState>;
-  /** Ask for a banner for a slot that is already laid out. Resolves to null when
-   *  nothing fills, and the reserved space simply stays empty — a banner that
-   *  pops in and reflows the list moves the row under the user's thumb. */
-  loadBanner: (slot: 'stop-list' | 'result') => Promise<{ readonly height: number } | null>;
-  /** Offer one rewarded view. Never called during a route. */
-  showRewarded: () => Promise<RewardedOutcome>;
 }
 
 // ─── Authentication ──────────────────────────────────────────────────────────

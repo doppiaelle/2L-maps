@@ -30,8 +30,10 @@ export function HistorySection({ onOpenRoute, theme }: HistorySectionProps): Rea
 
   return (
     <HistoryView
-      routes={[...saved.visible, ...saved.locked]}
+      routes={saved.routes}
       isLoading={saved.isLoading}
+      isUnavailable={saved.isUnavailable}
+      onRetry={saved.refetch}
       onOpen={(routeId) => {
         void open(routeId).then((opened) => {
           if (opened) onOpenRoute();

@@ -313,18 +313,15 @@ iOS submission — that is deferred ([ADR-0014](adr/0014-android-first-verificat
     disclosure is the most likely cause of rejection ([`26_APP_STORE.md`](26_APP_STORE.md)), and
     the wording is in `features/billing/PaywallView.tsx`.
 
-### Stage I — advertising and consent
+### Stage I — privacy declaration reconciliation
 
-Do this last. It is the least reversible step legally, and the product works without it.
+Advertising is not part of the product ([ADR-0029](adr/0029-single-driver-wedge-and-subscription-first-freemium.md)).
 
-33. Create an AdMob account and an app. Create one banner unit and one rewarded unit.
-34. Configure a **certified CMP** for the EEA. Non-personalised ads until consent is given, and
-    declining must cost the user nothing ([ADR-0015](adr/0015-ad-supported-free-tier.md) rule 5).
-35. Fill in the Play **Data safety** form from [`../store/data-safety.md`](../store/data-safety.md).
-    Do not answer it from memory; the three declarations have to agree.
+33. Confirm no ad SDK or advertising identifier is present in the dependency graph or native app.
+34. Fill in the Play **Data safety** form from [`../store/data-safety.md`](../store/data-safety.md).
+    Do not answer it from memory; repository code, privacy policy and store declarations must agree.
 
-> **Verify:** with a test device in the EEA, the consent flow appears before any ad, and
-> declining leaves every allowance unchanged.
+> **Verify:** no CMP or ATT prompt appears, and both stores declare no third-party advertising.
 
 ---
 

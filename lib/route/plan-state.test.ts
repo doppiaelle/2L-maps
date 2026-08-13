@@ -120,21 +120,14 @@ describe('what the control says', () => {
   it('offers the local solver, labelled, when the allowance is spent', () => {
     // Offered rather than withheld — and labelled, because a degraded result
     // must never look like a full one.
-    expect(
-      actionIntentOf(planStateOf(inputs()), { kind: 'degraded-only', canUnlockWithAd: false }),
-    ).toEqual({ kind: 'degraded-only', note: 'Estimated without traffic' });
-  });
-
-  it('offers the ad instead when one would buy a real optimization', () => {
-    expect(
-      actionIntentOf(planStateOf(inputs()), { kind: 'degraded-only', canUnlockWithAd: true }),
-    ).toEqual({ kind: 'unlockable', note: 'Watch a short ad for a traffic-aware route' });
+    expect(actionIntentOf(planStateOf(inputs()), { kind: 'degraded-only' })).toEqual({
+      kind: 'degraded-only',
+      note: 'Estimated without traffic',
+    });
   });
 
   it('says what happened when nothing at all is available', () => {
-    expect(
-      actionIntentOf(planStateOf(inputs()), { kind: 'blocked', canUnlockWithAd: false }),
-    ).toEqual({
+    expect(actionIntentOf(planStateOf(inputs()), { kind: 'blocked' })).toEqual({
       kind: 'blocked',
       reason: 'Your optimizations are used up until the allowance resets',
     });
@@ -156,7 +149,6 @@ describe('what the control says', () => {
     expect(
       actionIntentOf(planStateOf(inputs({ hasResult: true })), {
         kind: 'blocked',
-        canUnlockWithAd: false,
       }).kind,
     ).toBe('start');
   });

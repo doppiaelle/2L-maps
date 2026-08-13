@@ -68,7 +68,7 @@ const LIST_LIKE_RATIO = 0.6;
  * `maxStops` is the **plan's** ceiling, passed in rather than read from the
  * constant, so a free user is stopped at their own limit and told which one it
  * is rather than at a number belonging to somebody else's subscription
- * ([ADR-0015](../../docs/adr/0015-ad-supported-free-tier.md)).
+ * ([ADR-0029](../../docs/adr/0029-single-driver-wedge-and-subscription-first-freemium.md)).
  */
 export function parsePaste(text: string, maxStops: number = MAX_STOPS): PasteResult {
   const lines = text

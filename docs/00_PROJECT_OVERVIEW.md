@@ -47,7 +47,8 @@ drift.
 
 ### The problem
 
-A professional with twelve addresses to visit today has no good tool.
+An independent driver with a message or manifest containing twelve addresses has no fast path
+from that unstructured list to a route they can drive.
 
 **Google Maps** accepts up to ten stops and routes them **in the order they were entered**. It
 will not reorder them. A user who wants an efficient order must work it out themselves, on a
@@ -58,7 +59,7 @@ phone, in a van.
 **Fleet software** — OptimoRoute, Circuit for Teams, Routific — solves the ordering problem
 properly, and is priced and shaped for dispatchers managing drivers, not for the driver.
 
-The gap is specific: **a single professional, with their own list, who needs the order
+The gap is specific: **a single driver, with their own list of 10–25 stops, who needs the order
 computed and then wants to drive it with the navigation app they already use.**
 
 ### The thesis
@@ -84,16 +85,18 @@ right sequence, with a truthful ETA, in four taps.
 
 ### The user
 
-A single mobile professional visiting 5–25 stops a day: sales agents, field technicians,
-installers, small couriers, home-care staff, inspectors. Detailed in
-[`02_USER_PERSONAS.md`](02_USER_PERSONAS.md).
+The design centre is an independent or subcontracted last-mile driver visiting 10–25 stops in one
+vehicle. Local retail delivery is included. Field technicians are secondary and sales agents are
+adjacent. Detailed in [`02_USER_PERSONAS.md`](02_USER_PERSONAS.md) and
+[ADR-0029](adr/0029-single-driver-wedge-and-subscription-first-freemium.md).
 
 ### The business model
 
-A 7-day free trial converting automatically to an auto-renewing subscription. No permanent
-free tier ([ADR-0002](adr/0002-target-segment-and-monetization.md)). The reasoning is
-economic: every user costs real money in API calls, so a perpetual free user is a perpetual
-loss, while a bounded trial costs about a quarter of a dollar and either converts or ends.
+Advertising-free, subscription-first freemium: a bounded Free allowance, an occasional Day pass
+and Pro for regular working use. Server quotas bound acquisition cost; exact store prices and any
+introductory offer remain provisional until checkout is configured and validated. Confirmed routes
+remain the user's data and can be reopened without paying for the same optimization twice
+([ADR-0029](adr/0029-single-driver-wedge-and-subscription-first-freemium.md)).
 
 ---
 
@@ -169,29 +172,30 @@ bundle ID and signing certificate. Every other call is proxied
 The three journeys that define the product. Full detail in
 [`03_USER_JOURNEYS.md`](03_USER_JOURNEYS.md).
 
-**Flow A — first optimized route (the three-tap path).**
-Trigger: a new user completes onboarding and accepts the trial.
+**Flow A — first optimized route.**
+Trigger: an authenticated user opens Route.
 1. Add stops — by Places search, by importing a list, or from favourites.
 2. Tap **Optimize**. The server selects a tier and returns the ordered route.
-3. Tap **Start**. The app hands off to the chosen navigation application.
+3. Tap **Confirm & open navigator**. The app persists the confirmed route, then hands the complete
+   route to the chosen navigation application.
 Terminal states: an optimized route displayed and handed off (success); a quota or entitlement
 block (402/429, designed states); a degraded T0 result, clearly labelled (partial success).
 
 **Flow B — driving the route.**
-Trigger: the user taps **Start** on an optimized route.
-1. The app hands off stop 1 — or a chunk of about nine to Google Maps.
-2. The user drives; the app shows a Live Activity or persistent notification with progress.
-3. On arrival the user marks the stop done, manually or via opt-in geofence.
-4. The app offers the next stop. Repeat until the route completes.
-Terminal states: route completed; route abandoned and resumable; app killed mid-route and
-state restored on next launch.
+Trigger: the confirmed route has been saved.
+1. The app opens the preferred external navigator with the complete supported route or its
+   compatibility handoff.
+2. The navigation app owns turn-by-turn driving. 2L Maps does not show fake progress, arrival,
+   duration or in-app completion controls ([ADR-0027](adr/0027-the-drive-happens-elsewhere.md)).
+Terminal state: the route is already present in History before 2L Maps backgrounds.
 
 **Flow C — reuse.**
 Trigger: the user opens a saved route from history.
-1. Coordinates older than 30 days are silently re-hydrated from `place_id`
+1. The saved optimized order opens locally without another optimize request.
+2. Coordinates that require navigation are re-hydrated under the cache policy when needed
    ([ADR-0007](adr/0007-place-id-durable-coordinates-perishable.md)).
-2. The user edits stops for today.
-3. Re-optimize and drive.
+3. The user can hand off the saved route immediately. Editing its stops creates a new draft and
+   requires a new optimization.
 
 This flow is why the product retains users: the target segment revisits the same customers,
 so the second month is faster than the first.
@@ -200,7 +204,8 @@ so the second month is faster than the first.
 
 ## 7. Architectural decisions
 
-All twelve ADRs are binding. This table is the map; the reasoning is in each file.
+Accepted ADRs are binding. This table is the foundation; later amendments are indexed in
+[`INDEX.md`](INDEX.md).
 
 | ID | Decision | Governs |
 |---|---|---|
@@ -216,6 +221,7 @@ All twelve ADRs are binding. This table is the map; the reasoning is in each fil
 | [0010](adr/0010-mobile-only-scope.md) | Mobile only; stop list is a sheet, never a sidebar | Scope, IA |
 | [0011](adr/0011-server-side-quota-enforcement.md) | Entitlements and quotas enforced server-side only | Backend, billing |
 | [0012](adr/0012-long-term-osm-exit-path.md) | MapLibre + Valhalla documented as the exit path | Long-term risk |
+| [0029](adr/0029-single-driver-wedge-and-subscription-first-freemium.md) | Single-driver wedge; advertising-free Free / Day pass / Pro | Product focus, monetization |
 
 ---
 
@@ -311,8 +317,8 @@ next. Per-endpoint handling is in [`33_API_CONTRACTS.md`](33_API_CONTRACTS.md).
 
 | Phase | Scope | Trigger |
 |---|---|---|
-| **1 — MVP** | Stops, optimization T0–T2, preview, handoff, saved routes, history, trial-to-paid | — |
-| **2 — Retention** | List import at scale, richer address book, Live Activities, arrival geofencing, paywall placement experiment | MVP shipped, retention measured |
+| **1 — MVP** | Fast stop entry, optimization T0–T2, preview, confirmed-save-before-handoff, reusable History, plan comparison | — |
+| **2 — Retention** | Photo/list import at scale, richer address book, checkout after provider validation | MVP shipped, retention measured |
 | **3 — Expansion** | Multi-vehicle, time windows, web companion, T3 self-hosted matrix | Segment demand, or a trigger in [ADR-0012](adr/0012-long-term-osm-exit-path.md) |
 
 ## 14. Decision log
@@ -320,6 +326,7 @@ next. Per-endpoint handling is in [`33_API_CONTRACTS.md`](33_API_CONTRACTS.md).
 | Date | Change | Reason | Author |
 |---|---|---|---|
 | 2026-08-06 | Document created; D1–D10 recorded as ADR-0001…0012 | Project inception | Product owner |
+| 2026-08-13 | Single last-mile driver made primary; ads removed; History made a reuse and cost-control surface | ADR-0029 | Product owner |
 
 ## 15. Rationale
 

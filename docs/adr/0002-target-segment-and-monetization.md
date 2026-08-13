@@ -1,16 +1,15 @@
 # ADR-0002 — Target segment and monetization model
 
-**Status:** Accepted, **partly superseded by [ADR-0015](0015-ad-supported-free-tier.md)**
+**Status:** Accepted, **partly superseded by [ADR-0029](0029-single-driver-wedge-and-subscription-first-freemium.md)**
 **Date:** 2026-08-06
 **Deciders:** Product owner
 **Implements decisions:** D2, D10
 
-> **What changed.** The target segment below still stands and is unaffected. The
-> **"no permanent free tier"** decision does not: [ADR-0015](0015-ad-supported-free-tier.md)
-> introduces an ad-supported free tier, on the grounds that the free tier modelled here capped
-> the wrong axis — a stop limit constrains optimization, which is 6% of COGS, while leaving
-> address search, which is 78%, uncapped. Read the two together; where they conflict, ADR-0015
-> wins.
+> **What changed.** [ADR-0029](0029-single-driver-wedge-and-subscription-first-freemium.md)
+> narrows the design centre to the independent or subcontracted single driver, keeps the 25-stop
+> product ceiling, and replaces the hard-paywall decision with a bounded, advertising-free Free /
+> Day pass / Pro ladder. This record remains the historical cost and scope analysis; ADR-0029 wins
+> where they conflict.
 
 ---
 

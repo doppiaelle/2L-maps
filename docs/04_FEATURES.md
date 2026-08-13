@@ -118,7 +118,8 @@ the same proposal returns every few months and is re-argued from scratch.
 |---|---|---|---|
 | Sign in with Apple | MUST | ○ | Supabase Auth |
 | Google Sign-In | MUST | ○ | Supabase Auth |
-| 7-day trial, auto-converting | MUST | ○ | RevenueCat, [`20`](20_SUBSCRIPTIONS.md) |
+| Plan comparison: Free, Day pass, Pro | MUST | ○ | Live allowance from backend; no simulated purchase |
+| Store checkout and restore | DEFERRED | ○ | RevenueCat or chosen billing composition, [`20`](20_SUBSCRIPTIONS.md) |
 | Server-side entitlement | MUST | ○ | [ADR-0011](adr/0011-server-side-quota-enforcement.md) |
 | Restore purchases | MUST | ○ | RevenueCat |
 | Account deletion with full data erasure | MUST | ○ | GDPR, Apple requirement |
@@ -223,7 +224,6 @@ change for the decision to be revisited.
 |---|---|---|
 | **In-app turn-by-turn navigation** | Requires the Navigation SDK, which cannot coexist with the Maps SDK — adopting it would force rebuilding the entire planning map on a Beta pre-1.0 component ([ADR-0004](adr/0004-external-navigation-handoff.md)) | The RN wrapper reaches 1.0 with clustering and custom markers at parity |
 | **Offline downloadable maps** | Tile caching and bulk pre-fetch are prohibited by the Google Maps Platform terms ([ADR-0008](adr/0008-offline-scope.md)) | Only under the OSM stack in [ADR-0012](adr/0012-long-term-osm-exit-path.md) |
-| **Permanent free tier** | Each free user costs $0.30–0.80 every month indefinitely; at a 10:1 ratio the free base consumes the paid base's margin ([ADR-0002](adr/0002-target-segment-and-monetization.md)) | COGS per user falls by an order of magnitude — i.e. tier T3 |
 | **Time windows in the MVP** | Forces tier T2 on every optimization, changing cost from $0.01 per route to $0.01 per stop | A higher-priced tier exists to carry it |
 | **Multi-vehicle assignment** | A dispatcher product: needs a web dashboard, driver accounts, roles, B2B invoicing | Deliberate strategic pivot, not a feature request |
 | **Advertising** | Per-user COGS is real and recurring; ad revenue at this scale would not cover Places alone, and advertising to a driver is user-hostile | Never |
@@ -239,7 +239,7 @@ change for the decision to be revisited.
 
 | ID | Decision | Features it governs |
 |---|---|---|
-| [0002](adr/0002-target-segment-and-monetization.md) | Trial to paid, no permanent free tier | Paywall, trial, entitlement |
+| [0029](adr/0029-single-driver-wedge-and-subscription-first-freemium.md) | Advertising-free Free / Day pass / Pro for one driver | Plan comparison, entitlement, product scope |
 | [0004](adr/0004-external-navigation-handoff.md) | External handoff | Navigation, provider picker, chunking |
 | [0007](adr/0007-place-id-durable-coordinates-perishable.md) | Coordinates expire at 30 days | Saved routes, history, re-hydration |
 | [0008](adr/0008-offline-scope.md) | Offline is your own data | Every offline capability, and the exclusion of offline maps |

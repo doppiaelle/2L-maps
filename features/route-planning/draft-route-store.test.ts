@@ -211,6 +211,7 @@ describe('reset', () => {
     expect(store.getState().draft.stops).toEqual([]);
     expect(store.getState().undoable).toBeNull();
     expect(store.getState().lastRefusal).toBeNull();
+    expect(store.getState().draft.originIsCurrentLocation).toBe(false);
   });
 });
 
@@ -262,6 +263,11 @@ describe('reading a draft written by an older build', () => {
     // on a list the user typed themselves.
     const migrated = migrateDraft({ draft: { routeId: 'r', stops: [] } }, 0);
     expect(migrated.draft.isOptimized).toBe(false);
+  });
+
+  it('does not silently opt an old draft into current location', () => {
+    const migrated = migrateDraft({ draft: { routeId: 'r', stops: [] } }, 1);
+    expect(migrated.draft.originIsCurrentLocation).toBe(false);
   });
 
   it('falls back to an empty draft rather than restoring nonsense', () => {

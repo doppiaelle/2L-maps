@@ -14,10 +14,12 @@ import {
   removeStop,
   restoreEntryOrder,
   restoreStop,
+  setRouteEndpoints,
   setShape,
   type DraftRefusal,
   type DraftRoute,
 } from '@/lib/route/draft';
+import type { RouteEndpointChoice } from '@/lib/route/route-ends';
 import type { ResolvedPlace } from '@/lib/route/plan-rows';
 import type { OptimizationResult, RouteShape, Stop } from '@/types';
 
@@ -71,7 +73,7 @@ export interface DraftRouteState {
   readonly result: OptimizationResult | null;
 
   // Actions
-  reset: (routeId: string) => void;
+  reset: (routeId: string, endpoints?: RouteEndpointChoice) => void;
   /**
    * Replace the draft wholesale with one loaded from the server.
    *
@@ -90,6 +92,7 @@ export interface DraftRouteState {
   setStopLabel: (stopId: string, label: string | null) => void;
   setRouteShape: (shape: RouteShape) => void;
   setOrigin: (placeId: string | null, isCurrentLocation: boolean) => void;
+  setEndpoints: (endpoints: RouteEndpointChoice) => void;
   applyResult: (result: OptimizationResult) => void;
   /**
    * Throw away the result, keep the stops.
@@ -134,7 +137,7 @@ export type DraftStorage = PersistStorage<Pick<DraftRouteState, 'draft'>>;
  * fields, and reading it without filling them would sort stops by `undefined`
  * and claim an order nobody optimized.
  */
-export const DRAFT_SCHEMA_VERSION = 1;
+export const DRAFT_SCHEMA_VERSION = 2;
 
 /**
  * Fill in what an older stored draft is missing.
@@ -164,8 +167,24 @@ export function migrateDraft(persisted: unknown, _version: number): { draft: Dra
       // cannot act on.
       routeId: isRouteId(shaped.routeId) ? shaped.routeId : newRouteId(),
       originPlaceId: typeof shaped.originPlaceId === 'string' ? shaped.originPlaceId : null,
-      originIsCurrentLocation: shaped.originIsCurrentLocation !== false,
+      // Drafts written before the route-end controls treated an absent field as
+      // current location. That was an invisible opt-in and frequently reached
+      // optimize without a usable GPS fix. The safe migration is the first
+      // entered stop, which is also the new product default.
+      originIsCurrentLocation: shaped.originIsCurrentLocation === true,
       shape: shaped.shape === 'round-trip' ? 'round-trip' : 'one-way',
+      routeStart:
+        shaped.routeStart === 'current-location' || shaped.originIsCurrentLocation === true
+          ? 'current-location'
+          : 'first-stop',
+      routeEnd:
+        shaped.routeEnd === 'current-location' || shaped.routeEnd === 'return-to-start'
+          ? shaped.routeEnd
+          : shaped.shape === 'round-trip'
+            ? shaped.originIsCurrentLocation === true
+              ? 'current-location'
+              : 'return-to-start'
+            : 'last-stop',
       // A draft written before `entryOrder` existed had exactly one order, so
       // its current positions *are* its entry order. Defaulting to the index is
       // the only answer that cannot invent history.
@@ -195,8 +214,13 @@ export function createDraftRouteStore(storage?: DraftStorage) {
         undoable: null,
         result: null,
 
-        reset: (routeId) => {
-          set({ draft: emptyDraft(routeId), lastRefusal: null, undoable: null, result: null });
+        reset: (routeId, endpoints) => {
+          set({
+            draft: emptyDraft(routeId, endpoints),
+            lastRefusal: null,
+            undoable: null,
+            result: null,
+          });
         },
 
         replaceDraft: (draft) => {
@@ -264,6 +288,7 @@ export function createDraftRouteStore(storage?: DraftStorage) {
               ...draft,
               originPlaceId: placeId,
               originIsCurrentLocation: isCurrentLocation,
+              routeStart: isCurrentLocation ? 'current-location' : 'first-stop',
               // A new origin invalidates the order: which stop is nearest depends
               // on where the user starts. Both flags go, not just the label.
               isOptimized: false,
@@ -271,6 +296,10 @@ export function createDraftRouteStore(storage?: DraftStorage) {
             },
             result: null,
           });
+        },
+
+        setEndpoints: (endpoints) => {
+          set({ draft: setRouteEndpoints(get().draft, endpoints), result: null });
         },
 
         applyResolvedCoordinates: (resolved, now) => {

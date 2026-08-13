@@ -170,7 +170,7 @@ export interface ProviderCapabilities {
 export type EntitlementStatus = 'trial' | 'active' | 'lapsed' | 'none';
 
 /**
- * Which rung of the monetisation ladder a user is on (ADR-0015).
+ * Which rung of the monetisation ladder a user is on (ADR-0029).
  *
  * This is not a synonym for `EntitlementStatus`. The two answer different
  * questions and can legitimately disagree: a `lapsed` subscriber is on the
@@ -185,8 +185,8 @@ export type PlanTier = 'free' | 'day-pass' | 'pro';
  *
  * **The server is the source of these numbers** ([ADR-0011](../docs/adr/0011-server-side-quota-enforcement.md)).
  * They arrive on `/usage-quota` and move without an app release, which is the
- * control that keeps the ad-supported free tier cost-neutral. The constants in
- * `types/constants.ts` are the offline display fallback and nothing more —
+ * control that keeps the free tier inside its measured acquisition budget.
+ * The constants in `types/constants.ts` are the offline display fallback and nothing more —
  * a client that decides access from them has re-implemented the paywall in the
  * one place an attacker owns.
  */
@@ -195,9 +195,6 @@ export interface PlanAllowances {
   readonly maxStopsPerRoute: number;
   readonly optimizationsPerPeriod: number;
   readonly autocompleteSessionsPerPeriod: number;
-  /** Kept route history. Free keeps a handful; Pro sells the rest (ADR-0015). */
-  readonly savedRoutes: number;
-  readonly showsAds: boolean;
 }
 
 /** What a user has actually consumed this period, as the server counts it. */

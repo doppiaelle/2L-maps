@@ -7,6 +7,7 @@ import { USAGE_QUOTA_QUERY_KEY } from '@/features/quota/use-usage-quota';
 import { useDraftRouteStore, useUiStore } from '@/features/stores';
 import type { RoutingFailure, RoutingOutcome } from '@/lib/providers/types';
 import { idempotencyKeyFor } from '@/lib/route/idempotency';
+import { stopsForEndpointChoice } from '@/lib/route/route-ends';
 
 /**
  * Optimizing the current draft.
@@ -56,6 +57,10 @@ export function useOptimizeRoute(): OptimizeState {
     draft.originIsCurrentLocation && location.state.kind === 'ready'
       ? location.state.location.coordinate
       : null;
+  const requestStops = stopsForEndpointChoice(draft.stops, {
+    start: draft.routeStart,
+    end: draft.routeEnd,
+  });
 
   const mutation = useMutation<RoutingOutcome, Error, void>({
     mutationFn: async () => {
@@ -74,10 +79,13 @@ export function useOptimizeRoute(): OptimizeState {
         // The client id travels with the place id: two deliveries in the same
         // building are two stops, and sending place ids alone would collapse
         // them into one.
-        stops: draft.stops.map((stop) => ({ id: stop.id, placeId: stop.placeId })),
+        stops: requestStops.map((stop) => ({ id: stop.id, placeId: stop.placeId })),
         shape: draft.shape,
         departureTime: null,
-        idempotencyKey: idempotencyKeyFor(draft),
+        // Endpoint semantics and the live origin belong to the work identity.
+        // Without them a first-stop route and a current-location route over the
+        // same stops can receive one another's cached optimization.
+        idempotencyKey: idempotencyKeyFor({ ...draft, stops: requestStops }, origin),
       });
     },
 

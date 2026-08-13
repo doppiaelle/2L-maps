@@ -1,5 +1,11 @@
 import { isCoordinateFresh } from '@/lib/coordinates/staleness';
 import type { ResolvedPlace } from '@/lib/route/plan-rows';
+import {
+  shapeForRouteEnd,
+  type RouteEndpointChoice,
+  type RouteEndPreference,
+  type RouteStartPreference,
+} from '@/lib/route/route-ends';
 import { MAX_STOPS, MIN_STOPS, type RouteShape, type Stop } from '@/types';
 
 /**
@@ -20,6 +26,10 @@ export interface DraftRoute {
   readonly originPlaceId: string | null;
   readonly originIsCurrentLocation: boolean;
   readonly shape: RouteShape;
+  /** The product choices that produced origin/shape. Kept explicitly so a
+   * round trip to current location remains distinguishable in the UI. */
+  readonly routeStart: RouteStartPreference;
+  readonly routeEnd: RouteEndPreference;
   /** In the order the user arranged them. After optimization this is the
    *  optimized order; `entryOrder` on each stop preserves the original. */
   readonly stops: readonly Stop[];
@@ -40,16 +50,47 @@ export interface DraftRoute {
   readonly isDegraded: boolean;
 }
 
-export function emptyDraft(routeId: string): DraftRoute {
+export function emptyDraft(
+  routeId: string,
+  endpoints: RouteEndpointChoice = { start: 'first-stop', end: 'last-stop' },
+): DraftRoute {
   return {
     routeId,
     originPlaceId: null,
-    originIsCurrentLocation: true,
-    shape: 'one-way',
+    // No invisible location choice. A fresh route starts from the first stop
+    // until the user explicitly chooses the device position.
+    originIsCurrentLocation: endpoints.start === 'current-location',
+    shape: shapeForRouteEnd(endpoints.end),
+    routeStart: endpoints.start,
+    routeEnd: endpoints.end,
     stops: [],
     isOptimized: false,
     isDegraded: false,
   };
+}
+
+/** Apply the compact endpoint controls atomically. Origin and shape are backend
+ * fields; routeStart/routeEnd are the words that make those fields visible. */
+export function setRouteEndpoints(draft: DraftRoute, endpoints: RouteEndpointChoice): DraftRoute {
+  const next = {
+    ...draft,
+    originPlaceId: null,
+    originIsCurrentLocation: endpoints.start === 'current-location',
+    shape: shapeForRouteEnd(endpoints.end),
+    routeStart: endpoints.start,
+    routeEnd: endpoints.end,
+  };
+
+  if (
+    next.originIsCurrentLocation === draft.originIsCurrentLocation &&
+    next.shape === draft.shape &&
+    next.routeStart === draft.routeStart &&
+    next.routeEnd === draft.routeEnd
+  ) {
+    return draft;
+  }
+
+  return { ...next, isOptimized: false, isDegraded: false };
 }
 
 /** Why an edit was refused. Each is stated to the user before they hit it, not

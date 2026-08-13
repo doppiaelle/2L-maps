@@ -2,7 +2,6 @@ import {
   FREE_AUTOCOMPLETE_SESSIONS_PER_MONTH,
   FREE_MAX_STOPS,
   FREE_OPTIMIZATIONS_PER_MONTH,
-  FREE_SAVED_ROUTES,
   MAX_STOPS,
   MAX_STOPS_T0,
 } from '@/types';
@@ -30,24 +29,18 @@ const FALLBACKS: Readonly<Record<PlanTier, PlanAllowances>> = {
     maxStopsPerRoute: FREE_MAX_STOPS,
     optimizationsPerPeriod: FREE_OPTIMIZATIONS_PER_MONTH,
     autocompleteSessionsPerPeriod: FREE_AUTOCOMPLETE_SESSIONS_PER_MONTH,
-    savedRoutes: FREE_SAVED_ROUTES,
-    showsAds: true,
   },
   'day-pass': {
     plan: 'day-pass',
     maxStopsPerRoute: MAX_STOPS,
     optimizationsPerPeriod: 25,
     autocompleteSessionsPerPeriod: 40,
-    savedRoutes: Number.POSITIVE_INFINITY,
-    showsAds: false,
   },
   pro: {
     plan: 'pro',
     maxStopsPerRoute: MAX_STOPS,
     optimizationsPerPeriod: 300,
     autocompleteSessionsPerPeriod: 1_200,
-    savedRoutes: Number.POSITIVE_INFINITY,
-    showsAds: false,
   },
 };
 
@@ -67,14 +60,13 @@ export interface ServerLimits {
   readonly maxStopsPerRoute?: number;
   readonly optimizationsPerPeriod?: number;
   readonly autocompleteSessionsPerPeriod?: number;
-  readonly savedRoutes?: number;
 }
 
 /**
  * Merge what the server said over the local fallback, field by field.
  *
  * Partial merge rather than all-or-nothing: the server tunes the free tier's
- * allowances against realised ad revenue (ADR-0015), and it should be able to
+ * allowances against its measured acquisition budget (ADR-0029), and it should be able to
  * move one number without having to restate the rest.
  */
 export function resolveAllowances(plan: PlanTier, server: ServerLimits | null): PlanAllowances {
@@ -89,11 +81,6 @@ export function resolveAllowances(plan: PlanTier, server: ServerLimits | null): 
       server.autocompleteSessionsPerPeriod,
       base.autocompleteSessionsPerPeriod,
     ),
-    savedRoutes: pick(server.savedRoutes, base.savedRoutes),
-    // Never server-driven. Ads follow the plan, and a response that could turn
-    // them on for a subscriber would make a paid feature revocable by a field
-    // in a JSON body.
-    showsAds: base.showsAds,
   };
 }
 
@@ -115,10 +102,10 @@ export type OptimizeAvailability =
   | { readonly kind: 'allowed'; readonly remaining: number }
   /** Allowance spent, but the route is small enough that the local solver still
    *  gives an honest answer. Degraded, labelled, and free. */
-  | { readonly kind: 'degraded-only'; readonly canUnlockWithAd: boolean }
+  | { readonly kind: 'degraded-only' }
   /** Allowance spent and the route is too long for T0 to be worth offering.
    *  This is the one state where a free user genuinely cannot proceed. */
-  | { readonly kind: 'blocked'; readonly canUnlockWithAd: boolean }
+  | { readonly kind: 'blocked' }
   | { readonly kind: 'too-few-stops' }
   | { readonly kind: 'too-many-stops'; readonly limit: number };
 
@@ -139,33 +126,5 @@ export function optimizeAvailability(
   // ceiling, not by the plan: above MAX_STOPS_T0 a straight-line order can be
   // worse than the order the user typed, so offering it would be dishonest
   // rather than generous (ADR-0003).
-  const canUnlockWithAd = allowances.showsAds;
-  return stopCount <= MAX_STOPS_T0
-    ? { kind: 'degraded-only', canUnlockWithAd }
-    : { kind: 'blocked', canUnlockWithAd };
-}
-
-/**
- * Whether a rewarded ad should be offered to buy one more optimization.
- *
- * Only on a plan that shows ads. Offering a subscriber the chance to watch an
- * advert for something they already paid for is the kind of detail that reads
- * as contempt.
- */
-export function canOfferRewardedUnlock(allowances: PlanAllowances, usage: PlanUsage): boolean {
-  return allowances.showsAds && usage.optimizations >= allowances.optimizationsPerPeriod;
-}
-
-/** How an offered rewarded ad ended. */
-export type RewardedAdResult = 'watched' | 'dismissed' | 'unavailable';
-
-/**
- * Whether the unlock is granted.
- *
- * `unavailable` grants it. No fill, no network, SDK error — none of that is the
- * user's doing, and charging them for our fill rate is indefensible
- * (ADR-0015 rule 6). `dismissed` is a choice, and does not.
- */
-export function grantsRewardedUnlock(result: RewardedAdResult): boolean {
-  return result !== 'dismissed';
+  return stopCount <= MAX_STOPS_T0 ? { kind: 'degraded-only' } : { kind: 'blocked' };
 }

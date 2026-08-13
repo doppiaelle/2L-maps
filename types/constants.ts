@@ -91,7 +91,7 @@ export const LIST_VIRTUALISATION_THRESHOLD = 20;
 export const UNDO_WINDOW_MS = 6000;
 
 // ─── Subscription ────────────────────────────────────────────────────────────
-// ADR-0002 · ADR-0015 · docs/20_SUBSCRIPTIONS.md
+// ADR-0011 · ADR-0029 · docs/20_SUBSCRIPTIONS.md
 
 /** The introductory period, at €0, metered exactly like a paid subscription. */
 export const TRIAL_DURATION_DAYS = 7;
@@ -100,7 +100,7 @@ export const TRIAL_DURATION_DAYS = 7;
 export const DAY_PASS_DURATION_HOURS = 24;
 
 // ─── Plan allowances ─────────────────────────────────────────────────────────
-// ADR-0015 · docs/20_SUBSCRIPTIONS.md · docs/31_COST_MODEL.md
+// ADR-0029 · docs/20_SUBSCRIPTIONS.md · docs/31_COST_MODEL.md
 //
 // **These are display fallbacks, not the rule.** The server decides access and
 // sends the live numbers on `/usage-quota` (ADR-0011); these exist so the app
@@ -118,11 +118,8 @@ export const FREE_MAX_STOPS = 15;
 
 /** T1 optimizations per month on free. Past this the app degrades to T0, which
  *  costs nothing and needs no network — a free user is never locked out, only
- *  labelled (ADR-0003, ADR-0015). */
+ *  labelled (ADR-0003, ADR-0029). */
 export const FREE_OPTIMIZATIONS_PER_MONTH = 15;
 
 /** The real limit. ~$0.02 a session is where the free tier's money goes. */
 export const FREE_AUTOCOMPLETE_SESSIONS_PER_MONTH = 10;
-
-/** Free keeps a handful of routes; history is something Pro sells. */
-export const FREE_SAVED_ROUTES = 3;

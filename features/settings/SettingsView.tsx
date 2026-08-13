@@ -2,12 +2,14 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { colours, layout, radius, space } from '@/lib/design/tokens';
 import type { ThemeName } from '@/lib/design/tokens';
-import type { NavigationProviderId } from '@/types';
+import type { NavigationProviderId, PlanTier } from '@/types';
 
 export interface SettingsViewProps {
   readonly provider: NavigationProviderId;
+  readonly currentPlan: PlanTier;
   onBack: () => void;
   onChooseProvider: (provider: NavigationProviderId) => void;
+  onOpenSubscription: () => void;
   onSignOut: () => void;
   readonly theme: ThemeName;
   readonly testID?: string;
@@ -15,8 +17,10 @@ export interface SettingsViewProps {
 
 export function SettingsView({
   provider,
+  currentPlan,
   onBack,
   onChooseProvider,
+  onOpenSubscription,
   onSignOut,
   theme,
   testID,
@@ -60,6 +64,64 @@ export function SettingsView({
           Settings
         </Text>
       </View>
+
+      <Text
+        style={{
+          color: palette.textPrimary,
+          fontSize: 28,
+          lineHeight: 34,
+          fontWeight: '700',
+          marginTop: space.space6,
+        }}
+      >
+        Subscription
+      </Text>
+      <Pressable
+        onPress={onOpenSubscription}
+        accessibilityRole="button"
+        accessibilityLabel={`Open subscription plans. Current plan: ${planLabel(currentPlan)}`}
+        style={{
+          minHeight: 72,
+          marginTop: space.space3,
+          paddingHorizontal: space.space4,
+          borderRadius: radius.radiusLg,
+          backgroundColor: palette.surface,
+          borderWidth: 1,
+          borderColor: palette.border,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}
+        testID="settings-subscription"
+      >
+        <View>
+          <Text style={{ color: palette.textTertiary, fontSize: 12, fontWeight: '700' }}>
+            CURRENT PLAN
+          </Text>
+          <Text
+            style={{
+              color: palette.textPrimary,
+              fontSize: 18,
+              fontWeight: '700',
+              marginTop: space.space1,
+            }}
+          >
+            {planLabel(currentPlan)}
+          </Text>
+        </View>
+        <View
+          style={{
+            width: 42,
+            height: 42,
+            borderRadius: radius.radiusMd,
+            backgroundColor: palette.textPrimary,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Text style={{ color: palette.bg, fontSize: 26, fontWeight: '700' }}>→</Text>
+        </View>
+      </Pressable>
 
       <Text
         style={{
@@ -187,3 +249,9 @@ const PROVIDERS: readonly { label: string; value: NavigationProviderId }[] = [
   { label: 'Apple Maps', value: 'apple-maps' },
   { label: 'Waze', value: 'waze' },
 ];
+
+function planLabel(plan: PlanTier): string {
+  if (plan === 'day-pass') return 'Day pass';
+  if (plan === 'pro') return 'Pro';
+  return 'Free';
+}

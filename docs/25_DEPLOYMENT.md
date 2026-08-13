@@ -142,13 +142,29 @@ contributor guide, not a footnote — and it is risk C10 in
 
 ### Build shapes
 
-**EAS is not used** ([ADR-0014](adr/0014-android-first-verification.md)). Gradle on a Linux
-GitHub Actions runner produces the Android artifact with no monthly ceiling and no subscription,
-at the 1× minute rate rather than the 10× macOS rate.
+The default preview path is Gradle on a Linux GitHub-hosted runner
+([ADR-0014](adr/0014-android-first-verification.md)). This path is **quota-bound for a private
+repository**: GitHub Free currently includes 2,000 hosted minutes per month, after which jobs wait
+for the allowance reset unless paid usage is enabled. Public repositories using standard hosted
+runners and self-hosted runners do not consume that private hosted-minute allowance. Always check
+the current [GitHub Actions billing documentation](https://docs.github.com/en/billing/concepts/product-billing/github-actions)
+before treating CI capacity as available.
+
+When hosted minutes are exhausted, the supported alternatives are operational choices rather than
+app changes:
+
+- build/install locally with `npx expo run:android --device` or Android Studio/Gradle;
+- run `eas build --platform android --local` on a machine with the Android toolchain;
+- attach a maintained self-hosted GitHub Actions runner;
+- enable paid GitHub-hosted usage or wait for the monthly reset;
+- make the repository public only if exposing the source is an intentional product decision.
+
+References: [Expo local app development](https://docs.expo.dev/develop/development-builds/introduction/)
+and [EAS local builds](https://docs.expo.dev/build-reference/local-builds/).
 
 | Shape | Purpose | How it is obtained |
 |---|---|---|
-| **development** | The daily loop. Installed once; every later change arrives by QR code from the dev server | `android-preview` workflow, artifact download |
+| **development** | The daily loop. Installed once; JS changes arrive from the dev server; native changes require a rebuild | `android-preview`, local `expo run:android`, local Gradle or self-hosted runner |
 | release | Store submission | Deferred — needs the Play account |
 | iOS, any shape | — | Deferred — needs macOS and, for a device, the Apple programme |
 

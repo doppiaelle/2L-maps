@@ -4,8 +4,8 @@
 > order: Login, Route, Route/Search Open, Optimized Map, History, and Settings. Route and History
 > are the only bottom-dock destinations; Settings is always available from the top-right utility.
 > The palette is black/white by theme with mint reserved for navigation and confirmation. Settings
-> exposes Light, System, and Dark choices. The Route action is paired with a square reset utility
-> after optimization; reset restores the manually entered stop order and clears optimized geometry.
+> exposes Light, System, and Dark choices. Route includes a small destructive reset utility that
+> clears the current draft, result and transient failure while preserving saved endpoint defaults.
 > Address search remains an overlay/modal over Route so the underlying planning context is retained.
 
 > The Optimized Map is a synthetic procedural navigation environment: real stop coordinates and
@@ -136,9 +136,9 @@ only because the container could be dragged.
 
 | Region | Contents |
 |---|---|
-| Top | Summary metrics, status chip, ad slot when a provider exists |
+| Top | Official logo, Settings utility, title, subtitle and address search |
 | Middle | The stop list — scrollable, with remove and reorder on every row |
-| Bottom | The primary action, plus Add a stop · Start over · Paste a list |
+| Bottom | Endpoint choices, readiness card, Optimize action and the Route / History dock |
 
 The primary action is **pinned to the bottom of the section**. Its position is learned once
 and stays true, which is the property the pinned-at-every-detent rule was protecting.
@@ -147,7 +147,7 @@ and stays true, which is the property the pinned-at-every-detent rule was protec
 
 | State | Appearance |
 |---|---|
-| **Empty** | Map at current location. Sheet at peek: "Add your first stop". One affordance. No metrics. |
+| **Empty** | Route composition from the reference: search, compact start/end choices, empty guidance and no map or invented metrics |
 | **Stops added, not optimized** | Markers in entry order. No polyline. Metrics show straight-line estimate marked as an estimate. Primary action: **Optimize** |
 | **Optimizing** | Primary action becomes a progress state after 1 s. Sheet stays interactive. **The existing order remains visible and unchanged** |
 | **Optimized** | Markers renumber with `motion-deliberate`. Polyline draws. Metrics update. Primary action becomes **Start** |
@@ -165,18 +165,19 @@ and stays true, which is the property the pinned-at-every-detent rule was protec
   ROUTE · 4 STOPS
   34 KM        1H 12M
 
-  FROM   My location                     ← tappable; opens the search
-  [ End at last stop ] [ Back to my location ]
+  START  [ First added stop ▾ ]
+  END    [ Last added stop ▾ ]
   2 of 4 stops can be reordered
 ```
 
-Both were invisible. The origin has been a field on the draft since the first commit and no
-screen drew it, so picking "My location" produced no visible change at all. And `setRouteShape`
-had no caller, so every route was open — which pins the **last typed stop** as the destination
-and withholds it from the optimizer. The reorderable count is stated because it is the thing
-nobody could see: with neither end chosen, a four-stop round offers Google two of them
-([ADR-0027](adr/0027-the-drive-happens-elsewhere.md),
-[`15_ROUTE_OPTIMIZATION.md`](15_ROUTE_OPTIMIZATION.md) §3).
+The start menu contains **First added stop** (default) and **My current location**. The end menu
+contains **Last added stop** (default), **Return to starting point** and **Return to my current
+location**. Choosing the last option also selects current location as the start, producing one
+unambiguous closed loop. Non-default choices persist for the next new route. They are endpoint
+constraints, not ordinary draggable stop rows.
+
+A compact reset action sits beside these controls and clears the whole current draft only after
+an explicit press; it never changes the persisted defaults.
 
 A control rather than a question in front of Optimize: it costs no tap on the three-tap path,
 and `CLAUDE.md` §7 rule 8 rules out a blocking dialog before an action the driver takes in a
@@ -194,6 +195,8 @@ cab.
 | Pan or zoom the map | Camera stops following; **Recenter** appears |
 | Tap **Optimize** | Optimization begins. Order preserved throughout |
 | Tap **Start** | Handoff, or provider picker on first run |
+| Tap the search field | Opens the inline dropdown; Route remains visible under a dimmed blur |
+| Choose **My current location** | Requests permission if needed and applies it as the route origin |
 
 ---
 
@@ -201,8 +204,11 @@ cab.
 
 ### Add stop (modal)
 
-Search field focused on open. Below it, in priority order: **Recent**, then **Saved**, then
-autocomplete results once three characters are typed.
+The add-stop experience is an inline overlay over Route rather than a detached visual language.
+The search field stays aligned with the reference composition and receives focus on open. Before
+typing, **My current location** is the first result, followed by **Recent** and **Saved** places.
+After the query no longer matches that shortcut, autocomplete results replace it. The underlying
+Route page is dimmed and blurred, remains recognisable and is not interactive until dismissal.
 
 Recent and Saved come first because reuse is free and search costs money
 ([`31_COST_MODEL.md`](31_COST_MODEL.md)) — the cheapest interaction is also the fastest.
@@ -299,30 +305,23 @@ row in History, and a chip on every row is a chip that means nothing.
 
 | State | Appearance |
 |---|---|
-| Empty | "No saved routes yet" — a route is saved as soon as it is optimized, so there is nothing to file and nothing to remember |
+| Empty | "No confirmed routes yet" — confirmation, not optimization alone, creates History |
 | Loading | Skeleton rows |
 | Offline | Full list — history is local |
 | Sync conflict | Affected row flagged with a resolution action |
 
-### Paywall
+### Subscription
 
-The highest-risk screen in the product ([`26_APP_STORE.md`](26_APP_STORE.md)). Above the fold,
-without scrolling:
-
-- what the trial gives and for how long;
-- **the price after the trial and the renewal period**;
-- how to cancel;
-- the subscribe action;
-- restore purchases;
-- links to terms and privacy.
-
-Guideline 3.1.2 compliance is verified before every submission. Exact copy in
-[`20_SUBSCRIPTIONS.md`](20_SUBSCRIPTIONS.md).
+Opened from a standard Settings row. It compares **Free**, **Day pass** and **Pro** in the same
+rounded monochrome/mint component language and identifies the current server plan. Until a store
+billing provider is composed, prices are labelled provisional and purchase controls are absent or
+disabled with an honest "coming soon" explanation — the screen never simulates checkout.
 
 ### Settings
 
-Grouped so the two things users come for are immediately visible: **Subscription** and
-**Navigation app**. Then account, data and privacy (export, delete), legal, and version.
+Grouped so the two things users come for are immediately visible: **Navigation** and
+**Subscription**. Navigation provider exists only here; no duplicate picker is shown during
+handoff. Appearance and account controls follow in the same section style.
 
 ---
 

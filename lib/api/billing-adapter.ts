@@ -64,7 +64,7 @@ export interface BillingAdapterOptions {
 }
 
 /** What a signed-out or unreachable app shows: the free rung, which is a real
- *  product rather than a locked door (ADR-0015). */
+ *  product rather than a locked door (ADR-0029). */
 const UNKNOWN: BillingState = {
   status: 'none',
   plan: 'free',

@@ -44,7 +44,7 @@ It does not specify screens ([`08`](08_SCREEN_SPECIFICATIONS.md)) or routing bet
 
 ```
                     ┌──────────────┐
-     first launch → │  J0 Onboard  │ → trial started
+     first launch → │  J0 Onboard  │ → Free plan available
                     └──────┬───────┘
                            ▼
     ┌──────────────────────────────────────────────┐
@@ -118,7 +118,7 @@ including process death — discards it ([`11_STATE_MANAGEMENT.md`](11_STATE_MAN
 
 ## 6. Journeys
 
-### J0 — Onboarding and trial start
+### J0 — Onboarding and first route
 
 **Trigger:** first launch.
 **Persona:** all.
@@ -129,18 +129,13 @@ including process death — discards it ([`11_STATE_MANAGEMENT.md`](11_STATE_MAN
    launch costs more users than it serves.)*
 3. Location permission requested **in context**, with the reason stated: "to set your starting
    point". Denial is accepted without penalty.
-4. Paywall: trial length, price after trial, renewal period and cancellation method, all
-   visible without scrolling (CR-07).
-5. Trial starts. The user lands on an empty plan screen with a single affordance: add a stop.
+4. The user lands on Route with the server-resolved Free plan. Subscription comparison remains
+   available in Settings but does not interrupt first value.
 
-**Terminal states:** trial started (success) · paywall dismissed (see J7) · sign-in failed
-(retry, with the other provider offered).
+**Terminal states:** Route ready (success) · sign-in failed (retry, with the other provider offered).
 
-**Abandonment risk — highest in the product.** A user who has not yet seen a route reordered
-is being asked for payment details on trust. Mitigations: step 1 shows the transformation
-concretely; the paywall states "€0 today" as its most prominent element; steps are four, not
-seven. The post-launch experiment in [`28_ROADMAP.md`](28_ROADMAP.md) tests revealing one
-optimization before this screen.
+**Abandonment risk — highest in the product.** The user must understand the transformation and
+start entering stops without a billing detour. The Free allowance demonstrates value first.
 
 ---
 
@@ -399,28 +394,26 @@ the likely reason stated (wrong format, wrong country, empty input).
 
 ## 14. Rationale
 
-The journeys are shaped by one asymmetry: **planning happens once, driving happens all day.**
-J1 is optimised for speed because it is the gate; J2 is optimised for interruption tolerance
-because it runs for hours across dozens of app switches.
+The journeys are shaped by one asymmetry: **planning happens here; driving happens elsewhere.**
+J1 is optimized for speed and persistence; the external navigator owns the hours on the road.
 
-The return loop in J2 is the direct consequence of
-[ADR-0004](adr/0004-external-navigation-handoff.md). Since no external app accepts a full
-multi-stop route, the user comes back between stops. Rather than hiding that, the design makes
-the return the fastest possible interaction: one screen, two buttons, no navigation.
+There is no in-app return loop, Done, Skip or invented progress. Confirm first stores the route in
+History, then hands off the complete supported sequence
+([ADR-0027](adr/0027-the-drive-happens-elsewhere.md)).
 
 J5 carries the retention argument. A route planner used once is a utility; a route planner
 whose second month is measurably faster than its first is a subscription. Everything about
 `place_id` durability and the growing address book exists to make J5 fast.
 
 J7's rule — never block the user's own data — is a deliberate choice against a common dark
-pattern. Holding a user's saved routes hostage after a trial converts a lapsed user into a
-hostile one, and the marginal revenue is not worth it.
+pattern. Holding saved routes hostage after an entitlement change destroys the History reuse
+loop and charges unnecessary API work.
 
 ## 15. Rejected alternatives
 
 | Alternative | Attraction | Why rejected |
 |---|---|---|
-| Paywall after the first optimization | Higher conversion; the user has seen the value | Contradicts the product owner's decision. Retained as a post-launch experiment rather than discarded. |
+| Hard paywall before the first optimization | Bounds acquisition cost | Hides the product's value; the accepted Free allowance is server-metered instead |
 | Optimize automatically on adding each stop | Removes a tap; always current | Every stop addition becomes a billable call — a 12-stop route costs 12× more. Also produces a list that reorders under the user's finger. |
 | Show the chosen tier to the user | Transparency; explains a slow T2 | Meaningless to the user. Only the degraded T0 case affects their decisions, and that is labelled. |
 | Keep the user in-app during navigation with a WebView | Preserves session; avoids the return loop | Violates the Google Maps terms and produces a worse navigation experience than the native app. |

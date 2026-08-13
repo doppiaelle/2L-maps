@@ -1,7 +1,7 @@
 # 40 — UI Implementation Audit
 
 > **Status:** Implemented in source; Android artifact/device acceptance follows the `main` CI run
-> **Last reviewed:** 2026-08-12
+> **Last reviewed:** 2026-08-13
 > **Visual authority:** supplied Figma overview and UI brief override legacy screen prose
 
 ## 1. Audit outcome
@@ -22,14 +22,19 @@ written brief, not against fresh Figma layer measurements. This limitation remai
 | Login brand composition | `app/(auth)/sign-in.tsx`, `assets/brand/logo.png` | Typecheck, bundle, Android artifact, phone checklist |
 | Route header and hierarchy | `features/route-planning/PlanView.tsx`, `components/navigation/AppHeader.tsx` | Plan component tests |
 | 02A inline search, dropdown, dimming | `features/places/InlineStopSearch.tsx`, mounted by `app/(app)/index.tsx` | Stable test IDs and phone checklist |
-| Reset optimized order | Existing store action mounted beside optimized CTA in `PlanView` | Plan/store tests |
+| Reset current route | Draft-store reset mounted as a minimal endpoint-control utility | Store tests and phone checklist |
+| Persistent start/end choices | `RouteEndpointControls.tsx`, preferences and versioned draft migration | Pure endpoint/store tests |
+| Current location shortcut | First search offer plus permission-aware endpoint application | Search and endpoint tests |
 | Procedural navigation environment | `lib/map/scenery.ts`, `components/map/RouteCanvas.tsx` | Generator and canvas tests |
 | Pan, pinch, segment selection | `RouteCanvas.tsx`, viewport and selection helpers | Viewport/selection/canvas tests |
 | Zoom, recenter, compass, scale | `RouteCanvas.tsx` | Canvas component tests |
 | Numbered stops and mint route | `RouteCanvas.tsx`, `lib/design/tokens.ts` | Canvas/style/token tests |
 | Map summary and confirmation | `PlanView.tsx` | Plan tests and phone checklist |
 | Compact History cards | `features/routes/HistoryView.tsx` | History tests |
+| Sync attempt before external navigation | Awaited `useRouteSync().sync()` in the handoff critical path; durable local route remains usable on remote failure | Route/handoff integration tests |
+| Reopen without re-optimizing | Saved optimized order hydration | History integration test asserts zero optimize calls |
 | Provider and theme selection | `features/settings/SettingsView.tsx` | Preference/store tests and phone checklist |
+| Subscription comparison | `features/settings/SubscriptionView.tsx`, live server plan, checkout honestly unavailable | Typecheck and phone checklist |
 | Two-item dock and Settings utility | `components/navigation/Dock.tsx`, `app/(app)/index.tsx` | Dock/UI tests |
 | Standalone APK on each main push | `.github/workflows/android-preview.yml` | GitHub Actions run and artifact presence |
 
@@ -46,8 +51,9 @@ This prevents a city block from silently representing hundreds of kilometres.
 
 ## 4. Android artifact flow
 
-1. Push the verified commit to `main`.
-2. Wait for the `android-preview` workflow.
+1. Push the verified commit to `main` or the PR branch.
+2. Run `android-preview` when hosted minutes are available; otherwise use a local or self-hosted
+   Android build path from [`25_DEPLOYMENT.md`](25_DEPLOYMENT.md).
 3. Open its successful `development build (APK)` job.
 4. Download artifact `2l-maps-standalone`.
 5. Unzip and install the ARM64 APK on the Android phone.
@@ -67,8 +73,8 @@ proves buildability; it does not prove pixels or touch interactions on the phone
   buildings sit inside blocks; numbered stops lie on the route; pan, pinch, zoom, recenter,
   compass, segment selection and Confirm work.
 - History: populated routes are rounded compact cards with mint metrics and trailing action.
-- Settings: Google Maps, Apple Maps and Waze are directly selectable; Light, System and Dark update
-  all surfaces including the map.
+- Settings: Google Maps, Apple Maps and Waze are directly selectable once; Subscription opens the
+  Free / Day pass / Pro comparison; Light, System and Dark update every surface.
 - Repeat all six screens in Light and Dark at the supplied reference viewport.
 
 ## 6. Evidence required to close device acceptance

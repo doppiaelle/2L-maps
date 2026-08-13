@@ -168,31 +168,16 @@ process does not scale, is not auditable, and would fail a supervisory enquiry.
 ### Residency and processors
 
 Supabase in an **EU region**. Sub-processors: Supabase, Google Cloud Platform (Maps APIs),
-RevenueCat, Firebase, Sentry, the advertising network ([ADR-0015](adr/0015-ad-supported-free-tier.md)),
+the selected billing processor when checkout ships, Firebase, Sentry,
 and the model provider used for address parsing ([ADR-0016](adr/0016-ai-assisted-stop-entry.md)).
 Each requires a data processing agreement, and the list must be published in the privacy policy
 and kept current.
 
-### Advertising consent — the free tier's obligation
+### Advertising consent — not applicable
 
-The ad-supported free tier adds an SDK whose purpose is data collection, inside a product built
-to collect as little as possible (risk C18). Four requirements, none optional:
-
-1. **A Google-certified Consent Management Platform for EEA and UK traffic.** Google requires one
-   for ad serving; the ePrivacy Directive requires consent for the device storage an ad SDK uses
-   **even when the ads are non-personalised**. Consent is obtained before the SDK initialises,
-   not after.
-2. **Non-personalised until consent exists**, including the `not-asked` state. There is no
-   "assume yes until told otherwise".
-3. **Declining costs the user nothing** — same allowances, same features, non-personalised ads.
-   Consent that is priced is not freely given, and under Article 7(4) is not consent.
-4. **App Tracking Transparency on iOS**, and a "Third-Party Advertising" entry in both stores'
-   privacy declarations. A declaration that omits a field the SDK collects is the defect that
-   gets a release pulled, not a rejected submission.
-
-**The ad SDK receives no product data.** No address, no coordinate, no `place_id`, no route. This
-is enforced structurally rather than by review: the `AdsProvider` facade declares no method that
-accepts any of them.
+ADR-0029 rejects advertising. The app contains no ad SDK, advertising identifier, rewarded flow,
+CMP or ATT prompt. Introducing any of them reopens risk C18 and requires a new ADR plus updated
+privacy and store declarations before code is merged.
 
 ### AI-assisted entry — where we become a processor
 
