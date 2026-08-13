@@ -2,7 +2,6 @@ import { Pressable, Text, View } from 'react-native';
 
 import { colours, layout, radius, space } from '@/lib/design/tokens';
 import type { ThemeName } from '@/lib/design/tokens';
-import { markerStyle } from '@/lib/map/style';
 import type { StopText } from '@/lib/route/stop-text';
 import type { StopProgressState } from '@/lib/route/progress';
 
@@ -55,8 +54,6 @@ export interface StopRowProps {
   readonly theme: ThemeName;
   /** Null once the 30-day cache has expired. */
   readonly hasCoordinate: boolean;
-  /** `2.4 km · 8 min`, once a route has been optimized. */
-  readonly meta: string | null;
   onPress: () => void;
   /**
    * Editing controls, when the route may still be changed.
@@ -70,8 +67,6 @@ export interface StopRowProps {
    * following the list is not an edit, it is a hazard.
    */
   onRemove?: (() => void) | undefined;
-  onMoveUp?: (() => void) | undefined;
-  onMoveDown?: (() => void) | undefined;
   readonly testID?: string;
 }
 
@@ -81,21 +76,15 @@ export function StopRow({
   state,
   theme,
   hasCoordinate,
-  meta,
   onPress,
   onRemove,
-  onMoveUp,
-  onMoveDown,
   testID,
 }: StopRowProps): React.JSX.Element {
   // `false` for selection: the row has no selected appearance, and a selected
   // pin's mint fill would put the accent on a row for a stop the user merely
   // tapped on the map.
-  const presentation = markerStyle(theme, state, false);
   const { title, subtitle } = text;
   const palette = colours[theme];
-  const ordinalFill = state === 'pending' ? palette.textPrimary : presentation.fill;
-  const ordinalText = state === 'pending' ? palette.bg : presentation.foreground;
 
   return (
     <Pressable
@@ -103,7 +92,7 @@ export function StopRow({
       accessibilityRole="button"
       // Says what happens and what the state is, in one utterance — a screen
       // reader user should not have to explore the row to learn either.
-      accessibilityLabel={`Stop ${position}, ${title}, ${presentation.spoken}`}
+      accessibilityLabel={`Stop ${position}, ${title}`}
       accessibilityHint={
         hasCoordinate ? 'Opens stop details' : 'Needs its address re-entered before navigating'
       }
@@ -118,9 +107,7 @@ export function StopRow({
           width: 44,
           height: 44,
           borderRadius: radius.radiusFull,
-          backgroundColor: ordinalFill,
-          borderWidth: state === 'pending' ? 0 : 2,
-          borderColor: presentation.border,
+          backgroundColor: palette.textPrimary,
           alignItems: 'center',
           justifyContent: 'center',
         }}
@@ -128,9 +115,7 @@ export function StopRow({
         importantForAccessibility="no"
         testID="stop-ordinal"
       >
-        <Text style={{ color: ordinalText, fontSize: 16, fontWeight: '700' }}>
-          {presentation.glyph ?? position}
-        </Text>
+        <Text style={{ color: palette.bg, fontSize: 16, fontWeight: '700' }}>{position}</Text>
       </View>
 
       <View className="flex-1">
@@ -149,38 +134,10 @@ export function StopRow({
             {subtitle}
           </Text>
         )}
-
-        {meta !== null && (
-          <Text style={{ color: palette.textSecondary, fontSize: 13, marginTop: 2 }}>{meta}</Text>
-        )}
-
-        {!hasCoordinate && (
-          // Warning, not danger: an expired coordinate is expected behaviour on
-          // a route saved a month ago, not an error the user caused
-          // (docs/07_DESIGN_SYSTEM.md).
-          <Text style={{ color: palette.warning, fontSize: 13, marginTop: 2 }}>
-            Address needs refreshing
-          </Text>
-        )}
       </View>
 
-      {(onMoveUp !== undefined || onMoveDown !== undefined || onRemove !== undefined) && (
+      {onRemove !== undefined && (
         <View style={{ flexDirection: 'row', alignItems: 'center' }} testID="stop-controls">
-          {/* Each control states the stop it acts on. "Move up" alone is
-              ambiguous the moment a screen reader user is moving through a list
-              of twenty-five of them. */}
-          <RowControl
-            glyph="↑"
-            label={`Move ${title} up`}
-            onPress={onMoveUp}
-            testID="stop-move-up"
-          />
-          <RowControl
-            glyph="↓"
-            label={`Move ${title} down`}
-            onPress={onMoveDown}
-            testID="stop-move-down"
-          />
           <RowControl glyph="✕" label={`Remove ${title}`} onPress={onRemove} testID="stop-remove" />
         </View>
       )}
@@ -209,15 +166,11 @@ function RowControl({
   onPress: (() => void) | undefined;
   testID: string;
 }): React.JSX.Element {
-  const isEnabled = onPress !== undefined;
-
   return (
     <Pressable
       onPress={onPress}
-      disabled={!isEnabled}
       accessibilityRole="button"
       accessibilityLabel={label}
-      accessibilityState={{ disabled: !isEnabled }}
       style={{
         minWidth: layout.touchMin,
         minHeight: layout.touchMin,
@@ -226,7 +179,6 @@ function RowControl({
         borderColor: '#E4E4E1',
         alignItems: 'center',
         justifyContent: 'center',
-        opacity: isEnabled ? 1 : 0.22,
       }}
       testID={testID}
     >

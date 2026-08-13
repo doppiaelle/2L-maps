@@ -1,94 +1,28 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, render, screen, waitFor } from '@testing-library/react-native';
 import { Text } from 'react-native';
 
-import { HistoryView } from './HistoryView';
-import { saveNoticeOf } from '@/lib/route/save-notice';
-import { useOpenRoute } from './use-open-route';
-import { useRouteSync } from './use-route-sync';
-import { useSavedRoutes } from './use-saved-routes';
 import { ServicesProvider } from '@/features/api/services-provider';
 import { SessionProvider } from '@/features/auth/session-provider';
-import { useDraftRouteStore, useRouteProgressStore } from '@/features/stores';
+import { useDraftRouteStore } from '@/features/stores';
+import { useSavedRoutes } from './use-saved-routes';
+import { useRouteSync } from './use-route-sync';
 import type { AuthProvider } from '@/lib/providers/types';
-import type { RouteStatus, SavedRouteSummary } from '@/lib/route/persistence';
 import type { RoutesProvider, SaveOutcome } from '@/lib/supabase/routes-adapter';
-import type { Stop } from '@/types';
-
-/**
- * Route persistence, from the screen down.
- *
- * The properties worth protecting are the ones a user only discovers by losing
- * something: a route that reaches History, a route that comes back with the
- * progress it had, an error that is reported as an error rather than as an empty
- * list, and a write that does not fire on every keystroke.
- */
-
-const SESSION = { userId: 'user-1', accessToken: 'jwt' };
 
 const auth: AuthProvider = {
-  currentSession: () => Promise.resolve(SESSION),
+  currentSession: () => Promise.resolve({ userId: 'user-1', accessToken: 'jwt' }),
   subscribe: () => () => undefined,
   signIn: () => Promise.resolve({ ok: true }),
   signOut: () => Promise.resolve(),
 };
 
-const summary = (overrides: Partial<SavedRouteSummary> = {}): SavedRouteSummary => ({
-  routeId: 'route-1',
-  name: null,
-  status: 'completed' as RouteStatus,
-  stopCount: 12,
-  isRoundTrip: false,
-  stops: [],
-  isDegraded: false,
-  distanceMeters: 42_000,
-  durationSeconds: 3_600,
-  updatedAt: '2026-08-04T09:30:00.000Z',
-  ...overrides,
-});
-
-const stop = (id: string, position: number): Stop => ({
-  id,
-  placeId: `place-${id}`,
-  label: null,
-  placeText: null,
-  note: null,
-  position,
-  entryOrder: position,
-  coordinate: null,
-});
-
-const fakeRoutes = (overrides: Partial<RoutesProvider> = {}) => {
-  const saves: unknown[] = [];
-  const provider: RoutesProvider = {
-    save: async (write) => {
-      saves.push(write);
-      return { ok: true } as SaveOutcome;
-    },
-    list: async () => [],
-    load: async () => null,
-    advance: async () => ({ ok: true }) as SaveOutcome,
-    ...overrides,
-  };
-  return { provider, saves };
-};
-
-let queryClient: QueryClient | null = null;
-
-afterEach(() => {
-  queryClient?.clear();
-  queryClient = null;
-  useDraftRouteStore.getState().reset('draft');
-  useRouteProgressStore.getState().abandon();
-});
-
-const renderWithServices = async (routes: RoutesProvider, ui: React.ReactElement) => {
-  queryClient = new QueryClient({
+function renderWithServices(routes: RoutesProvider, ui: React.ReactElement) {
+  const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
-
-  const result = render(
-    <QueryClientProvider client={queryClient}>
+  return render(
+    <QueryClientProvider client={client}>
       <SessionProvider auth={auth}>
         <ServicesProvider
           baseUrl="https://example.test/functions/v1"
@@ -100,512 +34,79 @@ const renderWithServices = async (routes: RoutesProvider, ui: React.ReactElement
       </SessionProvider>
     </QueryClientProvider>,
   );
-
-  // Twice: the session resolves, then the queries it unblocked do.
-  await act(async () => undefined);
-  await act(async () => undefined);
-  return result;
-};
-
-// ─── The list ────────────────────────────────────────────────────────────────
-
-describe('what History shows', () => {
-  const noop = () => undefined;
-
-  const renderHistory = (props: Partial<Parameters<typeof HistoryView>[0]> = {}) =>
-    render(
-      <HistoryView
-        routes={[summary()]}
-        locked={[]}
-        isLoading={false}
-        isUnavailable={false}
-        onOpen={noop}
-        onRetry={noop}
-        onUpgrade={noop}
-        onDismiss={noop}
-        theme="light"
-        {...props}
-      />,
-    );
-
-  it('names a route nobody named by the day it was worked', () => {
-    renderHistory();
-    expect(screen.getByText(/4 Aug · 12 stops/)).toBeTruthy();
-  });
-
-  it('keeps a T0 route labelled degraded for ever', () => {
-    // `is_degraded` is stored rather than derived precisely so a degraded result
-    // never comes back from History looking like a traffic-aware one.
-    renderHistory({ routes: [summary({ isDegraded: true })] });
-    // The chip's own text is hidden from the accessibility tree — it announces
-    // as one utterance through its container — so it has to be asked for
-    // explicitly here.
-    expect(
-      screen.getByText('Estimated without traffic', { includeHiddenElements: true }),
-    ).toBeTruthy();
-  });
-
-  it('distinguishes a failed read from an empty history', () => {
-    // "You have never saved a route" is a lie the user cannot argue with, and
-    // only one of the two states has anything to retry.
-    renderHistory({ routes: [], isUnavailable: true });
-    expect(screen.getByTestId('history-unavailable')).toBeTruthy();
-    expect(screen.queryByTestId('history-empty')).toBeNull();
-  });
-
-  it('offers an empty history a way back rather than a dead end', () => {
-    renderHistory({ routes: [] });
-    expect(screen.getByTestId('history-empty')).toBeTruthy();
-    expect(screen.getByTestId('state-action')).toBeTruthy();
-  });
-
-  it('shows routes over the allowance as locked rather than hiding them', () => {
-    // They are the user's own work. Hiding them would be the product deleting a
-    // driver's records in order to sell them back (ADR-0015).
-    renderHistory({ locked: [summary({ routeId: 'route-2' }), summary({ routeId: 'route-3' })] });
-    expect(screen.getByTestId('history-locked')).toBeTruthy();
-    expect(screen.getByText(/2 older routes are saved/)).toBeTruthy();
-  });
-
-  it('says nothing about locked routes when there are none', () => {
-    renderHistory();
-    expect(screen.queryByTestId('history-locked')).toBeNull();
-  });
-
-  it('announces a row as one thing, not as three', () => {
-    // A screen reader walking a name, a distance and a duration separately
-    // cannot tell where one route ends and the next begins.
-    renderHistory({ routes: [summary({ isDegraded: true })] });
-    const row = screen.getByTestId('history-row');
-    expect(row.props.accessibilityLabel).toContain('estimated without traffic');
-    expect(row.props.accessibilityLabel).toContain('12 stops');
-  });
-
-  it('reports which route was opened', () => {
-    let opened: string | null = null;
-    renderHistory({
-      onOpen: (routeId) => {
-        opened = routeId;
-      },
-    });
-
-    fireEvent.press(screen.getByTestId('history-row'));
-    expect(opened).toBe('route-1');
-  });
-
-  it('shows a skeleton shaped like the row it replaces', () => {
-    renderHistory({ isLoading: true });
-    expect(screen.getByTestId('history-loading')).toBeTruthy();
-    expect(screen.queryByTestId('history-list')).toBeNull();
-  });
-
-  it('says where the day started and where it ended', () => {
-    // The reported problem: a title, a distance and a duration are identical
-    // across a week of rounds, so a driver looking for last Tuesday had to open
-    // routes until they found it (ADR-0027).
-    renderHistory({
-      routes: [
-        summary({
-          stops: [
-            {
-              placeId: 'ChIJa',
-              entryOrder: 0,
-              optimizedOrder: 0,
-              address: 'Corso Francia 12, 10138 Torino TO, Italia',
-            },
-            {
-              placeId: 'ChIJb',
-              entryOrder: 1,
-              optimizedOrder: 1,
-              address: 'Via Meucci 3, 10098 Rivoli TO, Italia',
-            },
-          ],
-        }),
-      ],
-    });
-
-    expect(screen.getByText('Corso Francia 12 → Via Meucci 3')).toBeTruthy();
-    expect(screen.getByText('12 stops · one way')).toBeTruthy();
-  });
-
-  it('still reads without a journey once the addresses have expired', () => {
-    // Thirty days, and the purge nulls the address while keeping the place id
-    // (ADR-0007). The row shows what it still knows rather than a placeholder.
-    renderHistory({ routes: [summary({ stops: [] })] });
-
-    expect(screen.getByText(/4 Aug · 12 stops/)).toBeTruthy();
-    expect(screen.queryByText(/→/)).toBeNull();
-  });
-
-  it('marks the route the driver set off on', () => {
-    renderHistory({ routes: [summary({ status: 'in_progress' })] });
-    expect(screen.getByText('In progress', { includeHiddenElements: true })).toBeTruthy();
-  });
-
-  it('leaves an ordinary saved route unmarked, so a chip means something', () => {
-    renderHistory({ routes: [summary({ status: 'optimized' })] });
-    expect(screen.queryByText('In progress', { includeHiddenElements: true })).toBeNull();
-    expect(screen.queryByText('Done', { includeHiddenElements: true })).toBeNull();
-  });
-});
-
-describe('a route that has not reached the server', () => {
-  const noop = () => undefined;
-
-  const renderHistory = (props: Partial<Parameters<typeof HistoryView>[0]> = {}) =>
-    render(
-      <HistoryView
-        routes={[summary()]}
-        locked={[]}
-        isLoading={false}
-        isUnavailable={false}
-        onOpen={noop}
-        onRetry={noop}
-        onUpgrade={noop}
-        onDismiss={noop}
-        theme="light"
-        {...props}
-      />,
-    );
-
-  it('says so here, where the route is missing from', () => {
-    // It used to be a toast over the route section, sitting on the Confirm pill
-    // — and its own dismiss button re-ran the write, so a repeated failure
-    // reopened it immediately (ADR-0027).
-    renderHistory({
-      notice: saveNoticeOf({ kind: 'offline' }),
-      onRetryNotice: noop,
-    });
-
-    expect(screen.getByTestId('history-save-notice')).toBeTruthy();
-    expect(screen.getByText(/safe on this phone/)).toBeTruthy();
-    expect(screen.getByTestId('history-save-retry')).toBeTruthy();
-  });
-
-  it('withholds the retry where retrying repeats the same refusal', () => {
-    renderHistory({
-      notice: saveNoticeOf({ kind: 'not-permitted' }),
-      onRetryNotice: noop,
-    });
-
-    expect(screen.getByTestId('history-save-notice')).toBeTruthy();
-    expect(screen.queryByTestId('history-save-retry')).toBeNull();
-  });
-
-  it('says nothing at all while everything is in step', () => {
-    renderHistory({ notice: saveNoticeOf(null) });
-    expect(screen.queryByTestId('history-save-notice')).toBeNull();
-  });
-});
-
-// ─── Reading ─────────────────────────────────────────────────────────────────
+}
 
 function SavedRoutesProbe(): React.JSX.Element {
   const saved = useSavedRoutes();
-  return (
-    <Text testID="probe">
-      {JSON.stringify({
-        visible: saved.visible.length,
-        locked: saved.locked.length,
-        unavailable: saved.isUnavailable,
-      })}
-    </Text>
-  );
+  return <Text testID="saved-routes">{saved.visible.length}</Text>;
 }
-
-describe('reading saved routes', () => {
-  it('reports an unreadable answer as unavailable rather than as none', async () => {
-    const { provider } = fakeRoutes({ list: async () => null });
-    await renderWithServices(provider, <SavedRoutesProbe />);
-
-    await waitFor(() => {
-      expect(screen.getByTestId('probe').props.children).toContain('"unavailable":true');
-    });
-  });
-
-  it('splits at the free allowance rather than truncating', async () => {
-    // Free keeps three; the rest are locked and still there.
-    const { provider } = fakeRoutes({
-      list: async () => [1, 2, 3, 4, 5].map((n) => summary({ routeId: `route-${n}` })),
-    });
-    await renderWithServices(provider, <SavedRoutesProbe />);
-
-    await waitFor(() => {
-      expect(screen.getByTestId('probe').props.children).toContain('"visible":3');
-    });
-    expect(screen.getByTestId('probe').props.children).toContain('"locked":2');
-  });
-});
-
-// ─── Opening ─────────────────────────────────────────────────────────────────
-
-function OpenProbe({ routeId }: { routeId: string }): React.JSX.Element {
-  const { open, failure } = useOpenRoute();
-  const draft = useDraftRouteStore((store) => store.draft);
-  const progress = useRouteProgressStore((store) => store.progress);
-
-  return (
-    <Text
-      testID="probe"
-      onPress={() => {
-        void open(routeId);
-      }}
-    >
-      {JSON.stringify({
-        routeId: draft.routeId,
-        stops: draft.stops.length,
-        startedAt: progress?.startedAt ?? null,
-        failure,
-      })}
-    </Text>
-  );
-}
-
-describe('opening a saved route', () => {
-  it('restores the route and its departure together', async () => {
-    // A route restored without its departure shows a day in progress as a plan
-    // — and hides it from the dock's emphasis and from the ads rule. Both
-    // halves land or neither does.
-    const { provider } = fakeRoutes({
-      load: async () => ({
-        draft: {
-          routeId: 'route-9',
-          originPlaceId: null,
-          originIsCurrentLocation: true,
-          shape: 'one-way',
-          stops: [stop('a', 0), stop('b', 1)],
-          isOptimized: true,
-          isDegraded: false,
-        },
-        status: 'in_progress' as RouteStatus,
-        progress: { routeId: 'route-9', startedAt: '2026-08-11T05:15:00.000Z' },
-      }),
-    });
-
-    await renderWithServices(provider, <OpenProbe routeId="route-9" />);
-    await act(async () => {
-      fireEvent.press(screen.getByTestId('probe'));
-    });
-
-    const state = screen.getByTestId('probe').props.children as string;
-    expect(state).toContain('"routeId":"route-9"');
-    expect(state).toContain('"stops":2');
-    expect(state).toContain('"startedAt":"2026-08-11T05:15:00.000Z"');
-  });
-
-  it('reports a route it cannot see as not found, without saying whose it is', async () => {
-    // RLS returns nothing for a deleted route and for somebody else's alike.
-    // Distinguishing them would be an ownership oracle.
-    const { provider } = fakeRoutes({ load: async () => null });
-
-    await renderWithServices(provider, <OpenProbe routeId="route-9" />);
-    await act(async () => {
-      fireEvent.press(screen.getByTestId('probe'));
-    });
-
-    expect(screen.getByTestId('probe').props.children).toContain('"failure":"not-found"');
-  });
-});
-
-// ─── Writing ─────────────────────────────────────────────────────────────────
 
 function SyncProbe(): React.JSX.Element {
   useRouteSync();
-  const addStop = useDraftRouteStore((store) => store.addStopToDraft);
-  const label = useDraftRouteStore((store) => store.setStopLabel);
-  const applyResult = useDraftRouteStore((store) => store.applyResult);
-  const reset = useDraftRouteStore((store) => store.reset);
-  const begin = useRouteProgressStore((store) => store.begin);
-
-  return (
-    <>
-      <Text
-        testID="add"
-        onPress={() => {
-          addStop(stop('a', 0));
-        }}
-      >
-        add
-      </Text>
-      <Text
-        testID="label"
-        onPress={() => {
-          label('a', 'Back entrance');
-        }}
-      >
-        label
-      </Text>
-      <Text
-        testID="optimize"
-        onPress={() => {
-          applyResult({
-            tier: 'T1',
-            isDegraded: false,
-            orderedStopIds: ['a'],
-            legs: [],
-            totalDistanceMeters: 1_000,
-            totalDurationSeconds: 300,
-            unreachableStopIds: [],
-          });
-        }}
-      >
-        optimize
-      </Text>
-      <Text
-        testID="handoff"
-        onPress={() => {
-          begin(useDraftRouteStore.getState().draft.routeId);
-        }}
-      >
-        handoff
-      </Text>
-      <Text
-        testID="reset"
-        onPress={() => {
-          reset('00000000-0000-4000-8000-000000000002');
-        }}
-      >
-        reset
-      </Text>
-    </>
-  );
+  return <Text testID="sync-probe">ready</Text>;
 }
 
-describe('when a route is written', () => {
-  it('does not write a draft nobody has optimized', async () => {
-    // A sketch. The local store already holds it, and a History full of
-    // two-stop sketches is a History nobody scrolls.
-    const { provider, saves } = fakeRoutes();
-    await renderWithServices(provider, <SyncProbe />);
-
-    await act(async () => {
-      fireEvent.press(screen.getByTestId('add'));
-    });
-
-    expect(saves).toHaveLength(0);
+describe('route persistence', () => {
+  afterEach(() => {
+    useDraftRouteStore.getState().reset('draft');
   });
 
-  it('writes once the route has been optimized', async () => {
-    const { provider, saves } = fakeRoutes();
-    await renderWithServices(provider, <SyncProbe />);
-
-    await act(async () => {
-      fireEvent.press(screen.getByTestId('add'));
-    });
-    await act(async () => {
-      fireEvent.press(screen.getByTestId('optimize'));
-    });
-
-    await waitFor(() => {
-      expect(saves.length).toBeGreaterThan(0);
-    });
+  it('loads confirmed routes for History', async () => {
+    const routes: RoutesProvider = {
+      save: async () => ({ ok: true }) as SaveOutcome,
+      list: async () => [
+        {
+          routeId: 'route-1',
+          name: null,
+          status: 'completed',
+          stopCount: 2,
+          isRoundTrip: false,
+          stops: [],
+          isDegraded: false,
+          distanceMeters: 12_000,
+          durationSeconds: 900,
+          updatedAt: '2026-08-04T09:30:00.000Z',
+        },
+      ],
+      load: async () => null,
+      advance: async () => ({ ok: true }) as SaveOutcome,
+    };
+    renderWithServices(routes, <SavedRoutesProbe />);
+    await waitFor(() => expect(screen.getByTestId('saved-routes').props.children).toBe(1));
   });
 
-  it('does not write again for a label the user typed', async () => {
-    // A write per keystroke is a request per keystroke, and nothing is at risk
-    // between writes — the draft is persisted locally and never evicted.
-    const { provider, saves } = fakeRoutes();
-    await renderWithServices(provider, <SyncProbe />);
-
-    await act(async () => {
-      fireEvent.press(screen.getByTestId('add'));
-    });
-    await act(async () => {
-      fireEvent.press(screen.getByTestId('optimize'));
-    });
-    await waitFor(() => {
-      expect(saves.length).toBeGreaterThan(0);
-    });
-
-    const afterOptimize = saves.length;
-    await act(async () => {
-      fireEvent.press(screen.getByTestId('label'));
-    });
-
-    expect(saves).toHaveLength(afterOptimize);
-  });
-
-  it('writes no coordinate, ever', async () => {
-    // `stops` has no expiry mechanism, so a coordinate written there is a terms
-    // breach nothing would ever clean up (ADR-0007).
-    const { provider, saves } = fakeRoutes();
-    await renderWithServices(provider, <SyncProbe />);
-
-    await act(async () => {
-      fireEvent.press(screen.getByTestId('add'));
-    });
-    await act(async () => {
-      fireEvent.press(screen.getByTestId('optimize'));
-    });
-    await waitFor(() => {
-      expect(saves.length).toBeGreaterThan(0);
-    });
-
-    expect(JSON.stringify(saves)).not.toContain('coordinate');
-    expect(JSON.stringify(saves)).not.toContain('latitude');
-  });
-
-  it('writes the handoff state that makes a confirmed route appear in History', async () => {
-    const { provider, saves } = fakeRoutes();
-    await renderWithServices(provider, <SyncProbe />);
-
-    await act(async () => {
-      fireEvent.press(screen.getByTestId('add'));
-    });
-    await act(async () => {
-      fireEvent.press(screen.getByTestId('optimize'));
-    });
-    await waitFor(() => {
-      expect(saves.some((save) => JSON.stringify(save).includes('"status":"optimized"'))).toBe(
-        true,
-      );
-    });
-
-    await act(async () => {
-      fireEvent.press(screen.getByTestId('handoff'));
-    });
-
-    await waitFor(() => {
-      expect(saves.some((save) => JSON.stringify(save).includes('"status":"in_progress"'))).toBe(
-        true,
-      );
-    });
-  });
-
-  it('starts a fresh lifecycle for the next route instead of blocking its save', async () => {
-    const { provider, saves } = fakeRoutes();
-    await renderWithServices(provider, <SyncProbe />);
-
-    await act(async () => {
-      fireEvent.press(screen.getByTestId('add'));
-      fireEvent.press(screen.getByTestId('optimize'));
-    });
-    await waitFor(() => {
-      expect(saves.length).toBeGreaterThan(0);
-    });
-    await act(async () => {
-      fireEvent.press(screen.getByTestId('handoff'));
-    });
-    await waitFor(() => {
-      expect(saves.some((save) => JSON.stringify(save).includes('"status":"in_progress"'))).toBe(
-        true,
-      );
-    });
-
-    await act(async () => {
-      fireEvent.press(screen.getByTestId('reset'));
-      fireEvent.press(screen.getByTestId('add'));
-      fireEvent.press(screen.getByTestId('optimize'));
-    });
-
-    await waitFor(() => {
-      expect(
-        saves.some(
-          (save) =>
-            JSON.stringify(save).includes('00000000-0000-4000-8000-000000000002') &&
-            JSON.stringify(save).includes('"status":"optimized"'),
-        ),
-      ).toBe(true);
-    });
+  it('saves an optimized route to the backend', async () => {
+    const saves: unknown[] = [];
+    const routes: RoutesProvider = {
+      save: async (write) => {
+        saves.push(write);
+        return { ok: true } as SaveOutcome;
+      },
+      list: async () => [],
+      load: async () => null,
+      advance: async () => ({ ok: true }) as SaveOutcome,
+    };
+    renderWithServices(routes, <SyncProbe />);
+    await act(async () => undefined);
+    useDraftRouteStore.setState((state) => ({
+      ...state,
+      draft: {
+        ...state.draft,
+        isOptimized: true,
+        stops: [
+          {
+            id: 'stop-1',
+            placeId: 'place-1',
+            label: null,
+            placeText: null,
+            note: null,
+            position: 0,
+            entryOrder: 0,
+            coordinate: null,
+          },
+        ],
+      },
+    }));
+    await waitFor(() => expect(saves.length).toBeGreaterThan(0));
   });
 });

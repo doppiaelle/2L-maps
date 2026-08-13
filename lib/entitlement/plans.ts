@@ -169,17 +169,3 @@ export type RewardedAdResult = 'watched' | 'dismissed' | 'unavailable';
 export function grantsRewardedUnlock(result: RewardedAdResult): boolean {
   return result !== 'dismissed';
 }
-
-/**
- * Whether an ad slot may render on this screen at this moment.
- *
- * Both conditions are load-bearing. The plan check is commercial; the
- * `isRouteInProgress` check is a safety rule — the user is driving, and no ad
- * appears during a route (CLAUDE.md §7 rule 8, ADR-0015 rule 1).
- */
-export function shouldShowAdSlot(
-  allowances: PlanAllowances,
-  context: { readonly isRouteInProgress: boolean },
-): boolean {
-  return allowances.showsAds && !context.isRouteInProgress;
-}

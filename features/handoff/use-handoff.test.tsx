@@ -71,7 +71,7 @@ function Probe({
 const run = async (
   stops: readonly Stop[],
   options: {
-    provider?: NavigationProviderId | null;
+    provider?: NavigationProviderId;
     opens?: boolean;
   } = {},
 ) => {
@@ -81,8 +81,7 @@ const run = async (
   useRouteProgressStore.getState().abandon();
 
   const provider = options.provider === undefined ? 'google-maps' : options.provider;
-  if (provider === null) usePreferencesStore.getState().forgetNavigationProvider();
-  else usePreferencesStore.getState().chooseNavigationProvider(provider, true);
+  usePreferencesStore.getState().chooseNavigationProvider(provider);
 
   const open = async (): Promise<boolean> => {
     // Recorded at the moment the URL is opened, so the assertion can compare it
@@ -145,13 +144,6 @@ describe('the ordering that cannot be got wrong', () => {
 });
 
 describe('what it refuses, and why', () => {
-  it('asks which app before guessing one', async () => {
-    // A first handoff sending a twelve-stop day to the wrong app is a bad
-    // introduction to the one feature the product is for.
-    const { outcome } = await run([stop('a', 0), stop('b', 1)], { provider: null });
-    expect(outcome).toEqual({ kind: 'needs-provider' });
-  });
-
   it('refuses a route with nothing to route', async () => {
     const { outcome } = await run([stop('a', 0)]);
     expect(outcome).toEqual({ kind: 'no-route' });

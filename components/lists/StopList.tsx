@@ -52,22 +52,10 @@ export type StopListState =
 export interface StopListProps {
   readonly state: StopListState;
   onSelectStop: (stopId: string) => void;
-  /**
-   * Editing, when the route may still be changed.
-   *
-   * All three absent means a read-only list, which is what a route in progress
-   * is: reordering under a driver following the list is a hazard, not an edit.
-   * The store already owned `removeStopById`, `undoRemove` and `moveStopTo` —
-   * this is the surface that reaches them.
-   */
   onRemoveStop?: ((stopId: string) => void) | undefined;
-  onMoveStop?: ((fromIndex: number, toIndex: number) => void) | undefined;
   /** Which palette the row ordinals are drawn from, so the list dot and the map
    *  pin are the same mark. Read once by the screen and passed down. */
   readonly theme: ThemeName;
-  /** Rendered between the header and the rows — the ad slot goes here, so the
-   *  list does not have to know what advertising is. */
-  readonly header?: React.ReactElement | null;
   readonly rowHeight?: number;
   readonly testID?: string;
 }
@@ -79,19 +67,13 @@ export const DEFAULT_ROW_HEIGHT = 82;
 const Row = memo(
   function Row({
     item,
-    index,
-    total,
     onSelect,
     onRemove,
-    onMove,
     theme,
   }: {
     item: StopListItem;
-    index: number;
-    total: number;
     onSelect: (stopId: string) => void;
     onRemove: ((stopId: string) => void) | undefined;
-    onMove: ((fromIndex: number, toIndex: number) => void) | undefined;
     theme: ThemeName;
   }): React.JSX.Element {
     return (
@@ -101,7 +83,6 @@ const Row = memo(
         state={item.state}
         theme={theme}
         hasCoordinate={item.hasCoordinate}
-        meta={item.meta}
         onPress={() => {
           onSelect(item.id);
         }}
@@ -110,23 +91,6 @@ const Row = memo(
           : {
               onRemove: () => {
                 onRemove(item.id);
-              },
-            })}
-        // Undefined at the ends rather than a no-op: the control renders
-        // disabled, so the row keeps its width and the list does not shift as
-        // the user scrolls past the first and last stops.
-        {...(onMove === undefined || index === 0
-          ? {}
-          : {
-              onMoveUp: () => {
-                onMove(index, index - 1);
-              },
-            })}
-        {...(onMove === undefined || index === total - 1
-          ? {}
-          : {
-              onMoveDown: () => {
-                onMove(index, index + 1);
               },
             })}
       />
@@ -146,11 +110,8 @@ const Row = memo(
     a.item.state === b.item.state &&
     a.item.hasCoordinate === b.item.hasCoordinate &&
     a.item.meta === b.item.meta &&
-    a.index === b.index &&
-    a.total === b.total &&
     a.onSelect === b.onSelect &&
     a.onRemove === b.onRemove &&
-    a.onMove === b.onMove &&
     a.theme === b.theme,
 );
 
@@ -158,27 +119,15 @@ export function StopList({
   state,
   onSelectStop,
   onRemoveStop,
-  onMoveStop,
   theme,
-  header = null,
   rowHeight = DEFAULT_ROW_HEIGHT,
   testID,
 }: StopListProps): React.JSX.Element {
-  const total = state.kind === 'ready' ? state.stops.length : 0;
-
   const renderItem = useCallback(
-    ({ item, index }: { item: StopListItem; index: number }) => (
-      <Row
-        item={item}
-        index={index}
-        total={total}
-        onSelect={onSelectStop}
-        onRemove={onRemoveStop}
-        onMove={onMoveStop}
-        theme={theme}
-      />
+    ({ item }: { item: StopListItem; index: number }) => (
+      <Row item={item} onSelect={onSelectStop} onRemove={onRemoveStop} theme={theme} />
     ),
-    [onSelectStop, onRemoveStop, onMoveStop, total, theme],
+    [onSelectStop, onRemoveStop, theme],
   );
 
   const getItemLayout = useCallback(
@@ -193,7 +142,6 @@ export function StopList({
   if (state.kind === 'loading') {
     return (
       <View testID={testID} accessibilityLabel="Loading stops" accessibilityRole="progressbar">
-        {header}
         {/* A skeleton that matches the eventual layout, not a spinner: the list
             does not jump when the data lands, and the user can already see how
             much is coming. */}
@@ -212,7 +160,6 @@ export function StopList({
   if (state.kind === 'empty') {
     return (
       <View testID={testID} className="px-screen-padding py-space-6 items-center">
-        {header}
         <Text
           style={{ fontSize: 24, lineHeight: 30, fontWeight: '400' }}
           className="text-text-primary"
@@ -223,7 +170,7 @@ export function StopList({
           style={{ fontSize: 21, lineHeight: 31 }}
           className="text-text-secondary mt-space-4 text-center"
         >
-          Add an address, paste a list, or photograph one.
+          Add an address to get started.
         </Text>
       </View>
     );
@@ -239,7 +186,6 @@ export function StopList({
       // one animation this product is judged on.
       keyExtractor={(item) => item.id}
       getItemLayout={getItemLayout}
-      ListHeaderComponent={header}
       // Only above the threshold. Below it the windowing machinery costs more
       // than it saves, and the whole list fits on screen anyway.
       removeClippedSubviews={state.stops.length > LIST_VIRTUALISATION_THRESHOLD}

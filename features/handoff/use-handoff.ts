@@ -34,10 +34,6 @@ import type { NavigationProviderId, Stop } from '@/types';
 
 export type HandoffOutcome =
   | { readonly kind: 'handed-off'; readonly chunkCount: number }
-  /** No provider chosen yet. The screen presents the picker rather than
-   *  guessing: a first handoff to the wrong app is a bad introduction to the one
-   *  feature the product is for. */
-  | { readonly kind: 'needs-provider' }
   /** Waze takes coordinates and has no address form, so an expired cache blocks
    *  the handoff outright rather than degrading it (ADR-0007). */
   | { readonly kind: 'needs-coordinates'; readonly stopIds: readonly string[] }
@@ -48,7 +44,7 @@ export type HandoffOutcome =
 export interface HandoffState {
   start: () => Promise<HandoffOutcome>;
   readonly lastOutcome: HandoffOutcome | null;
-  readonly preferredProvider: NavigationProviderId | null;
+  readonly preferredProvider: NavigationProviderId;
 }
 
 export interface ResolvedPlace {
@@ -105,8 +101,6 @@ export function useHandoff({ routeId, stops, resolved, open }: HandoffOptions): 
     };
 
     if (places.length < 2) return record({ kind: 'no-route' });
-    if (preferredProvider === null) return record({ kind: 'needs-provider' });
-
     // Checked before a single URL is built. Waze has no address form, so a stop
     // whose coordinate has expired cannot be handed to it at all — and finding
     // that out halfway through a chunked sequence strands the driver between two

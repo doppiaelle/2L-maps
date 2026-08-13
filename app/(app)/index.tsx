@@ -1,10 +1,7 @@
-import { router } from 'expo-router';
-import { getLocales } from 'expo-localization';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Linking, Pressable, Text, View } from 'react-native';
 
 import { useHandoff } from '@/features/handoff/use-handoff';
-import { useMonetisation } from '@/features/monetisation/monetisation-provider';
 import { useDrainOnReconnect } from '@/features/network/use-drain-on-reconnect';
 import { usePendingDeepLinkContext } from '@/features/navigation/deep-link-provider';
 import { useLaunchDestination } from '@/features/navigation/use-launch-destination';
@@ -14,35 +11,25 @@ import { PlanView } from '@/features/route-planning/PlanView';
 import { useOptimizeRoute } from '@/features/route-planning/use-optimize-route';
 import { useOpenRoute } from '@/features/routes/use-open-route';
 import { useRouteSync } from '@/features/routes/use-route-sync';
-import { useDraftRouteStore, useRouteProgressStore, useUiStore } from '@/features/stores';
-import { AdSlot } from '@/components/primitives/AdSlot';
+import { useDraftRouteStore, useUiStore } from '@/features/stores';
 import { RouteCanvas } from '@/components/map/RouteCanvas';
-import { Dock, DOCK_OUTER_HEIGHT } from '@/components/navigation/Dock';
-import { useIsBackgrounded } from '@/features/ui/use-is-backgrounded';
+import { Dock } from '@/components/navigation/Dock';
 import { SectionPanel } from '@/components/navigation/SectionPanel';
 import { HistorySection } from '@/features/routes/HistorySection';
 import { SettingsSection } from '@/features/settings/SettingsSection';
 import { dockItems, toggleSection } from '@/lib/ui/dock';
-import { NoticeToast } from '@/components/feedback/NoticeToast';
-import { UndoToast } from '@/components/feedback/UndoToast';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colours, space } from '@/lib/design/tokens';
-import { addressNoticeOf } from '@/lib/places/notice';
-import { formatDistance, formatDuration } from '@/lib/format/units';
-import { buildPlanRows, placeIdsToResolve, straightLineMeters } from '@/lib/route/plan-rows';
+import { buildPlanRows, placeIdsToResolve } from '@/lib/route/plan-rows';
 import { legSummary } from '@/lib/map/leg-selection';
-import { buildRouteGeometry, connectorsThrough, planRoute } from '@/lib/map/route-geometry';
-import { PREPARING_DELAY_MS, routeViewAfter, showsCanvas, showsMap } from '@/lib/route/route-view';
+import { buildRouteGeometry, planRoute } from '@/lib/map/route-geometry';
+import { routeViewAfter, showsMap } from '@/lib/route/route-view';
 import type { RouteView } from '@/lib/route/route-view';
-import { handoffNoticeOf } from '@/lib/handoff/outcome-notice';
-import { newRouteId } from '@/lib/route/route-id';
 import { actionIntentOf, planStateOf } from '@/lib/route/plan-state';
-import { reorderableCount, routeEndsOf, shapeForEnd } from '@/lib/route/route-ends';
 import { unreachableIn } from '@/lib/route/progress';
 import { wasAlreadyOptimal } from '@/lib/route/draft';
 import { useAppTheme } from '@/features/preferences/use-app-theme';
-import { InlineStopSearch } from '@/features/places/InlineStopSearch';
 
 /**
  * Plan — the primary screen.
@@ -59,50 +46,27 @@ import { InlineStopSearch } from '@/features/places/InlineStopSearch';
  */
 export default function PlanScreen(): React.JSX.Element {
   const theme = useAppTheme();
-  const locale = getLocales()[0]?.languageTag ?? 'en-GB';
-
   const pending = usePendingDeepLinkContext();
-  const { ads } = useMonetisation();
   const draft = useDraftRouteStore((store) => store.draft);
   const result = useDraftRouteStore((store) => store.result);
-  const progress = useRouteProgressStore((store) => store.progress);
-  const abandonProgress = useRouteProgressStore((store) => store.abandon);
   const activeSection = useUiStore((store) => store.activeSection);
   const openSection = useUiStore((store) => store.openSection);
   const closeSection = useUiStore((store) => store.closeSection);
   const selectedStopId = useUiStore((store) => store.selectedStopId);
   const selectStop = useUiStore((store) => store.selectStop);
-  const clearSelection = useUiStore((store) => store.clearSelection);
-  // The three actions the store has always had and no screen ever called. The
-  // list could be built and optimized but never edited: no removal, no
-  // reordering, no way to start again short of reinstalling.
   const removeStopById = useDraftRouteStore((store) => store.removeStopById);
-  const undoRemove = useDraftRouteStore((store) => store.undoRemove);
-  const moveStopTo = useDraftRouteStore((store) => store.moveStopTo);
-  const setRouteShape = useDraftRouteStore((store) => store.setRouteShape);
-  const resetDraft = useDraftRouteStore((store) => store.reset);
-  const resetOptimization = useDraftRouteStore((store) => store.resetOptimization);
   const applyResolvedCoordinates = useDraftRouteStore((store) => store.applyResolvedCoordinates);
-
-  // What the undo toast is offering. Null means nothing was just removed —
-  // the removal has already happened in the store, and `undoRemove` is what
-  // puts it back (docs/06 P8: execute and offer undo, never confirm first).
-  const [pendingRemoval, setPendingRemoval] = useState<string | null>(null);
 
   // Which face the Route section is showing. `routeViewAfter` decides; this only
   // holds the answer (ADR-0022).
   const [routeView, setRouteView] = useState<RouteView>('list');
-  // What the last handoff attempt produced, for the five outcomes that used to
-  // produce nothing at all.
-  const [handoffNotice, setHandoffNotice] = useState<ReturnType<typeof handoffNoticeOf>>(null);
   // Which hop the driver tapped on the canvas. Null is most of the time and is
   // the whole route.
   const [selectedLegIndex, setSelectedLegIndex] = useState<number | null>(null);
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   const destination = useLaunchDestination({
     isStoreHydrated: true,
-    hasRouteInProgress: progress !== null,
+    hasRouteInProgress: false,
     pendingDeepLink: pending.target,
   });
 
@@ -117,7 +81,7 @@ export default function PlanScreen(): React.JSX.Element {
    * save looked exactly like one that saved — on screen, in the store, and
    * simply not in History (ADR-0027).
    */
-  const routeSync = useRouteSync();
+  useRouteSync();
 
   // The signal coming back is the interesting edge: the server's copy is behind
   // by whatever the driver did underground. Pushes first, then re-reads.
@@ -125,7 +89,6 @@ export default function PlanScreen(): React.JSX.Element {
 
   const { open: openRoute } = useOpenRoute();
 
-  const isBackgrounded = useIsBackgrounded();
   // The device's own edges. Read once, here, and passed down: a component that
   // asks answers differently in a test and in split screen.
   const insets = useSafeAreaInsets();
@@ -176,29 +139,6 @@ export default function PlanScreen(): React.JSX.Element {
     now,
   });
 
-  /**
-   * Where the round starts and finishes.
-   *
-   * Both ends were invisible: the origin was a field no screen drew, and
-   * `setRouteShape` had no caller at all, so every route was one-way — which
-   * pins the last typed stop as the destination and withholds it from the
-   * optimizer (ADR-0027).
-   */
-  const ends = routeEndsOf({
-    originPlaceId: draft.originPlaceId,
-    originIsCurrentLocation: draft.originIsCurrentLocation,
-    originAddress:
-      draft.originPlaceId === null
-        ? null
-        : (places.byPlaceId.get(draft.originPlaceId)?.address ?? null),
-    shape: draft.shape,
-    firstStopTitle: rows[0]?.text.title ?? null,
-  });
-
-  // The route starts from stop one only when no origin was chosen at all — the
-  // same condition `optimizeUpstream` applies, and it costs a movable stop.
-  const startsFromFirstStop = draft.originPlaceId === null && !draft.originIsCurrentLocation;
-
   const quota = useUsageQuota();
   const availability = useOptimizeAvailability(draft.stops.length, quota);
   const { optimize, isOptimizing, failure } = useOptimizeRoute();
@@ -227,33 +167,6 @@ export default function PlanScreen(): React.JSX.Element {
     () => markers.map((marker) => ({ stopId: marker.stopId, coordinate: marker.coordinate })),
     [markers],
   );
-
-  // Real figures once a result exists; a straight-line total before that,
-  // labelled as an estimate by `<RouteSummaryHeader>`. A number is more useful
-  // than a blank — but a straight-line *time* would be a road estimate we did
-  // not make, so a draft gets no duration at all.
-  const metres =
-    result !== null && !result.isDegraded
-      ? result.totalDistanceMeters
-      : straightLineMeters(markers);
-  const distance =
-    metres === null
-      ? null
-      : {
-          value: formatDistance(metres, locale),
-          spoken:
-            result !== null && !result.isDegraded
-              ? formatDistance(metres, locale)
-              : `${formatDistance(metres, locale)} in a straight line`,
-        };
-
-  const duration =
-    result !== null && !result.isDegraded
-      ? {
-          value: formatDuration(result.totalDurationSeconds),
-          spoken: formatDuration(result.totalDurationSeconds),
-        }
-      : null;
 
   const state = planStateOf({
     isLoading: places.isLoading && draft.stops.length > 0,
@@ -306,40 +219,7 @@ export default function PlanScreen(): React.JSX.Element {
   const editSignature = [...draft.stops.map((stop) => stop.id)].sort().join(',');
   useEffect(() => {
     setRouteView((current) => routeViewAfter({ kind: 'edited' }, { current, hasResult: false }));
-    setHandoffNotice(null);
   }, [editSignature]);
-
-  /**
-   * The wait between pressing Optimize and seeing an answer.
-   *
-   * **Held back for a second** (`PREPARING_DELAY_MS`). A cached optimization
-   * returns in well under that, and the user goes straight from the list to the
-   * route having seen nothing in between — which is the right experience for
-   * work that did not have to be done again. Anything that flashes for 200 ms
-   * reads as a glitch (`docs/03_USER_JOURNEYS.md` J1).
-   *
-   * The timer is cleared on the way out **and the callback checks again before
-   * it acts**. A result landing at 990 ms would otherwise be covered by a
-   * waiting face scheduled before it arrived — the cleanup and the callback race
-   * within the same tick, and one guard cannot be relied on to win.
-   */
-  const isOptimizingRef = useRef(isOptimizing);
-  isOptimizingRef.current = isOptimizing;
-
-  useEffect(() => {
-    if (!isOptimizing) return;
-
-    const timer = setTimeout(() => {
-      if (!isOptimizingRef.current) return;
-      setRouteView((current) =>
-        routeViewAfter({ kind: 'optimize-started' }, { current, hasResult: false }),
-      );
-    }, PREPARING_DELAY_MS);
-
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [isOptimizing]);
 
   // A failure returns to the list, where the stops are — and they are exactly as
   // they were, which is the thing a failed optimization most has to demonstrate.
@@ -351,10 +231,6 @@ export default function PlanScreen(): React.JSX.Element {
   }, [hasFailed]);
 
   const isMapShowing = showsMap(routeView, result !== null);
-  // Both faces of the canvas occupy the same space, so the layout that depends
-  // on it — running behind the dock, lifting Confirm clear of it — is the same
-  // for both.
-  const isCanvasShowing = showsCanvas(routeView, result !== null);
   const selectedLegDetails = (() => {
     if (geometry === null || selectedLegIndex === null) return null;
     const summary = legSummary(selectedLegIndex, geometry.legs);
@@ -384,7 +260,7 @@ export default function PlanScreen(): React.JSX.Element {
           topInset={insets.top}
           // The drawn route runs the whole height with the dock floating on it;
           // the stop list stops above the dock, or its last row is unreachable.
-          extendsBehindDock={isCanvasShowing}
+          extendsBehindDock={isMapShowing}
           testID="section-itinerary"
         >
           <PlanView
@@ -394,23 +270,15 @@ export default function PlanScreen(): React.JSX.Element {
             // (ADR-0022). `showsMap` is the floor: a view of 'map' with no
             // result would draw an empty canvas, and the drawn map has no tiles
             // to fall back on.
-            view={isMapShowing ? 'map' : isCanvasShowing ? 'preparing' : 'list'}
+            view={isMapShowing ? 'map' : 'list'}
             // Lifts Confirm clear of the dock the canvas runs underneath.
-            bottomInset={isCanvasShowing ? insets.bottom + space.space5 : 0}
+            bottomInset={isMapShowing ? insets.bottom + space.space5 : 0}
             mapSlot={
-              !isCanvasShowing ? null : (
+              !isMapShowing ? null : (
                 <RouteCanvas
                   stops={markers}
-                  // The result's own geometry once there is one; the stops in the
-                  // order they were typed while there is not. Same canvas, same
-                  // projection, same drawn town — so the answer arriving changes
-                  // what is on screen without moving any of it.
-                  route={
-                    isMapShowing
-                      ? planRoute(geometry, positionedStops)
-                      : connectorsThrough(positionedStops)
-                  }
-                  phase={isMapShowing ? 'ready' : 'preparing'}
+                  route={planRoute(geometry, positionedStops)}
+                  phase="ready"
                   // Tapping a hop shows what Google measured for it — data the
                   // field mask already buys and nothing was showing (ADR-0027).
                   selectedLegIndex={selectedLegIndex}
@@ -436,69 +304,15 @@ export default function PlanScreen(): React.JSX.Element {
                * unit of quota on an answer we were still holding.
                *
                * What the control says is "back to the stop list", and that is now
-               * all it does. `onShowMap` is the way back.
+               * all it does.
                */
               setRouteView(
                 routeViewAfter({ kind: 'dismissed' }, { current: routeView, hasResult: true }),
               );
             }}
-            // Only offered when there is a drawn route to return to. Free: the
-            // result is in memory and the canvas is drawn from it.
-            {...(result === null
-              ? {}
-              : {
-                  onShowMap: () => {
-                    setRouteView((current) =>
-                      routeViewAfter({ kind: 'result-arrived' }, { current, hasResult: true }),
-                    );
-                  },
-                })}
             stops={rows}
-            ends={{
-              ends,
-              theme,
-              onEditStart: () => {
-                router.push('/add-stop?origin=1');
-              },
-              onSelectEnd: (end) => {
-                // The store already clears the result: the optimal order
-                // genuinely differs between the two shapes, so a cached answer
-                // for one is not an answer for the other.
-                setRouteShape(shapeForEnd(end));
-              },
-              reorderable:
-                draft.stops.length < 3
-                  ? null
-                  : {
-                      movable: reorderableCount({
-                        stopCount: draft.stops.length,
-                        end: draft.shape === 'round-trip' ? 'back-to-start' : 'last-stop',
-                        startsFromFirstStop,
-                      }),
-                      total: draft.stops.length,
-                    },
-            }}
-            distance={distance}
-            duration={duration}
             onSelectStop={selectStop}
-            onRemoveStop={(stopId) => {
-              removeStopById(stopId);
-              setPendingRemoval(stopId);
-            }}
-            onMoveStop={moveStopTo}
-            onClearRoute={() => {
-              // A fresh id, because a new route is a new row rather than an edit of
-              // the last one — History would otherwise show one route that keeps
-              // changing shape.
-              resetDraft(newRouteId());
-              abandonProgress();
-              clearSelection();
-            }}
-            onResetOptimization={() => {
-              resetOptimization();
-              setRouteView('list');
-              setSelectedLegIndex(null);
-            }}
+            onRemoveStop={removeStopById}
             onPrimaryAction={() => {
               // The control's own state already says which of the two this is; the
               // screen only has to route the tap. `planStateOf` decided that, and
@@ -512,59 +326,8 @@ export default function PlanScreen(): React.JSX.Element {
               // anything — that write is what moves the route to `in_progress`
               // and therefore into History, which is exactly what was not
               // happening (`docs/11_STATE_MANAGEMENT.md` §7).
-              void handoff.start().then((outcome) => {
-                // A first handoff with no provider chosen presents the picker rather
-                // than guessing — sending a twelve-stop day to the wrong app is a bad
-                // introduction to the one feature the product is for.
-                if (outcome.kind === 'needs-provider') {
-                  router.push('/provider');
-                  return;
-                }
-
-                // **The other five used to produce nothing.** A blocked Waze
-                // handoff, a route past the URL ceiling and an app that is not
-                // installed all looked the same from the phone: the button was
-                // pressed and the screen did not change (`CLAUDE.md` §0 rule 5).
-                setHandoffNotice(
-                  handoffNoticeOf({
-                    kind: outcome.kind,
-                    ...(outcome.kind === 'handed-off' ? { chunkCount: outcome.chunkCount } : {}),
-                    ...(outcome.kind === 'needs-coordinates'
-                      ? { stopCount: outcome.stopIds.length }
-                      : {}),
-                  }),
-                );
-              });
+              void handoff.start();
             }}
-            // Nothing at all until an ad provider exists. `<AdSlot>` reserves its
-            // height from the first render to avoid a reflow, so rendering it with no
-            // provider would reserve a gap that could never be filled.
-            adSlot={
-              ads === null ? null : (
-                <AdSlot
-                  slot="stop-list"
-                  allowances={quota.allowances}
-                  isRouteInProgress={progress !== null}
-                  ads={ads}
-                  testID="plan-ad-slot"
-                />
-              )
-            }
-            onAddStop={() => {
-              setIsSearchOpen(true);
-            }}
-            onImport={() => {
-              router.push('/import');
-            }}
-            // Four causes, four sentences, and a retry only where retrying can
-            // work. Every row used to say "Address needs refreshing" for all of
-            // them and offer no way to refresh anything.
-            addressNotice={addressNoticeOf({
-              failure: places.failure,
-              unresolvedCount: places.unresolved.length,
-              isLoading: places.isLoading,
-            })}
-            onRetryAddresses={places.retry}
             theme={theme}
             testID="plan-view"
           />
@@ -573,16 +336,7 @@ export default function PlanScreen(): React.JSX.Element {
 
       {activeSection === 'history' && (
         <SectionPanel theme={theme} topInset={insets.top} testID="section-history">
-          {/* The failure belongs here rather than over the route. What has gone
-              wrong is that a route is *not in History*, so History is where it
-              is said — and Confirm, which the driver presses to set off, is
-              never covered by a panel about filing. */}
-          <HistorySection
-            onOpenRoute={closeSection}
-            saveFailure={routeSync.failure}
-            onRetrySave={routeSync.sync}
-            theme={theme}
-          />
+          <HistorySection onOpenRoute={closeSection} theme={theme} />
         </SectionPanel>
       )}
 
@@ -618,69 +372,16 @@ export default function PlanScreen(): React.JSX.Element {
         </Pressable>
       )}
 
-      {isSearchOpen && activeSection === 'itinerary' && (
-        <InlineStopSearch theme={theme} onClose={() => setIsSearchOpen(false)} />
-      )}
-
-      {activeSection !== 'settings' && !isCanvasShowing && (
+      {activeSection !== 'settings' && !isMapShowing && (
         <Dock
           // The gesture bar sits below the dock rather than behind it.
           bottomInset={insets.bottom}
-          items={dockItems(activeSection, { isRouteInProgress: progress !== null })}
+          items={dockItems(activeSection, { isRouteInProgress: false })}
           onSelect={(section) => {
             openSection(toggleSection(activeSection, section));
           }}
           theme={theme}
           testID="plan-dock"
-        />
-      )}
-
-      {handoffNotice !== null && (
-        // No timer on this one. A route split into three parts, or a navigation
-        // app that is not installed, are both things the driver has to act on
-        // before setting off — and a message that removes itself after six
-        // seconds is one they can miss by looking at the road.
-        <NoticeToast
-          title={handoffNotice.title}
-          detail={handoffNotice.detail}
-          kind={handoffNotice.kind}
-          bottomOffset={
-            isCanvasShowing
-              ? insets.bottom + space.space5
-              : DOCK_OUTER_HEIGHT + insets.bottom + space.space2
-          }
-          theme={theme}
-          onDismiss={() => {
-            setHandoffNotice(null);
-          }}
-          testID="plan-handoff-notice"
-        />
-      )}
-
-      {pendingRemoval !== null && (
-        // The removal already happened; this is the window in which it can be
-        // taken back. A dialog before the fact would tax every deletion to guard
-        // against a mistake that is both rare and reversible (docs/06 P8).
-        <UndoToast
-          message="Stop removed"
-          // Above the dock rather than inside it. The toast used to be a plain
-          // flex child, so it pushed the content up by its own height and then
-          // painted over the navigation.
-          bottomOffset={DOCK_OUTER_HEIGHT + space.space2}
-          // The window pauses while the app is off screen. `lib/ui/undo-window`
-          // was written for this and nothing had ever passed the flag, so in
-          // production the six seconds ran down in the user's pocket.
-          isBackgrounded={isBackgrounded}
-          onUndo={() => {
-            undoRemove();
-            setPendingRemoval(null);
-          }}
-          onExpire={() => {
-            // Nothing to commit: the store removed it immediately. Closing the
-            // window is only about giving up the ability to reverse it.
-            setPendingRemoval(null);
-          }}
-          testID="plan-undo-remove"
         />
       )}
     </View>

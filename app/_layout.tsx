@@ -16,7 +16,6 @@ import { DeepLinkProvider } from '@/features/navigation/deep-link-provider';
 import { LocationProvider } from '@/features/location/location-provider';
 import type { DeepLinkPort } from '@/features/navigation/use-pending-deep-link';
 import { useStoresHydrated } from '@/features/navigation/use-launch-destination';
-import { MonetisationProvider } from '@/features/monetisation/monetisation-provider';
 import { ConnectivityProvider } from '@/features/network/connectivity-provider';
 import { PERSISTED_STORES } from '@/features/stores';
 import { createLocationPort } from '@/lib/location/expo-location-adapter';
@@ -128,21 +127,12 @@ export default function RootLayout(): React.JSX.Element {
                 signed-out answer and leave a paying user on the free
                 allowances. */}
                 <ServicesProvider baseUrl={baseUrl} routes={routes} favourites={favourites}>
-                  {/* Both null: RevenueCat needs an account and three configured
-                  products, AdMob needs an account and a certified CMP for the
-                  EEA (ADR-0015). Absence is the ordinary case until they exist,
-                  which is what keeps every screen that touches them working. */}
-                  <MonetisationProvider billing={null} ads={null}>
-                    {/* Above the screens rather than inside one, because the map
-                      follows the driver and the add-stop modal needs the same
-                      fix: two subscribers would be two GPS subscriptions. */}
-                    <LocationProvider port={location}>
-                      <DeepLinkProvider port={linking}>
-                        <StatusBar style="auto" />
-                        <RestorationGate />
-                      </DeepLinkProvider>
-                    </LocationProvider>
-                  </MonetisationProvider>
+                  <LocationProvider port={location}>
+                    <DeepLinkProvider port={linking}>
+                      <StatusBar style="auto" />
+                      <RestorationGate />
+                    </DeepLinkProvider>
+                  </LocationProvider>
                 </ServicesProvider>
               </SessionProvider>
             </ConnectivityProvider>
