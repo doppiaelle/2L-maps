@@ -194,8 +194,8 @@ export function PlanView({
           <Text
             style={{
               color: colours[theme].textPrimary,
-              fontSize: 42,
-              lineHeight: 50,
+              fontSize: 34,
+              lineHeight: 40,
               fontWeight: '700',
               marginTop: space.space5,
             }}
@@ -205,8 +205,8 @@ export function PlanView({
           <Text
             style={{
               color: colours[theme].textSecondary,
-              fontSize: 18,
-              lineHeight: 26,
+              fontSize: 16,
+              lineHeight: 23,
               marginTop: space.space1,
             }}
           >
@@ -217,34 +217,34 @@ export function PlanView({
             accessibilityRole="button"
             accessibilityLabel="Search an address or place"
             style={{
-              minHeight: 72,
+              minHeight: 60,
               marginTop: space.space5,
               paddingLeft: space.space4,
               paddingRight: space.space2,
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'space-between',
-              borderRadius: 28,
+              borderRadius: radius.radiusLg,
               backgroundColor: colours[theme].surface,
               borderWidth: 1,
               borderColor: colours[theme].border,
             }}
             testID="route-search-field"
           >
-            <Text style={{ color: colours[theme].textTertiary, fontSize: 20 }} numberOfLines={1}>
+            <Text style={{ color: colours[theme].textTertiary, fontSize: 17 }} numberOfLines={1}>
               Search an address or place…
             </Text>
             <View
               style={{
-                width: 56,
-                height: 56,
-                borderRadius: 18,
+                width: 48,
+                height: 48,
+                borderRadius: radius.radiusMd,
                 backgroundColor: colours[theme].textPrimary,
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
             >
-              <Text style={{ color: colours[theme].bg, fontSize: 26, fontWeight: '700' }}>⌕</Text>
+              <Text style={{ color: colours[theme].bg, fontSize: 22, fontWeight: '700' }}>⌕</Text>
             </View>
           </Pressable>
           {/* Above the summary rather than between the list rows: the top of the
@@ -350,9 +350,9 @@ export function PlanView({
                   position: 'absolute',
                   left: layout.screenPadding,
                   right: layout.screenPadding,
-                  bottom: bottomInset + 78,
-                  padding: space.space5,
-                  borderRadius: 28,
+                  bottom: bottomInset + space.space6,
+                  padding: space.space4,
+                  borderRadius: radius.radiusLg,
                   backgroundColor: colours[theme].textPrimary,
                 }}
                 testID="map-itinerary-card"
@@ -372,8 +372,8 @@ export function PlanView({
                   numberOfLines={2}
                   style={{
                     color: colours[theme].bg,
-                    fontSize: 28,
-                    lineHeight: 34,
+                    fontSize: 22,
+                    lineHeight: 28,
                     fontWeight: '700',
                     marginTop: space.space2,
                   }}
@@ -386,8 +386,8 @@ export function PlanView({
                   style={{
                     color: colours[theme].bg,
                     opacity: 0.72,
-                    fontSize: 18,
-                    lineHeight: 26,
+                    fontSize: 15,
+                    lineHeight: 21,
                     marginTop: space.space2,
                   }}
                 >
@@ -396,7 +396,7 @@ export function PlanView({
                 <Text
                   style={{
                     color: colours[theme].accent,
-                    fontSize: 20,
+                    fontSize: 18,
                     fontWeight: '700',
                     marginTop: space.space4,
                   }}
@@ -461,16 +461,16 @@ export function PlanView({
               marginHorizontal: layout.screenPadding,
               marginBottom: space.space5,
               paddingHorizontal: space.space4,
-              paddingVertical: space.space4,
-              borderRadius: 26,
+              paddingVertical: space.space3,
+              borderRadius: radius.radiusLg,
               backgroundColor: colours[theme].accentSubtle,
             }}
             testID="plan-ready-card"
           >
             <Text
-              style={{ color: colours[theme].accent, fontSize: 22, fontWeight: '700' }}
+              style={{ color: colours[theme].accent, fontSize: 18, fontWeight: '700' }}
             >{`${stops.length} ${stops.length === 1 ? 'stop' : 'stops'} ready`}</Text>
-            <Text style={{ color: colours[theme].accent, fontSize: 17, marginTop: space.space2 }}>
+            <Text style={{ color: colours[theme].accent, fontSize: 15, marginTop: space.space1 }}>
               Optimize to automatically reorder them.
             </Text>
           </View>

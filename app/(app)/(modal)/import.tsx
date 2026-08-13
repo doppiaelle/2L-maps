@@ -1,9 +1,9 @@
 import { router } from 'expo-router';
-import { useColorScheme } from 'react-native';
 
 import { ImportView } from '@/features/import/ImportView';
 import { useImport } from '@/features/import/use-import';
 import { useDraftRouteStore } from '@/features/stores';
+import { useAppTheme } from '@/features/preferences/use-app-theme';
 import { newStopId } from '@/lib/route/route-id';
 import { placeTextFrom } from '@/lib/route/stop-text';
 
@@ -21,7 +21,7 @@ import { placeTextFrom } from '@/lib/route/stop-text';
  * Inventing an id here would be a key with nothing behind it.
  */
 export default function ImportScreen(): React.JSX.Element {
-  const scheme = useColorScheme();
+  const theme = useAppTheme();
   const importState = useImport();
   const addStopToDraft = useDraftRouteStore((store) => store.addStopToDraft);
 
@@ -81,7 +81,7 @@ export default function ImportScreen(): React.JSX.Element {
       onDismiss={() => {
         router.back();
       }}
-      theme={scheme === 'dark' ? 'dark' : 'light'}
+      theme={theme}
       testID="import-screen"
     />
   );

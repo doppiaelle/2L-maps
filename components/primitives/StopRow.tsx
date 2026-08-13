@@ -107,16 +107,16 @@ export function StopRow({
       accessibilityHint={
         hasCoordinate ? 'Opens stop details' : 'Needs its address re-entered before navigating'
       }
-      style={{ minHeight: layout.touchMin, paddingVertical: space.space3 }}
-      className="flex-row items-center gap-space-4 px-screen-padding"
+      style={{ minHeight: layout.touchMin, paddingVertical: space.space2 }}
+      className="flex-row items-center gap-space-3 px-screen-padding"
       testID={testID}
     >
       {/* The ordinal is the row's anchor: it is what the user reads out loud to
           themselves while driving, so it is the one number that never moves. */}
       <View
         style={{
-          width: 50,
-          height: 50,
+          width: 44,
+          height: 44,
           borderRadius: radius.radiusFull,
           backgroundColor: ordinalFill,
           borderWidth: state === 'pending' ? 0 : 2,
@@ -128,14 +128,14 @@ export function StopRow({
         importantForAccessibility="no"
         testID="stop-ordinal"
       >
-        <Text style={{ color: ordinalText, fontSize: 18, fontWeight: '700' }}>
+        <Text style={{ color: ordinalText, fontSize: 16, fontWeight: '700' }}>
           {presentation.glyph ?? position}
         </Text>
       </View>
 
       <View className="flex-1">
         <Text
-          style={{ color: palette.textPrimary, fontSize: 22, lineHeight: 28, fontWeight: '700' }}
+          style={{ color: palette.textPrimary, fontSize: 18, lineHeight: 23, fontWeight: '700' }}
           numberOfLines={2}
         >
           {title}
@@ -143,7 +143,7 @@ export function StopRow({
 
         {subtitle !== null && (
           <Text
-            style={{ color: palette.textSecondary, fontSize: 17, lineHeight: 23, marginTop: 3 }}
+            style={{ color: palette.textSecondary, fontSize: 14, lineHeight: 19, marginTop: 2 }}
             numberOfLines={2}
           >
             {subtitle}
@@ -151,14 +151,14 @@ export function StopRow({
         )}
 
         {meta !== null && (
-          <Text style={{ color: palette.textSecondary, fontSize: 15, marginTop: 3 }}>{meta}</Text>
+          <Text style={{ color: palette.textSecondary, fontSize: 13, marginTop: 2 }}>{meta}</Text>
         )}
 
         {!hasCoordinate && (
           // Warning, not danger: an expired coordinate is expected behaviour on
           // a route saved a month ago, not an error the user caused
           // (docs/07_DESIGN_SYSTEM.md).
-          <Text style={{ color: palette.warning, fontSize: 15, marginTop: 3 }}>
+          <Text style={{ color: palette.warning, fontSize: 13, marginTop: 2 }}>
             Address needs refreshing
           </Text>
         )}

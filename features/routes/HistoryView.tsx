@@ -85,8 +85,8 @@ export function HistoryView({
         accessibilityRole="header"
         style={{
           color: colours[theme].textPrimary,
-          fontSize: 44,
-          lineHeight: 52,
+          fontSize: 34,
+          lineHeight: 40,
           fontWeight: '700',
           marginTop: space.space5,
         }}
@@ -96,8 +96,8 @@ export function HistoryView({
       <Text
         style={{
           color: colours[theme].textSecondary,
-          fontSize: 20,
-          lineHeight: 28,
+          fontSize: 16,
+          lineHeight: 23,
           marginTop: space.space1,
         }}
       >
@@ -180,7 +180,7 @@ export function HistoryView({
           // costing frames on the hardware this is built for
           // (`CLAUDE.md` §6 rule 3).
           initialNumToRender={LIST_VIRTUALISATION_THRESHOLD}
-          contentContainerStyle={{ paddingTop: 82, paddingBottom: space.space8 }}
+          contentContainerStyle={{ paddingTop: space.space5, paddingBottom: space.space7 }}
           renderItem={({ item }) => <RouteRow summary={item} onOpen={onOpen} theme={theme} />}
           ListFooterComponent={
             locked.length === 0 ? null : (
@@ -229,11 +229,11 @@ function RouteRow({
       accessibilityLabel={`Open ${row.spoken}`}
       accessibilityHint="Loads this route, ready to optimize"
       style={{
-        minHeight: 112,
-        marginBottom: space.space5,
-        paddingHorizontal: space.space4,
-        paddingVertical: space.space4,
-        borderRadius: 28,
+        minHeight: 96,
+        marginBottom: space.space3,
+        paddingHorizontal: space.space3,
+        paddingVertical: space.space3,
+        borderRadius: radius.radiusLg,
         backgroundColor: palette.surface,
         borderWidth: 1,
         borderColor: palette.border,
@@ -242,7 +242,7 @@ function RouteRow({
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.space2 }}>
         <Text
-          style={{ color: palette.textPrimary, fontSize: 22, lineHeight: 28, fontWeight: '700' }}
+          style={{ color: palette.textPrimary, fontSize: 18, lineHeight: 23, fontWeight: '700' }}
           className="flex-1"
           numberOfLines={1}
         >
@@ -257,19 +257,19 @@ function RouteRow({
         )}
         <View
           style={{
-            width: 52,
-            height: 52,
-            borderRadius: 18,
+            width: 44,
+            height: 44,
+            borderRadius: radius.radiusMd,
             backgroundColor: palette.textPrimary,
             alignItems: 'center',
             justifyContent: 'center',
           }}
         >
-          <Text style={{ color: palette.bg, fontSize: 34, fontWeight: '700' }}>›</Text>
+          <Text style={{ color: palette.bg, fontSize: 28, fontWeight: '700' }}>›</Text>
         </View>
       </View>
 
-      <Text style={{ color: palette.textSecondary, fontSize: 16, marginTop: space.space2 }}>
+      <Text style={{ color: palette.textSecondary, fontSize: 14, marginTop: space.space1 }}>
         {row.meta}
       </Text>
 
@@ -278,7 +278,7 @@ function RouteRow({
         // rows are different heights are two routes the eye has to measure
         // before it can compare them.
         <Text
-          style={{ color: palette.textSecondary, fontSize: 15, marginTop: space.space1 }}
+          style={{ color: palette.textSecondary, fontSize: 13, marginTop: space.space1 }}
           numberOfLines={1}
         >
           {row.journey}
@@ -287,7 +287,7 @@ function RouteRow({
 
       <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: space.space1 }}>
         {row.metrics !== null && (
-          <Text style={{ color: palette.accent, fontSize: 16, fontWeight: '700' }}>
+          <Text style={{ color: palette.accent, fontSize: 14, fontWeight: '700' }}>
             {row.metrics}
           </Text>
         )}

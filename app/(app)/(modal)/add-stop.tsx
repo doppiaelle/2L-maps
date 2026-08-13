@@ -1,5 +1,4 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useColorScheme } from 'react-native';
 
 import { useConnectivity } from '@/features/network/connectivity-provider';
 import { AddStopView } from '@/features/places/AddStopView';
@@ -8,6 +7,7 @@ import { usePlaceSearch } from '@/features/places/use-place-search';
 import { useUsageQuota } from '@/features/quota/use-usage-quota';
 import { useDraftRouteStore } from '@/features/stores';
 import { useLocation } from '@/features/location/location-provider';
+import { useAppTheme } from '@/features/preferences/use-app-theme';
 import { isOffline } from '@/lib/network/connectivity';
 import { newStopId } from '@/lib/route/route-id';
 import { placeTextFrom } from '@/lib/route/stop-text';
@@ -27,7 +27,7 @@ import type { SourcedOption } from '@/lib/places/search';
  * to somebody else's subscription ([ADR-0015](../../../docs/adr/0015-ad-supported-free-tier.md)).
  */
 export default function AddStopScreen(): React.JSX.Element {
-  const scheme = useColorScheme();
+  const theme = useAppTheme();
 
   /**
    * Whether this search is choosing the route's **start** rather than a stop.
@@ -168,7 +168,7 @@ export default function AddStopScreen(): React.JSX.Element {
       onDismiss={() => {
         router.back();
       }}
-      theme={scheme === 'dark' ? 'dark' : 'light'}
+      theme={theme}
       testID="add-stop-screen"
     />
   );

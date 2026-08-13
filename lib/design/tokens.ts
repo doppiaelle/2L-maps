@@ -346,7 +346,7 @@ export const layout = {
    *  (docs/09_COMPONENT_LIBRARY.md §7): it is pressed one-handed, in a van, often
    *  without looking straight at it. 44 is the minimum a control may be; 56 is
    *  what this one is. */
-  actionMinHeight: 56,
+  actionMinHeight: 52,
 } as const;
 
 export const radius = {

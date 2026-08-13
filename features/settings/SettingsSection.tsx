@@ -49,14 +49,10 @@ export function SettingsSection({ theme, onBack }: SettingsSectionProps): React.
           ? 'Allowance unavailable — showing free limits'
           : `${quota.usage.optimizations} of ${allowances.optimizationsPerPeriod} optimizations used, resets ${quota.periodEndsAt}`
       }
-      providerLabel={provider === null ? 'Choose a navigation app' : `Navigating with ${provider}`}
       provider={provider}
       onBack={onBack}
       onOpenPaywall={() => {
         router.push('/paywall');
-      }}
-      onOpenProvider={() => {
-        router.push('/provider');
       }}
       onChooseProvider={(next) => chooseProvider(next, true)}
       onSignOut={() => {

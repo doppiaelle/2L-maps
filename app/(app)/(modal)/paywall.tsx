@@ -1,9 +1,9 @@
 import { router } from 'expo-router';
-import { useColorScheme } from 'react-native';
 
 import { PaywallView } from '@/features/billing/PaywallView';
 import { useOffers } from '@/features/billing/use-offers';
 import { useUsageQuota } from '@/features/quota/use-usage-quota';
+import { useAppTheme } from '@/features/preferences/use-app-theme';
 
 /**
  * The paywall — modal, and **not dismissible by swipe**
@@ -16,7 +16,7 @@ import { useUsageQuota } from '@/features/quota/use-usage-quota';
  * disagreeing is the worst possible bug on this screen.
  */
 export default function PaywallScreen(): React.JSX.Element {
-  const scheme = useColorScheme();
+  const theme = useAppTheme();
   const { quota } = useUsageQuota();
   const offers = useOffers();
 
@@ -31,7 +31,7 @@ export default function PaywallScreen(): React.JSX.Element {
       onContinueFree={() => {
         router.back();
       }}
-      theme={scheme === 'dark' ? 'dark' : 'light'}
+      theme={theme}
       testID="paywall-screen"
     />
   );
