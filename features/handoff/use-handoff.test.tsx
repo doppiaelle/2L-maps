@@ -47,12 +47,29 @@ function Probe({
   stops,
   open,
   order,
+  beforeOpen,
+  originIsCurrentLocation,
+  originCoordinate,
+  isRoundTrip,
 }: {
   stops: readonly Stop[];
   open: (url: string) => Promise<boolean>;
   order: string[];
+  beforeOpen?: () => Promise<void>;
+  originIsCurrentLocation?: boolean;
+  originCoordinate?: { readonly latitude: number; readonly longitude: number } | null;
+  isRoundTrip?: boolean;
 }): React.JSX.Element {
-  const handoff = useHandoff({ routeId: 'route-1', stops, resolved: new Map(), open });
+  const handoff = useHandoff({
+    routeId: 'route-1',
+    stops,
+    resolved: new Map(),
+    open,
+    ...(beforeOpen === undefined ? {} : { beforeOpen }),
+    ...(originIsCurrentLocation === undefined ? {} : { originIsCurrentLocation }),
+    ...(originCoordinate === undefined ? {} : { originCoordinate }),
+    ...(isRoundTrip === undefined ? {} : { isRoundTrip }),
+  });
 
   return (
     <Text
@@ -73,6 +90,10 @@ const run = async (
   options: {
     provider?: NavigationProviderId;
     opens?: boolean;
+    beforeOpen?: () => Promise<void>;
+    originIsCurrentLocation?: boolean;
+    originCoordinate?: { readonly latitude: number; readonly longitude: number } | null;
+    isRoundTrip?: boolean;
   } = {},
 ) => {
   harness = { outcome: null, order: [] };
@@ -91,11 +112,34 @@ const run = async (
     return options.opens ?? true;
   };
 
-  render(<Probe stops={stops} open={open} order={order} />);
+  const rendered = render(
+    <Probe
+      stops={stops}
+      open={open}
+      order={order}
+      {...(options.beforeOpen === undefined
+        ? {}
+        : {
+            beforeOpen: async () => {
+              order.push('saved');
+              await options.beforeOpen?.();
+            },
+          })}
+      {...(options.originIsCurrentLocation === undefined
+        ? {}
+        : { originIsCurrentLocation: options.originIsCurrentLocation })}
+      {...(options.originCoordinate === undefined
+        ? {}
+        : { originCoordinate: options.originCoordinate })}
+      {...(options.isRoundTrip === undefined ? {} : { isRoundTrip: options.isRoundTrip })}
+    />,
+  );
 
   await act(async () => {
     fireEvent.press(screen.getByTestId('go'));
   });
+
+  rendered.unmount();
 
   return harness;
 };
@@ -111,6 +155,16 @@ describe('the ordering that cannot be got wrong', () => {
     const { order } = await run([stop('a', 0), stop('b', 1)]);
     expect(order[0]).toBe('progress');
     expect(order[1]).toBe('opened');
+  });
+
+  it('waits for History persistence before opening the navigator', async () => {
+    const { order } = await run([stop('a', 0), stop('b', 1)], {
+      beforeOpen: async () => undefined,
+    });
+
+    // The injected persistence completes inside the progress-first handoff
+    // boundary, so an immediate app background cannot cancel it.
+    expect(order).toEqual(['saved', 'progress', 'opened']);
   });
 
   it('records the route it was actually given', async () => {

@@ -37,7 +37,7 @@ export interface EntitlementState {
   /**
    * Whether this user may use metered features **at all**.
    *
-   * Since [ADR-0015](../../../docs/adr/0015-ad-supported-free-tier.md) a free
+   * Since [ADR-0029](../../../docs/adr/0029-single-driver-wedge-and-subscription-first-freemium.md) a free
    * user is entitled — to the free allowances. This is false only where there is
    * genuinely no rung to stand on, which today means nothing: the flag stays
    * because the step is the right place to refuse a suspended or fraudulent

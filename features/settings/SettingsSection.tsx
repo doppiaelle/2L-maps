@@ -1,7 +1,12 @@
+import { useEffect, useState } from 'react';
+
 import { SettingsView } from './SettingsView';
+import { SubscriptionView } from './SubscriptionView';
 import { useSession } from '@/features/auth/session-provider';
+import { useUsageQuota } from '@/features/quota/use-usage-quota';
 import { usePreferencesStore } from '@/features/stores';
 import type { ThemeName } from '@/lib/design/tokens';
+import type { PlanTier } from '@/types';
 
 /**
  * Settings, as a dock section.
@@ -18,19 +23,47 @@ import type { ThemeName } from '@/lib/design/tokens';
 
 export interface SettingsSectionProps {
   readonly theme: ThemeName;
+  readonly initialView?: 'settings' | 'subscription';
   onBack: () => void;
 }
 
-export function SettingsSection({ theme, onBack }: SettingsSectionProps): React.JSX.Element {
+export function SettingsSection({
+  theme,
+  initialView = 'settings',
+  onBack,
+}: SettingsSectionProps): React.JSX.Element {
   const { signOut } = useSession();
   const provider = usePreferencesStore((store) => store.preferences.navigationProvider);
   const chooseProvider = usePreferencesStore((store) => store.chooseNavigationProvider);
+  const quota = useUsageQuota();
+  const currentPlan = quota.allowances.plan;
+  const [view, setView] = useState(initialView);
+  const [selectedPlan, setSelectedPlan] = useState<PlanTier>(currentPlan);
+
+  useEffect(() => setView(initialView), [initialView]);
+  useEffect(() => setSelectedPlan(currentPlan), [currentPlan]);
+
+  if (view === 'subscription') {
+    return (
+      <SubscriptionView
+        currentPlan={currentPlan}
+        currentAllowances={quota.allowances}
+        selectedPlan={selectedPlan}
+        onBack={() => setView('settings')}
+        onChoosePlan={setSelectedPlan}
+        theme={theme}
+        testID="subscription-screen"
+      />
+    );
+  }
 
   return (
     <SettingsView
       provider={provider}
+      currentPlan={currentPlan}
       onBack={onBack}
       onChooseProvider={chooseProvider}
+      onOpenSubscription={() => setView('subscription')}
       onSignOut={() => {
         void signOut();
       }}

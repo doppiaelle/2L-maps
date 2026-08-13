@@ -1,11 +1,17 @@
 # ADR-0015 — Ad-supported free tier, and the monetisation ladder above it
 
-**Status:** Accepted
+**Status:** Superseded in part by
+[ADR-0029](0029-single-driver-wedge-and-subscription-first-freemium.md)
 **Date:** 2026-08-08
 **Deciders:** Product owner
 **Amends:** [ADR-0002](0002-target-segment-and-monetization.md) — specifically its
 "no permanent free tier" decision, which is reversed here for reasons ADR-0002 could not
 have weighed at the time.
+
+> **Current rule.** The permanent, server-metered free tier survives. Advertising, rewarded
+> unlocks, the ad SDK and the advertising consent flow do not. ADR-0029 replaces those parts with
+> an advertising-free acquisition budget and makes the single last-mile driver the primary user.
+> The plan matrix and historical arithmetic below remain useful context, not current ad policy.
 
 ---
 

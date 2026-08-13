@@ -58,8 +58,8 @@ Priority:  MUST    MVP blocker. No release without it.
 ```
         ┌──────────────── MUST ────────────────┐
         │  add stops · optimize · preview ·    │
-        │  handoff · save · history · trial    │
-        │  to paid · offline own data          │
+        │  save-before-handoff · history ·     │
+        │  plan comparison · offline own data  │
         └──────────────────┬───────────────────┘
                            │
         ┌──────────────── SHOULD ──────────────┐
@@ -174,9 +174,9 @@ is the one the constraint permits. If neither is constrained, the persona in
 
 | ID | Requirement | Priority | Verified by |
 |---|---|---|---|
-| FR-39 | The user can save a route and reopen it later | MUST | Integration |
+| FR-39 | Confirm saves a route before the external navigator opens | MUST | Integration |
 | FR-40 | Completed routes appear in a history list | MUST | Integration |
-| FR-41 | A route reopened after any interval is usable, re-resolving expired coordinates transparently | MUST | Integration |
+| FR-41 | A route reopened after any interval keeps its optimized order and does not optimize again unless edited | MUST | Integration |
 | FR-42 | The user can duplicate a saved route as the basis for a new one | SHOULD | Integration |
 | FR-43 | The user can delete a route and their entire account with all data | MUST | Integration |
 
@@ -185,9 +185,9 @@ is the one the constraint permits. If neither is constrained, the persona in
 | ID | Requirement | Priority | Verified by |
 |---|---|---|---|
 | FR-44 | The user can create an account with Sign in with Apple or Google Sign-In | MUST | E2E |
-| FR-45 | A 7-day free trial starts on subscribing and converts automatically unless cancelled | MUST | E2E, manual |
-| FR-46 | The paywall states trial length, price after trial, renewal period and how to cancel | MUST | Manual, review checklist |
-| FR-47 | The user can restore purchases on a new device | MUST | Manual |
+| FR-45 | Settings compares Free, Day pass and Pro using live server allowances | MUST | Integration, component |
+| FR-46 | Until store billing is composed, plan selection cannot purchase or grant access and says so explicitly | MUST | Integration, manual |
+| FR-47 | Real checkout and restore use live localized offerings and are enabled only after store sandbox verification | SHOULD | E2E, manual |
 | FR-48 | Entitlement is determined server-side; the client never grants access | MUST | Integration |
 | FR-49 | Quota exhaustion states what limit was reached, when it resets, and what still works | MUST | Integration, component |
 
@@ -234,8 +234,8 @@ trade-off.
 | CR-04 | Turn-by-turn guidance requires the Navigation SDK, which cannot coexist with the Maps SDK | Google licensing and SDK conflict | [ADR-0004](adr/0004-external-navigation-handoff.md) |
 | CR-05 | `optimizeWaypointOrder` supports at most 25 intermediate waypoints, and is incompatible with `TRAFFIC_AWARE_OPTIMAL` | Routes API | [ADR-0003](adr/0003-tiered-optimization-cascade.md) |
 | CR-06 | Apple Maps and Waze accept a single destination per deep link | Platform URL schemes | [ADR-0004](adr/0004-external-navigation-handoff.md) |
-| CR-07 | Free trial with auto-renewal must disclose terms in the purchase flow | App Store Guideline 3.1.2 | [`26_APP_STORE.md`](26_APP_STORE.md) |
-| CR-08 | Auto-renewal after a free trial requires pre-contractual information and a right of withdrawal | Codice del Consumo, Dir. 2011/83/EU | [`32_LEGAL_COMPLIANCE.md`](32_LEGAL_COMPLIANCE.md) |
+| CR-07 | Any future subscription/trial must disclose live price, period, renewal and cancellation terms in the purchase flow | App Store Guideline 3.1.2 | [`26_APP_STORE.md`](26_APP_STORE.md) |
+| CR-08 | Any future auto-renewal requires pre-contractual information and a right of withdrawal | Codice del Consumo, Dir. 2011/83/EU | [`32_LEGAL_COMPLIANCE.md`](32_LEGAL_COMPLIANCE.md) |
 | CR-09 | Location data is personal data under GDPR | GDPR | [`32_LEGAL_COMPLIANCE.md`](32_LEGAL_COMPLIANCE.md) |
 | CR-10 | Expo Go cannot run this app; a development build is required | Native modules | [`25_DEPLOYMENT.md`](25_DEPLOYMENT.md) |
 
@@ -245,7 +245,7 @@ trade-off.
 
 | ID | Decision | Requirements it governs |
 |---|---|---|
-| [0002](adr/0002-target-segment-and-monetization.md) | Single professional, 5–25 stops; trial to paid | Stop caps, entitlement, paywall |
+| [0029](adr/0029-single-driver-wedge-and-subscription-first-freemium.md) | Single driver, 10–25-stop wedge; advertising-free freemium | Stop caps, entitlement, subscription comparison |
 | [0003](adr/0003-tiered-optimization-cascade.md) | Cost-aware cascade T0–T3 | Every optimization requirement |
 | [0004](adr/0004-external-navigation-handoff.md) | Handoff, never in-app turn-by-turn | Navigation requirements |
 | [0005](adr/0005-map-engine-and-route-preview.md) | `react-native-maps` behind a facade | Map and preview requirements |

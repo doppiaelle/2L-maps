@@ -15,7 +15,7 @@ import type { EntitlementStatus, PlanTier, PlanUsage } from '@/types';
  * One response answers the whole screen: which plan, which entitlement state,
  * how much is used, and when the period ends. `plan` and `status` are distinct
  * on purpose — a lapsed subscriber is on the free plan, not locked out
- * ([ADR-0015](../../docs/adr/0015-ad-supported-free-tier.md)).
+ * ([ADR-0029](../../docs/adr/0029-single-driver-wedge-and-subscription-first-freemium.md)).
  */
 
 const limitSchema = z.object({
@@ -44,7 +44,7 @@ export interface UsageQuota {
   readonly status: EntitlementStatus;
   readonly usage: PlanUsage;
   /** What the server says the limits are, so a tuned free tier takes effect
-   *  without a release (ADR-0015). Merged over the local fallback field by
+   *  without a release (ADR-0029). Merged over the local fallback field by
    *  field in `resolveAllowances`. */
   readonly serverLimits: {
     readonly optimizationsPerPeriod?: number;

@@ -207,20 +207,20 @@ in [`../CLAUDE.md`](../CLAUDE.md) §6, not a suggestion.
 
 ## 8. Per-user cost
 
-### Target profile — Marco, the sales agent
+### Target profile — Sofia, the single last-mile driver
 
-8 stops per day, 22 working days, 1 optimization per day.
+15 stops per day, 22 working days, one imported list and one optimization per day.
 
 | Line | Without mitigations | With mitigations | Mechanism |
 |---|---|---|---|
-| Address entry | $3.52/month | **$0.80/month** | Address-book reuse, session tokens, explicit submit ([ADR-0019](adr/0019-explicit-address-search.md)), 3-character minimum |
+| Address entry | $6.60/month | **$1.65/month** | Paste/photo workflow plus batch geocoding; recents and current location before autocomplete |
 | Optimization (T1) | $0.22/month | **$0.22/month** | Flat per route |
-| Shared cache saving | — | −$0.05 | Content-keyed cross-user cache |
+| History reuse | another request per reopen | **$0** | Confirmed optimized order is saved and reopened locally |
 | Navigation | $0 | $0 | External handoff |
-| **Total COGS** | **~$3.74** | **~$1.02** | |
+| **Total COGS** | **~$6.82** | **~$1.87** before shared-cache savings | |
 
-**Address entry dominates.** Routing is 6% of the total; address search is 78%. Every cost
-decision in the product follows from this single fact (risk C2,
+**Address entry dominates.** Every cost
+decision in the product follows from this fact (risk C2,
 [`35_RISK_REGISTER.md`](35_RISK_REGISTER.md)) — which is why the address book is
 offered before search in every add-stop flow ([`04_FEATURES.md`](04_FEATURES.md)).
 
@@ -250,7 +250,7 @@ available to the dominant cost line, and it arrives disguised as a UX feature.
 
 Import is more than three times cheaper than typing the same addresses through autocomplete.
 
-### Sofia, the courier — out of scope, shown for contrast
+### High-volume fleet-style courier — out of scope, shown for contrast
 
 35 stops, twice-daily optimization. Above 25 stops, tier T2 bills per stop.
 
@@ -261,17 +261,15 @@ Import is more than three times cheaper than typing the same addresses through a
 | **Total** | **~$19.25/month** |
 
 Against a €9.99 subscription this is a loss on every user. This is the quantitative basis for
-excluding the segment ([ADR-0002](adr/0002-target-segment-and-monetization.md)) and for the
+excluding that high-volume segment ([ADR-0029](adr/0029-single-driver-wedge-and-subscription-first-freemium.md)) and for the
 hierarchical chunking mitigation in phase 2.0.
 
-### Trial cost
+### Free acquisition cost
 
-Seven days of full use at the target profile: **~$0.25 per trial user**. At a 20% conversion
-rate, each acquired subscriber carries roughly **$1.25 of trial API cost** — recovered in the
-first month.
-
-This is the structural advantage of trial-to-paid over freemium, where a free user costs
-$0.30–0.80 **every month, indefinitely**.
+Free is a server-bounded acquisition allowance, not an ad-supported product. Its maximum monthly
+request envelope is measured against conversion and retained use. If realised COGS is too high,
+autocomplete and optimization allowances move without an app release; confirmed History reuse
+never consumes another optimization.
 
 ---
 
@@ -344,7 +342,7 @@ never fire, so an occurrence is a probable defect rather than a user problem.
 | ID | Decision | Applies to |
 |---|---|---|
 | [0003](adr/0003-tiered-optimization-cascade.md) | Cascade T0–T3 | The routing cost line, and the 25× difference that motivated it |
-| [0002](adr/0002-target-segment-and-monetization.md) | Trial to paid, no permanent free tier | Trial COGS, acquisition cost, margin |
+| [0029](adr/0029-single-driver-wedge-and-subscription-first-freemium.md) | Single-driver wedge and advertising-free metered Free / Day pass / Pro | Acquisition COGS, target profile, margin |
 | [0011](adr/0011-server-side-quota-enforcement.md) | Server-side quota | Why the quota values here are enforceable at all |
 | [0006](adr/0006-mandatory-backend-proxy.md) | Backend proxy | The shared cache, the single largest cost lever after the address book |
 | [0012](adr/0012-long-term-osm-exit-path.md) | OSM exit path | The long-term ceiling on per-route cost |
@@ -416,7 +414,9 @@ of twenty-five on the dominant operation, and the mitigations here take per-user
 |---|---|---|---|
 | 2026-08-06 | Model created; T1 identified as ~25× cheaper than T2 at 25 stops | Cost analysis inverted the brief's engine choice | Architecture |
 | 2026-08-06 | Places identified as 78% of COGS | Modelling the target profile | Architecture |
-| 2026-08-06 | Sofia's segment excluded on cost grounds | ~$19.25/month COGS against a €9.99 price | Product owner |
+| 2026-08-06 | High-volume 35-stop courier case excluded on cost grounds | ~$19.25/month COGS against an illustrative consumer price | Product owner |
+| 2026-08-13 | Sofia narrowed to a 10–25-stop single-driver round and made the target profile | Keeps the sharp delivery pain inside the viable cost envelope | Product owner |
+| 2026-08-13 | Advertising revenue removed from the model | Free is measurable acquisition COGS, not speculative ad revenue | Product owner |
 | 2026-08-06 | Quota values set with 7–13× headroom | Quotas target abuse and defects, not normal use | Architecture |
 
 ## 18. Rationale
@@ -451,15 +451,10 @@ leaves address search, 78%, running. Capping the expensive axis instead brings t
 | Optimization, 15 × T1 | $0.15 | §6 |
 | **Total** | **~$0.48** | |
 
-Banner advertising returns **€0.13–0.26** against that (medium confidence, unverified against a
-live account — see [ADR-0015](adr/0015-ad-supported-free-tier.md)), so **the free tier does not
-pay for itself on banners alone**, and stating otherwise would make this model fiction. What
-closes it is rewarded ads coupled to the metered action — revenue that scales with COGS rather
-than with session time — plus the fact that every allowance above is server configuration and
-falls if measurement says it must. The free tier is held to cost-neutrality as an acquisition
-channel; it is not a revenue line.
-
-The trial remains a bounded liability of **$0.25 total** per trial user, unchanged.
+There is no banner or rewarded revenue. The **~$0.48 ceiling is acquisition COGS**, controlled by
+server configuration and justified only if it produces activation, retained History reuse and
+paid conversion. This is intentionally less optimistic and operationally simpler than claiming
+that advertising will close the gap ([ADR-0029](adr/0029-single-driver-wedge-and-subscription-first-freemium.md)).
 
 ## 19. Rejected alternatives
 
@@ -467,7 +462,7 @@ The trial remains a bounded liability of **$0.25 total** per trial user, unchang
 |---|---|---|
 | Route Optimization API for all requests | One engine; all constraints available | 10–25× more expensive on the dominant case |
 | Google matrix + local TSP solver | Algorithmic control; feels cheaper | The most expensive measured option: $3.38 vs $0.01 at 25 stops |
-| Freemium with a limited free tier | Larger funnel; word of mouth | Perpetual per-user cost with no revenue; consumes the paid base's margin |
+| Unlimited freemium | Larger funnel; word of mouth | Unbounded third-party API cost; the accepted free tier is strictly server-metered |
 | Usage-based pricing per optimization | Costs track revenue exactly; no quota needed | Unpredictable bills are hostile to a professional budgeting monthly, and the amounts are too small to justify the friction |
 | Higher price (€19.99) with no quotas | Simpler; better margin per user | Above the prosumer band's comfortable range for a single-purpose tool, and quotas would still be needed to bound defect-driven cost |
 | Absorbing costs and pricing at €4.99 | Aggressive growth; undercuts every comparable | Margin at €4.99 net of 15% commission is €3.22 against $1.02 COGS — viable but leaves nothing for support, marketing or a bad month |

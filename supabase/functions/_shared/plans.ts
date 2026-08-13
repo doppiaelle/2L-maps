@@ -9,18 +9,18 @@ import { DAY_PASS_DURATION_HOURS } from '../../../types/constants.ts';
  * remaining above a button that answers 429, and the user has no way to tell
  * which one is lying.
  *
- * **Entitlement is no longer a boolean** ([ADR-0015](../../../docs/adr/0015-ad-supported-free-tier.md)):
+ * **Entitlement is no longer a boolean** ([ADR-0029](../../../docs/adr/0029-single-driver-wedge-and-subscription-first-freemium.md)):
  * it is a three-value plan with per-plan allowances, and the ADR names the
  * pipeline's step 2 as one of the places that had to change. A free user is
  * *entitled* — to the free allowances. Treating "no subscription" as "no access"
- * is the hard paywall ADR-0015 removed, and it would lock every new account out
+ * is the hard paywall the current freemium model removed, and it would lock every new account out
  * of the product before they had seen it work once.
  *
  * The numbers come from [`docs/20_SUBSCRIPTIONS.md`](../../../docs/20_SUBSCRIPTIONS.md) §6
  * for the free and day-pass rows, and from
  * [`docs/33_API_CONTRACTS.md`](../../../docs/33_API_CONTRACTS.md) §10 for Pro.
  * They live on the server so they move without an app release, which is the
- * control that keeps the ad-supported free tier cost-neutral
+ * control that keeps the free tier inside its measured acquisition budget
  * ([ADR-0011](../../../docs/adr/0011-server-side-quota-enforcement.md)).
  */
 

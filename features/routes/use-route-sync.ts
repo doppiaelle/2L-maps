@@ -49,8 +49,9 @@ export interface RouteSync {
   /** The last write that failed, so a screen can say so rather than letting the
    *  route silently exist on one device only. Null while everything is in step. */
   readonly failure: SaveFailure | null;
+  readonly isSaving: boolean;
   /** Force a write — used by the retry in the failure state. */
-  sync: () => void;
+  sync: () => Promise<boolean>;
 }
 
 interface RouteWriteSnapshot {
@@ -70,13 +71,14 @@ export function useRouteSync(): RouteSync {
   const progress = useRouteProgressStore((store) => store.progress);
 
   const [failure, setFailure] = useState<SaveFailure | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   // What the server last accepted. The transition guard needs a *from*, and
   // deriving it from the current draft would compare a status to itself.
   const lastWrittenStatus = useRef<RouteStatus | null>(null);
   const activeRouteId = useRef(draft.routeId);
   // Which write is in flight, so two status changes in quick succession do not
   // produce overlapping upserts that land out of order.
-  const inFlight = useRef<Promise<void> | null>(null);
+  const inFlight = useRef<Promise<boolean> | null>(null);
   /** The route this hook was last looking at, so the moment it becomes a
    *  different one is observable. That moment is the only thing left that can
    *  close a day. */
@@ -111,14 +113,20 @@ export function useRouteSync(): RouteSync {
   };
 
   const writeSnapshot = useCallback(
-    async (snapshot: RouteWriteSnapshot): Promise<void> => {
+    async (snapshot: RouteWriteSnapshot): Promise<boolean> => {
       const userId = session?.userId;
-      if (services === null || userId === undefined) return;
+      if (services === null || userId === undefined) {
+        setFailure({ kind: 'failed' });
+        return false;
+      }
 
       const from = lastWrittenStatus.current;
       // A transition the lifecycle forbids is a defect upstream, and writing it
       // would let a completed day be reopened. Refused here rather than sent.
-      if (from !== null && !canTransition(from, snapshot.status)) return;
+      if (from !== null && !canTransition(from, snapshot.status)) {
+        setFailure({ kind: 'illegal-transition', from, to: snapshot.status });
+        return false;
+      }
 
       const outcome = await services.routes.save(
         toRows(snapshot.draft, userId, {
@@ -145,7 +153,7 @@ export function useRouteSync(): RouteSync {
         // by hand: the list carries a stop count and an updated timestamp that
         // only the server knows.
         void queryClient.invalidateQueries({ queryKey: queryKeys.savedRoutes() });
-        return;
+        return true;
       }
 
       /**
@@ -158,18 +166,52 @@ export function useRouteSync(): RouteSync {
        */
       console.warn(`[route-sync] save failed, kind=${outcome.failure.kind}`);
       setFailure(outcome.failure);
+      return false;
     },
     [services, session?.userId, queryClient],
   );
 
-  const sync = useCallback(() => {
-    const snapshot = latestSnapshot.current;
+  const sync = useCallback((): Promise<boolean> => {
+    /**
+     * Read the stores at the instant the caller asks, rather than waiting for a
+     * React render. Confirm writes progress and immediately backgrounds the app;
+     * a snapshot captured by the previous render still says `optimized` and is
+     * the reason the `in_progress` write used to be lost.
+     */
+    const currentDraft = useDraftRouteStore.getState().draft;
+    const currentResult = useDraftRouteStore.getState().result;
+    const currentProgress = useRouteProgressStore.getState().progress;
+    const currentStatus = statusFor({
+      isOptimized: currentDraft.isOptimized,
+      isUnderway: currentProgress?.routeId === currentDraft.routeId,
+    });
+    const previousSnapshot = latestSnapshot.current;
+    const snapshot: RouteWriteSnapshot = {
+      draft: currentDraft,
+      result: currentResult,
+      status: currentStatus,
+      optimizedAt:
+        previousSnapshot.draft.routeId === currentDraft.routeId && currentDraft.isOptimized
+          ? previousSnapshot.optimizedAt
+          : new Date().toISOString(),
+    };
+    latestSnapshot.current = snapshot;
+
     // Serialised. Two upserts of the same route racing would be harmless for the
     // route row and wrong for the stops, where the second delete can land after
     // the first insert.
-    const previous = inFlight.current ?? Promise.resolve();
+    const previous = inFlight.current ?? Promise.resolve(true);
     const run = () => writeSnapshot(snapshot);
-    inFlight.current = previous.then(run, run);
+    const queued = previous.then(run, run);
+    inFlight.current = queued;
+    setIsSaving(true);
+    void queued.finally(() => {
+      if (inFlight.current === queued) {
+        inFlight.current = null;
+        setIsSaving(false);
+      }
+    });
+    return queued;
   }, [writeSnapshot]);
 
   /**
@@ -187,7 +229,7 @@ export function useRouteSync(): RouteSync {
   useEffect(() => {
     // A pure draft stays local until something happens to it worth recording.
     if (status === 'draft' && lastWrittenStatus.current === null) return;
-    sync();
+    void sync();
   }, [status, sync]);
 
   /**
@@ -226,5 +268,5 @@ export function useRouteSync(): RouteSync {
       });
   }, [routeId, status, services, queryClient]);
 
-  return { failure, sync };
+  return { failure, isSaving, sync };
 }

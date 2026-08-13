@@ -1,13 +1,7 @@
 import { FREE_MAX_STOPS, FREE_OPTIMIZATIONS_PER_MONTH, MAX_STOPS, MAX_STOPS_T0 } from '@/types';
 import type { PlanUsage } from '@/types';
 
-import {
-  canOfferRewardedUnlock,
-  fallbackAllowances,
-  grantsRewardedUnlock,
-  optimizeAvailability,
-  resolveAllowances,
-} from './plans';
+import { fallbackAllowances, optimizeAvailability, resolveAllowances } from './plans';
 
 const noUsage: PlanUsage = { optimizations: 0, autocompleteSessions: 0 };
 const spent = (optimizations: number): PlanUsage => ({
@@ -42,7 +36,7 @@ describe('stop limits at their boundaries', () => {
   it('costs nothing to be generous about stops on free', () => {
     // The point of FREE_MAX_STOPS being 15 rather than 8: a T1 route bills the
     // same at either size, so the stingier limit would save $0.00 and only make
-    // the free tier feel mean (ADR-0015, docs/31_COST_MODEL.md §8).
+    // the free tier feel mean (ADR-0029, docs/31_COST_MODEL.md §8).
     expect(free.maxStopsPerRoute).toBeGreaterThan(MAX_STOPS_T0);
   });
 });
@@ -60,56 +54,34 @@ describe('running out of the monthly allowance', () => {
   it('degrades rather than locking out, when the route is small enough', () => {
     // A free user is never locked out — T0 costs nothing and needs no network.
     const outcome = optimizeAvailability(free, spent(FREE_OPTIMIZATIONS_PER_MONTH), MAX_STOPS_T0);
-    expect(outcome).toEqual({ kind: 'degraded-only', canUnlockWithAd: true });
+    expect(outcome).toEqual({ kind: 'degraded-only' });
   });
 
   it('blocks above the local solver ceiling instead of offering a bad answer', () => {
     // The gap this test pins down: free allows 15 stops but T0 stops being
     // honest above 8. A 9-stop free route with the allowance spent is the one
     // state where there is genuinely nothing good to offer — so the app says so
-    // and offers the unlock, rather than shipping a straight-line order that
-    // can be worse than the one the user typed (ADR-0003).
+    // rather than shipping a straight-line order that can be worse than the
+    // one the user typed (ADR-0003). ADR-0029 retired the advertising unlock.
     const outcome = optimizeAvailability(
       free,
       spent(FREE_OPTIMIZATIONS_PER_MONTH),
       MAX_STOPS_T0 + 1,
     );
-    expect(outcome).toEqual({ kind: 'blocked', canUnlockWithAd: true });
+    expect(outcome).toEqual({ kind: 'blocked' });
   });
 
-  it('never offers an ad unlock to someone who paid', () => {
+  it('degrades a paid plan after its allowance too', () => {
     const pro = fallbackAllowances('pro');
     const outcome = optimizeAvailability(pro, spent(pro.optimizationsPerPeriod), 4);
-    expect(outcome).toEqual({ kind: 'degraded-only', canUnlockWithAd: false });
-    expect(canOfferRewardedUnlock(pro, spent(pro.optimizationsPerPeriod))).toBe(false);
-  });
-
-  it('offers the unlock only once the allowance is actually spent', () => {
-    expect(canOfferRewardedUnlock(free, spent(FREE_OPTIMIZATIONS_PER_MONTH - 1))).toBe(false);
-    expect(canOfferRewardedUnlock(free, spent(FREE_OPTIMIZATIONS_PER_MONTH))).toBe(true);
-  });
-});
-
-describe('the rewarded unlock', () => {
-  it('is granted when the ad played', () => {
-    expect(grantsRewardedUnlock('watched')).toBe(true);
-  });
-
-  it('is granted when no ad could be shown', () => {
-    // No fill, no network, SDK error — none of that is the user's doing, and
-    // charging them for our fill rate is indefensible (ADR-0015 rule 6).
-    expect(grantsRewardedUnlock('unavailable')).toBe(true);
-  });
-
-  it('is not granted when the user chose to close it', () => {
-    expect(grantsRewardedUnlock('dismissed')).toBe(false);
+    expect(outcome).toEqual({ kind: 'degraded-only' });
   });
 });
 
 describe('the server owns the numbers', () => {
   it('takes the server value over the local fallback', () => {
     // The allowances move without an app release, which is the control that
-    // keeps the free tier cost-neutral against realised ad revenue (ADR-0015).
+    // keeps the free tier within a measured acquisition budget (ADR-0029).
     const tightened = resolveAllowances('free', { optimizationsPerPeriod: 5 });
     expect(tightened.optimizationsPerPeriod).toBe(5);
   });
@@ -134,12 +106,5 @@ describe('the server owns the numbers', () => {
     });
     expect(nonsense.optimizationsPerPeriod).toBe(fallbackAllowances('pro').optimizationsPerPeriod);
     expect(nonsense.maxStopsPerRoute).toBe(MAX_STOPS);
-  });
-
-  it('does not let a response turn ads on for a subscriber', () => {
-    // Ads follow the plan. If this were server-driven, a field in a JSON body
-    // could revoke something the user paid to remove.
-    const pro = resolveAllowances('pro', { optimizationsPerPeriod: 1 });
-    expect(pro.showsAds).toBe(false);
   });
 });

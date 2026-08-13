@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
+import { ActivityIndicator } from 'react-native';
 
 import { PrimaryAction } from './PrimaryAction';
 import type { PrimaryActionState } from './PrimaryAction';
@@ -60,7 +61,7 @@ describe('working', () => {
   it('hides the spinner from assistive technology', () => {
     // It carries no information the label does not already give.
     renderWith({ kind: 'working', label: 'Optimizing…' });
-    expect(screen.UNSAFE_getByType(require('react-native').ActivityIndicator).props).toMatchObject({
+    expect(screen.UNSAFE_getByType(ActivityIndicator).props).toMatchObject({
       accessibilityElementsHidden: true,
     });
   });
@@ -107,22 +108,6 @@ describe('degraded', () => {
       taps += 1;
     });
 
-    fireEvent.press(screen.getByRole('button'));
-    expect(taps).toBe(1);
-  });
-});
-
-describe('unlockable', () => {
-  it('offers the unlock and stays pressable', () => {
-    let taps = 0;
-    renderWith(
-      { kind: 'unlockable', label: 'Watch an ad to optimize', note: 'Monthly allowance used' },
-      () => {
-        taps += 1;
-      },
-    );
-
-    expect(screen.getByText('Monthly allowance used')).toBeTruthy();
     fireEvent.press(screen.getByRole('button'));
     expect(taps).toBe(1);
   });

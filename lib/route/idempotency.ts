@@ -1,4 +1,5 @@
 import type { DraftRoute } from './draft';
+import type { LatLng } from '@/lib/geo/haversine';
 
 /**
  * The idempotency key for an optimization attempt.
@@ -56,8 +57,23 @@ export function fingerprint(input: string): string {
  * routes that happen to hold identical stops still get different keys — which is
  * what stops one route's result being served for another.
  */
-export function idempotencyKeyFor(draft: DraftRoute): string {
+export function idempotencyKeyFor(
+  draft: DraftRoute,
+  originCoordinate: LatLng | null = null,
+): string {
   const stops = draft.stops.map((stop) => stop.placeId).join(',');
-  const origin = draft.originPlaceId ?? 'here';
-  return `${draft.routeId}:${fingerprint(`${draft.shape}:${origin}:${stops}`)}`;
+  const coordinate =
+    originCoordinate === null
+      ? 'none'
+      : `${originCoordinate.latitude},${originCoordinate.longitude}`;
+  const origin = draft.originIsCurrentLocation
+    ? `current-location:${coordinate}`
+    : `place:${draft.originPlaceId ?? 'first-stop'}`;
+
+  // routeStart/routeEnd are included even though they currently map onto the
+  // origin and shape fields too. They preserve the product meaning of the
+  // request if the backend representation changes later, and keep “return to
+  // start” separate from “return to current location” today.
+  const work = [draft.shape, draft.routeStart, draft.routeEnd, origin, stops].join(':');
+  return `${draft.routeId}:${fingerprint(work)}`;
 }

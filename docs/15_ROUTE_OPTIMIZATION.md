@@ -60,13 +60,21 @@ the asymmetric TSP with an optional return to origin:
   restrictions and directional traffic;
 - **open or closed** — one way ends at the last stop; round trip returns to the origin.
 
-**Which one it is, is the driver's choice and used not to be.** `setRouteShape` had no caller
-until ADR-0027's follow-up, so every route was open — and an open route pins its **last typed
-stop** as the destination and withholds it from the optimizer. Rome, Abruzzo, Milan, Bari with
-no origin chosen offered Google **two of the four stops**: the first is consumed as the origin,
-the last is pinned because it was typed last. A control on the stop list now says where the
-round starts and offers where it ends, and states how many stops are reorderable — because that
-number is what nobody could see ([`08_SCREEN_SPECIFICATIONS.md`](08_SCREEN_SPECIFICATIONS.md) §7).
+**Endpoints are explicit constraints.** The UI persists two independent choices, normalized to
+valid combinations before every request:
+
+| Start | End | Request semantics |
+|---|---|---|
+| First added stop (default) | Last added stop (default) | Open route; first and last user stops stay fixed, middle stops are optimized |
+| My current location | Last added stop | Current coordinates are the origin; the final user stop stays fixed |
+| First added stop | Return to starting point | First user stop is fixed as origin and destination; all remaining user stops are intermediates |
+| My current location | Return to my current location | Current coordinates are origin and destination; all user stops are intermediates |
+
+Selecting return to current location automatically selects current location as the start. Endpoint
+locations are materialized in the optimize and handoff request; they do not become duplicated,
+draggable rows in the user's stop list. Changing an endpoint invalidates the previous optimized
+result. Reopening a confirmed History item preserves its stored optimized order and does not call
+the optimizer unless the draft is edited.
 
 Asymmetry matters more than it appears. A symmetric approximation using straight-line distance
 produces visibly wrong orders in cities with one-way systems, which is precisely where the

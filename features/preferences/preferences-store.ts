@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { createJSONStorage, persist, type PersistStorage } from 'zustand/middleware';
 
 import type { NavigationProviderId } from '@/types';
+import type { RouteEndPreference, RouteStartPreference } from '@/lib/route/route-ends';
 
 /**
  * User preferences.
@@ -29,12 +30,16 @@ export interface Preferences {
   readonly navigationProvider: NavigationProviderId;
   readonly theme: ThemePreference;
   readonly units: UnitPreference;
+  readonly routeStart: RouteStartPreference;
+  readonly routeEnd: RouteEndPreference;
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
   navigationProvider: 'google-maps',
   theme: null,
   units: null,
+  routeStart: 'first-stop',
+  routeEnd: 'last-stop',
 };
 
 export type PreferencesStorage = PersistStorage<{ preferences: Preferences }>;
@@ -47,6 +52,8 @@ export interface PreferencesStore {
   chooseNavigationProvider: (provider: NavigationProviderId) => void;
   chooseTheme: (theme: ThemePreference) => void;
   chooseUnits: (units: UnitPreference) => void;
+  chooseRouteStart: (start: RouteStartPreference) => void;
+  chooseRouteEnd: (end: RouteEndPreference) => void;
 }
 
 export function createPreferencesStore(storage?: PreferencesStorage) {
@@ -70,6 +77,14 @@ export function createPreferencesStore(storage?: PreferencesStorage) {
 
         chooseUnits: (units) => {
           set({ preferences: { ...get().preferences, units } });
+        },
+
+        chooseRouteStart: (routeStart) => {
+          set({ preferences: { ...get().preferences, routeStart } });
+        },
+
+        chooseRouteEnd: (routeEnd) => {
+          set({ preferences: { ...get().preferences, routeEnd } });
         },
       }),
       {

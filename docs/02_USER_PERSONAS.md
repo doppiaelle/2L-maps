@@ -44,13 +44,13 @@ talking to real users.
 
 ```
                         MVP design weight
-  Marco  ████████████████████████████████████  primary — design for him
+  Sofia  ████████████████████████████████████  primary — design for her
   Elena  ████████████████████                  secondary — must work well
-  Sofia  ████████                              tertiary — must not be blocked
+  Marco  ████████                              adjacent — must remain usable
   Luca   ░░░░                                  anti-persona — explicitly not served
 ```
 
-When personas conflict, Marco wins. When Marco is neutral, Elena decides.
+When personas conflict, Sofia wins. When Sofia is neutral, Elena decides.
 
 ### Shared operating conditions
 
@@ -97,7 +97,7 @@ already decided on is no longer evidence, and the decision log records that dist
 
 ## 6. Personas
 
-### Marco — the sales agent · **primary**
+### Marco — the sales agent · **adjacent**
 
 **43, Bergamo. Sells industrial supplies across Lombardy for a manufacturer.**
 
@@ -154,31 +154,29 @@ target.
 
 ---
 
-### Sofia — the independent courier · **tertiary**
+### Sofia — the independent last-mile driver · **primary**
 
-**29, Napoli. Runs her own last-mile delivery van for e-commerce clients.**
+**29, Napoli. Runs one last-mile van for local retailers and subcontracted delivery rounds.**
 
-Sofia handles 25 to 40 parcels a day in dense urban streets. Her margins are thin and her
-volume is at the top of what the product supports — sometimes past it. She is the most
-demanding user and the least profitable.
+Sofia receives 10 to 25 addresses for a shift, often as pasted WhatsApp text, a photograph of a
+manifest or a poorly formatted spreadsheet. No dispatcher tool orders them for her. Her first job
+is turning that source into a clean route before the van moves; every minute of retyping is unpaid.
 
 | | |
 |---|---|
-| **Stops per day** | 25–40, above the MVP ceiling on her heaviest days |
+| **Stops per day** | 10–25 in the target round; larger manifests must be split honestly |
 | **Devices** | Android, phone mount in the van |
 | **Uses today** | A free planner with hard limits, plus Google Maps |
-| **Fails her because** | Free tools cap at 10–20 stops; paid fleet tools are priced for companies |
+| **Fails her because** | Consumer maps preserve typed order; fleet tools assume a dispatcher and a company workflow |
 | **Pays for** | Fuel and time saved; she calculates the return precisely |
-| **Would abandon over** | A stop limit she hits daily, or an optimization slower than her own guess |
+| **Would abandon over** | Retyping, a lost confirmed route, or paying twice to optimize the same round |
 
-**Decisive question:** *When Sofia exceeds 25 stops, does the app tell her honestly and offer
-something useful, rather than failing?*
+**Decisive question:** *Can Sofia turn the list she has into a saved route and open her navigator
+before she would have finished retyping the first few addresses?*
 
-Sofia is deliberately **not** the target ([ADR-0002](adr/0002-target-segment-and-monetization.md)):
-above 25 stops the cost per user reaches roughly $18/month against a consumer subscription
-price. She is included here because she will download the app anyway, and how the product
-handles her determines whether it earns a one-star review or a future upgrade path. She is the
-reason the 25-stop limit must be communicated as a plan boundary rather than an error.
+Sofia is deliberately scoped to a single vehicle and at most 25 stops. A 40–100-stop fleet round
+is not silently squeezed into this product; it is an enterprise VRP use case with different costs
+and constraints ([ADR-0029](adr/0029-single-driver-wedge-and-subscription-first-freemium.md)).
 
 ---
 
@@ -203,7 +201,7 @@ so, it does not belong in this release.*
 
 | ID | Decision | Applies to |
 |---|---|---|
-| [0002](adr/0002-target-segment-and-monetization.md) | Marco and Elena are the target; Sofia is out of scope; Luca is excluded | Segment, pricing, stop ceiling |
+| [0029](adr/0029-single-driver-wedge-and-subscription-first-freemium.md) | Sofia is primary; Elena secondary; Marco adjacent; Luca excluded | Segment, pricing, stop ceiling |
 | [0008](adr/0008-offline-scope.md) | Offline covers own data — driven by Elena's basements | Offline behaviour |
 | [0010](adr/0010-mobile-only-scope.md) | Mobile only, one-handed — driven by Marco's car | Layout, controls |
 
@@ -211,7 +209,7 @@ so, it does not belong in this release.*
 
 | # | Condition | Expected behaviour | Specified in |
 |---|---|---|---|
-| 1 | Sofia exceeds 25 stops | Clear explanation of the limit, offer to split into two routes — never a bare error | [`08`](08_SCREEN_SPECIFICATIONS.md) |
+| 1 | Sofia exceeds 25 stops | Clear explanation of the single-route limit and a safe path to create another route — never a bare error | [`08`](08_SCREEN_SPECIFICATIONS.md) |
 | 2 | Elena loses signal mid-day with a route in progress | Full list, order and last ETA remain available; edits queue | [`17`](17_OFFLINE_MODE.md) |
 | 3 | Marco is interrupted by a call mid-optimization | State survives backgrounding; he returns to exactly where he left | [`11`](11_STATE_MANAGEMENT.md) |
 | 4 | Elena wears gloves | Touch targets meet the 44×44 pt minimum with generous spacing | [`23`](23_ACCESSIBILITY.md) |
@@ -227,14 +225,14 @@ thumb. No modal dialog blocks a route in progress ([`../CLAUDE.md`](../CLAUDE.md
 
 | Failure | Persona most affected | Result |
 |---|---|---|
-| Optimization fails | Marco | One-line explanation, retry action, previous order preserved |
+| Optimization fails | Sofia | One-line explanation, retry action, previous order preserved |
 | Import partially fails | Elena | Successes and failures listed separately; she proceeds with what worked |
 | Stop limit exceeded | Sofia | Limit explained with a split-route offer |
 | Signal lost mid-route | Elena | Silent degradation to cached data, with a persistent but unobtrusive indicator |
 
 ## 10. Best practices
 
-1. **Design for Marco's car, not your desk.** Every interaction is validated one-handed, on a
+1. **Design for Sofia's van, not your desk.** Every interaction is validated one-handed, on a
    real device, ideally in a vehicle.
 2. **Elena's list is sacred.** Data loss is the one failure that ends the relationship
    permanently.
@@ -258,9 +256,9 @@ thumb. No modal dialog blocks a route in progress ([`../CLAUDE.md`](../CLAUDE.md
 
 | Phase | Scope | Trigger |
 |---|---|---|
-| MVP | Marco and Elena fully served; Sofia handled honestly | — |
-| 1.x | Elena's import improved; Live Activity for Marco's in-car progress | Usage data |
-| 2.0 | Sofia becomes a target via a higher tier with hierarchical chunking | Demonstrated willingness to pay above €20/month |
+| MVP | Sofia's 10–25-stop round fully served; Elena and Marco work without special UI | — |
+| 1.x | Paste, photo and spreadsheet import improved from measured correction rates | Usage data |
+| 2.0 | Constraint-aware single-driver planning considered | Demonstrated demand and viable API cost |
 | 3.0 | Luca reconsidered as a separate product, never as a feature of this one | Strategic decision, not a roadmap item |
 
 ## 13. Decision log
@@ -268,6 +266,7 @@ thumb. No modal dialog blocks a route in progress ([`../CLAUDE.md`](../CLAUDE.md
 | Date | Change | Reason | Author |
 |---|---|---|---|
 | 2026-08-06 | Personas defined; Sofia set as tertiary, Luca as anti-persona | Cost modelling showed Sofia unprofitable at consumer pricing and Luca a different product | Product owner |
+| 2026-08-13 | Sofia narrowed to 10–25 stops and made primary | Fast unstructured input is the clearest single-driver wedge | Product owner |
 
 ## 14. Rationale
 
@@ -275,13 +274,12 @@ Three personas and one anti-persona, rather than a broad market description, bec
 product's viability depends on a narrow bet: that a single professional will pay roughly €10 a
 month to stop guessing the order of their stops.
 
-Marco is primary because he represents the largest addressable group with the cleanest
-economics — moderate stop counts, high value of time, low API cost. Elena is secondary because
+Sofia is primary because she has the most acute daily ordering and import pain inside the viable
+10–25-stop cost envelope. Elena is secondary because
 she stresses the two capabilities that would otherwise be under-built: import and offline. Her
 basements are the reason the offline contract is specified precisely rather than hand-waved.
 
-Sofia is documented despite being out of scope because ignoring a user who will certainly
-arrive is how products acquire bad reviews. Luca is documented because "we could add
+Marco remains useful adjacent evidence for speed and repeated customers. Luca is documented because "we could add
 multi-vehicle" is the most plausible-sounding way this product could lose focus, and naming
 him makes that pull visible.
 
@@ -294,6 +292,6 @@ constraints are remembered.
 | Alternative | Attraction | Why rejected |
 |---|---|---|
 | A single generic persona | Simpler; less to maintain | Loses the specific tensions — Marco wants speed, Elena wants durability — that resolve real design arguments. |
-| Sofia as the primary persona | Highest pain, clearest value, most enthusiastic user | Unprofitable at consumer pricing. See [ADR-0002](adr/0002-target-segment-and-monetization.md). |
+| High-volume courier as primary | Highest pain and willingness to pay | Above the 25-stop single-route boundary it becomes a different cost and operations model |
 | Serving Luca with a "teams" tier | Highest revenue per account | Requires a web dashboard, roles and dispatch. A partial implementation would be worse than none and would divert the MVP. |
 | Demographic personas with photos and backstories | Familiar format; good for presentations | Age and hobbies drive no decisions here. Operating conditions and stop counts do. |

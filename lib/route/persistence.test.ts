@@ -4,7 +4,6 @@ import {
   completeSupersededRoute,
   displayName,
   fromRows,
-  partitionByAllowance,
   progressFromRows,
   statusFor,
   toRows,
@@ -378,39 +377,5 @@ describe('naming a route nobody named', () => {
 
   it('says stop rather than stops for one', () => {
     expect(displayName(summary({ stopCount: 1 }))).toContain('1 stop');
-  });
-});
-
-describe('how many routes a plan keeps', () => {
-  const summaries = Array.from({ length: 5 }, (_, index) => ({
-    routeId: `route-${index}`,
-    name: null,
-    status: 'completed' as RouteStatus,
-    stopCount: 3,
-    isRoundTrip: false,
-    stops: [],
-    isDegraded: false,
-    distanceMeters: null,
-    durationSeconds: null,
-    updatedAt: '2026-08-04T09:30:00.000Z',
-  }));
-
-  it('shows the newest within the allowance', () => {
-    expect(partitionByAllowance(summaries, 3).visible.map((s) => s.routeId)).toEqual([
-      'route-0',
-      'route-1',
-      'route-2',
-    ]);
-  });
-
-  it('locks the rest rather than hiding them', () => {
-    // They are the user's own work. A product that silently deletes a driver's
-    // records in order to sell them back is a different product.
-    expect(partitionByAllowance(summaries, 3).locked).toHaveLength(2);
-  });
-
-  it('locks everything when the allowance is nothing', () => {
-    expect(partitionByAllowance(summaries, 0).visible).toHaveLength(0);
-    expect(partitionByAllowance(summaries, 0).locked).toHaveLength(5);
   });
 });

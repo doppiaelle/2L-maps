@@ -115,7 +115,7 @@ function readEnv(key: string): string {
  * refused by step 2 before ever reaching it. Per-plan allowances now live in
  * `plans.ts`, read by the quota gate and by `/usage-quota` alike so the number
  * that refuses and the number that is displayed cannot drift
- * ([ADR-0015](../../../docs/adr/0015-ad-supported-free-tier.md)).
+ * ([ADR-0029](../../../docs/adr/0029-single-driver-wedge-and-subscription-first-freemium.md)).
  *
  * Burst stays flat across plans on purpose: it catches a stuck input or a retry
  * loop, which is a defect rather than a purchase.

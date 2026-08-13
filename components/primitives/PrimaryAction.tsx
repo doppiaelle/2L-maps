@@ -31,10 +31,7 @@ export type PrimaryActionState =
   /** The allowance is spent but the route is small enough for the local solver.
    *  Labelled, because a degraded result must never look like a full one
    *  (`CLAUDE.md` §7 rule 6). */
-  | { readonly kind: 'degraded'; readonly label: string; readonly note: string }
-  /** The allowance is spent and a rewarded ad would buy one more
-   *  ([ADR-0015](../../docs/adr/0015-ad-supported-free-tier.md)). */
-  | { readonly kind: 'unlockable'; readonly label: string; readonly note: string };
+  | { readonly kind: 'degraded'; readonly label: string; readonly note: string };
 
 export interface PrimaryActionProps {
   readonly state: PrimaryActionState;

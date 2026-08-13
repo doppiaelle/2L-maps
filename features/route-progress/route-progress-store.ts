@@ -31,8 +31,7 @@ export type ProgressStorage = PersistStorage<{ progress: RouteProgress | null }>
 export const ROUTE_PROGRESS_STORAGE_KEY = '2l-maps.route-progress';
 
 export interface RouteProgressStore {
-  /** Null when no route has been handed over — which is also what tells the ads
-   *  layer it may render (ADR-0015 rule 1). */
+  /** Null when no route has been handed over. */
   readonly progress: RouteProgress | null;
 
   /** Record that this route has been handed to a navigation app. */

@@ -102,6 +102,61 @@ describe('what the key must still mean', () => {
     );
   });
 
+  it('separates a first-stop route from a current-location route', () => {
+    const draft = draftWith(['ChIJa', 'ChIJb']);
+    const currentLocationDraft = {
+      ...draft,
+      originIsCurrentLocation: true,
+      routeStart: 'current-location' as const,
+    };
+
+    expect(idempotencyKeyFor(draft)).not.toBe(
+      idempotencyKeyFor(currentLocationDraft, { latitude: 45.4642, longitude: 9.19 }),
+    );
+  });
+
+  it('changes when the current-location coordinate changes', () => {
+    const draft = {
+      ...draftWith(['ChIJa', 'ChIJb']),
+      originIsCurrentLocation: true,
+      routeStart: 'current-location' as const,
+    };
+
+    expect(idempotencyKeyFor(draft, { latitude: 45.4642, longitude: 9.19 })).not.toBe(
+      idempotencyKeyFor(draft, { latitude: 45.4742, longitude: 9.19 }),
+    );
+  });
+
+  it('is stable for a retry from the same current-location coordinate', () => {
+    const draft = {
+      ...draftWith(['ChIJa', 'ChIJb']),
+      originIsCurrentLocation: true,
+      routeStart: 'current-location' as const,
+    };
+    const origin = { latitude: 45.4642, longitude: 9.19 };
+
+    expect(idempotencyKeyFor(draft, origin)).toBe(idempotencyKeyFor(draft, origin));
+  });
+
+  it('separates return-to-start from return-to-current-location', () => {
+    const draft = draftWith(['ChIJa', 'ChIJb']);
+    const returnToStart = {
+      ...draft,
+      shape: 'round-trip' as const,
+      routeEnd: 'return-to-start' as const,
+    };
+    const returnToCurrent = {
+      ...returnToStart,
+      originIsCurrentLocation: true,
+      routeStart: 'current-location' as const,
+      routeEnd: 'current-location' as const,
+    };
+
+    expect(idempotencyKeyFor(returnToStart)).not.toBe(
+      idempotencyKeyFor(returnToCurrent, { latitude: 45.4642, longitude: 9.19 }),
+    );
+  });
+
   it('separates two routes that happen to hold identical stops', () => {
     // The route id stays outside the hash for exactly this: one route's result
     // must never be served for another's.

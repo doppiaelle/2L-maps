@@ -19,7 +19,7 @@ import type { HandlerContext } from '../handler.ts';
  * ([ADR-0011](../../../../docs/adr/0011-server-side-quota-enforcement.md)). The
  * client carries a fallback copy of these numbers only so it can render an
  * allowance bar offline; when the two disagree, this wins
- * ([ADR-0015](../../../../docs/adr/0015-ad-supported-free-tier.md)).
+ * ([ADR-0029](../../../../docs/adr/0029-single-driver-wedge-and-subscription-first-freemium.md)).
  *
  * Entitlement and allowances come back together because they are the same
  * question asked twice, and two round trips on every app start to render one

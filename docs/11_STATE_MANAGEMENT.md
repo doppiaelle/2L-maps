@@ -51,9 +51,8 @@ loss and process death.
                               │  never copied into ↓
   ┌────────────────────────────────────────────────────────┐
   │ ZUSTAND — global client state, feature-scoped          │
-  │   draft route (stops, order, round-trip flag)          │
-  │   route progress (current stop, completed, skipped)    │
-  │   selection · sheet detent · provider preference       │
+  │   draft route (stops, order, endpoint choices, result) │
+  │   selection · provider/theme/endpoint preferences      │
   └────────────────────────────────────────────────────────┘
   ┌────────────────────────────────────────────────────────┐
   │ useState — local UI                                    │
@@ -77,10 +76,8 @@ ever been sent to the server.
   PERSISTED (survives process death)          IN-MEMORY (does not)
   ────────────────────────────────            ──────────────────────
   draft route + stop order                    sheet detent
-  route progress ◀── written before           map camera
-                     every handoff            selected stop
   mutation queue                              search input
-  provider preference                         modal drafts (background only)
+  provider + route endpoint preferences        modal drafts (background only)
   last optimization result
   auth session
 ```
@@ -162,9 +159,9 @@ Small, feature-scoped stores. No single global store.
 
 | Store | Holds | Persisted |
 |---|---|---|
-| `draftRouteStore` | Stops, order, origin, round-trip flag, last result | **Yes** |
-| `routeProgressStore` | That a route was handed to a navigation app, and when | **Yes** |
-| `preferencesStore` | Navigation provider, theme override, units | **Yes** |
+| `draftRouteStore` | Stops, entry order, start/end choices, last result | **Yes**, schema-versioned |
+| `routeProgressStore` | Legacy handoff marker; not used for fake in-app progress | **Yes** |
+| `preferencesStore` | Navigation provider, theme override, units, default start and end choices | **Yes** |
 | `mutationQueueStore` | Pending offline operations | **Yes** |
 | `uiStore` | Open dock section, selected stop, camera | No |
 
@@ -272,7 +269,7 @@ is indistinguishable from data loss.
 
 1. **Server data never enters Zustand.**
 2. **Stores expose actions, not setters** — invariants stay inside.
-3. **Persist route progress before every handoff.**
+3. **Await the confirmed-route save before every external handoff.**
 4. **Never optimistically reorder.** The result is the point.
 5. **Roll back to the captured prior state**, exactly.
 6. **Version persisted state** from the first release; migration is unavoidable later.

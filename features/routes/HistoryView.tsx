@@ -11,6 +11,8 @@ import { LIST_VIRTUALISATION_THRESHOLD } from '@/types';
 export interface HistoryViewProps {
   readonly routes: readonly SavedRouteSummary[];
   readonly isLoading: boolean;
+  readonly isUnavailable?: boolean;
+  onRetry?: () => void;
   onOpen: (routeId: string) => void;
   readonly theme: ThemeName;
   readonly testID?: string;
@@ -19,6 +21,8 @@ export interface HistoryViewProps {
 export function HistoryView({
   routes,
   isLoading,
+  isUnavailable = false,
+  onRetry,
   onOpen,
   theme,
   testID,
@@ -58,7 +62,27 @@ export function HistoryView({
         Your confirmed itineraries, ready to restart.
       </Text>
 
-      {!isLoading && (
+      {!isLoading && isUnavailable && (
+        <HistoryState
+          title="Could not load your routes"
+          detail="Your saved routes have not been removed. Reconnect and try again."
+          actionLabel="Try again"
+          {...(onRetry === undefined ? {} : { onAction: onRetry })}
+          theme={theme}
+          testID="history-unavailable"
+        />
+      )}
+
+      {!isLoading && !isUnavailable && routes.length === 0 && (
+        <HistoryState
+          title="No saved routes yet"
+          detail="Confirm an optimized route and it will appear here, ready to reopen without optimizing it again."
+          theme={theme}
+          testID="history-empty"
+        />
+      )}
+
+      {!isLoading && !isUnavailable && routes.length > 0 && (
         <FlatList
           data={routes}
           keyExtractor={(item) => item.routeId}
@@ -67,6 +91,70 @@ export function HistoryView({
           renderItem={({ item }) => <RouteRow summary={item} onOpen={onOpen} theme={theme} />}
           testID="history-list"
         />
+      )}
+    </View>
+  );
+}
+
+function HistoryState({
+  title,
+  detail,
+  actionLabel,
+  onAction,
+  theme,
+  testID,
+}: {
+  title: string;
+  detail: string;
+  actionLabel?: string;
+  onAction?: () => void;
+  theme: ThemeName;
+  testID: string;
+}): React.JSX.Element {
+  const palette = colours[theme];
+  return (
+    <View
+      style={{
+        marginTop: space.space6,
+        padding: space.space5,
+        borderRadius: radius.radiusLg,
+        backgroundColor: palette.surface,
+        borderWidth: 1,
+        borderColor: palette.border,
+        alignItems: 'center',
+      }}
+      testID={testID}
+    >
+      <Text style={{ color: palette.textPrimary, fontSize: 20, fontWeight: '700' }}>{title}</Text>
+      <Text
+        style={{
+          color: palette.textSecondary,
+          fontSize: 15,
+          lineHeight: 21,
+          textAlign: 'center',
+          marginTop: space.space2,
+        }}
+      >
+        {detail}
+      </Text>
+      {actionLabel !== undefined && onAction !== undefined && (
+        <Pressable
+          onPress={onAction}
+          accessibilityRole="button"
+          style={{
+            minHeight: 48,
+            marginTop: space.space4,
+            paddingHorizontal: space.space5,
+            borderRadius: radius.radiusMd,
+            backgroundColor: palette.accent,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Text style={{ color: palette.accentOn, fontSize: 16, fontWeight: '700' }}>
+            {actionLabel}
+          </Text>
+        </Pressable>
       )}
     </View>
   );

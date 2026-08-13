@@ -99,8 +99,7 @@ export type ActionIntent =
   | { readonly kind: 'start' }
   | { readonly kind: 'retry' }
   | { readonly kind: 'blocked'; readonly reason: string }
-  | { readonly kind: 'degraded-only'; readonly note: string }
-  | { readonly kind: 'unlockable'; readonly note: string };
+  | { readonly kind: 'degraded-only'; readonly note: string };
 
 export function actionIntentOf(state: PlanState, availability: OptimizeAvailability): ActionIntent {
   switch (state.kind) {
@@ -152,17 +151,13 @@ function draftIntent(stopCount: number, availability: OptimizeAvailability): Act
       // The allowance is spent but the route is small enough for the local
       // solver. Offered, and labelled — a degraded result must never look like
       // a full one (CLAUDE.md §7 rule 6).
-      return availability.canUnlockWithAd
-        ? { kind: 'unlockable', note: 'Watch a short ad for a traffic-aware route' }
-        : { kind: 'degraded-only', note: 'Estimated without traffic' };
+      return { kind: 'degraded-only', note: 'Estimated without traffic' };
 
     case 'blocked':
-      return availability.canUnlockWithAd
-        ? { kind: 'unlockable', note: 'Watch a short ad to optimize this route' }
-        : {
-            kind: 'blocked',
-            reason: 'Your optimizations are used up until the allowance resets',
-          };
+      return {
+        kind: 'blocked',
+        reason: 'Your optimizations are used up until the allowance resets',
+      };
   }
 }
 

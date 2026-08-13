@@ -92,8 +92,8 @@ product. An experiment whose outcomes all lead to the same decision is not run.
 ### MVP — prove someone pays to have their stops reordered
 
 **Scope:** every MUST feature in [`04_FEATURES.md`](04_FEATURES.md). Stops, the T0–T2 cascade,
-route preview, external handoff, saved routes, history, offline access to own data, trial to
-paid.
+route preview, save-before-handoff, reusable History, external handoff, offline access to own data
+and honest plan comparison.
 
 **Explicitly not in the MVP,** despite being easy to add: Live Activity, geofenced arrival,
 notes, snapshot export, satellite view, favourites-at-scale. Each is deferred because none
@@ -106,7 +106,7 @@ and a real user who is not the developer has completed a route.
 
 | Metric | Threshold | Meaning if missed |
 |---|---|---|
-| Trial-to-paid conversion | ≥ 15% | The paywall or the value proposition is wrong. Run the [J0 experiment](03_USER_JOURNEYS.md) before adding features. |
+| Activated-Free-to-paid conversion | ≥ 15% | The value proposition, plan limits or checkout placement is wrong; do not add fleet features |
 | COGS per active user | ≤ $1.50/month | Cost assumptions are wrong. Fix caching and quotas before scaling. |
 | Crash-free sessions | ≥ 99.5% | Stability first. No new features. |
 | Routes optimized per paying user per week | ≥ 3 | The product is not part of the routine; retention will not follow. |
@@ -121,8 +121,8 @@ is full and whose routes repeat gets faster every week. Everything in this phase
 | Release | Scope | Why here |
 |---|---|---|
 | **1.1** | List import at scale with CSV column mapping; favourites; route duplication; time-saved summary | Elena's morning retyping is the sharpest recurring pain; time-saved is the only numeric proof of value |
-| **1.2** | Live Activity and persistent notification for route progress; stop notes | Reduces the friction of the return loop that external handoff imposes |
-| **1.3** | Opt-in geofenced arrival detection | Removes the return loop entirely for users who accept the permission. Deferred to last in the phase because it carries the highest App Review risk |
+| **1.2** | Photo/spreadsheet correction flow; stop notes | Improves the fastest-unstructured-input wedge |
+| **1.3** | Billing provider composition and purchase/restore once store products are validated | Converts the existing comparison without faking checkout |
 
 **Gate D2 — measured over 90 days:**
 
@@ -138,11 +138,11 @@ indicate the product has become part of a routine rather than a tool used once.
 
 ---
 
-### 2.0 — expand the segment upward
+### 2.0 — consider constraint-aware single-driver planning
 
-**Thesis:** the 25-stop ceiling and the absence of constraints exclude Sofia
-([`02_USER_PERSONAS.md`](02_USER_PERSONAS.md)) and the professional whose day has fixed
-appointments. Both are reachable, but only with a pricing tier that carries the cost.
+**Thesis:** Sofia is already the target inside 10–25 stops. Time windows and priorities may serve
+that same driver, but only with a price and API budget that carry T2. More than one vehicle remains
+a separate product.
 
 | Scope | Cost implication |
 |---|---|
