@@ -81,7 +81,12 @@ export interface PlanViewProps {
    * of the total and no comparison — those would be arithmetic presented as
    * measurement.
    */
-  readonly selectedLeg?: { readonly value: string; readonly spoken: string } | null;
+  readonly selectedLeg?: {
+    readonly value: string;
+    readonly spoken: string;
+    readonly stopLabel?: string;
+    readonly stopNumber?: number;
+  } | null;
   /**
    * Points to keep clear at the bottom, in map mode.
    *
@@ -189,15 +194,22 @@ export function PlanView({
           <Text
             style={{
               color: colours[theme].textPrimary,
-              fontSize: 24,
-              lineHeight: 30,
+              fontSize: 42,
+              lineHeight: 50,
               fontWeight: '700',
-              marginTop: space.space4,
+              marginTop: space.space5,
             }}
           >
             Your route
           </Text>
-          <Text style={{ color: colours[theme].textSecondary, fontSize: 12, marginTop: 2 }}>
+          <Text
+            style={{
+              color: colours[theme].textSecondary,
+              fontSize: 18,
+              lineHeight: 26,
+              marginTop: space.space1,
+            }}
+          >
             Add the places you need to visit.
           </Text>
           <Pressable
@@ -205,33 +217,34 @@ export function PlanView({
             accessibilityRole="button"
             accessibilityLabel="Search an address or place"
             style={{
-              minHeight: 44,
-              marginTop: space.space4,
-              paddingHorizontal: space.space3,
+              minHeight: 72,
+              marginTop: space.space5,
+              paddingLeft: space.space4,
+              paddingRight: space.space2,
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'space-between',
-              borderRadius: radius.radiusMd,
+              borderRadius: 28,
               backgroundColor: colours[theme].surface,
               borderWidth: 1,
               borderColor: colours[theme].border,
             }}
             testID="route-search-field"
           >
-            <Text style={{ color: colours[theme].textTertiary, fontSize: 13 }}>
+            <Text style={{ color: colours[theme].textTertiary, fontSize: 20 }} numberOfLines={1}>
               Search an address or place…
             </Text>
             <View
               style={{
-                width: 28,
-                height: 28,
-                borderRadius: 8,
+                width: 56,
+                height: 56,
+                borderRadius: 18,
                 backgroundColor: colours[theme].textPrimary,
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
             >
-              <Text style={{ color: colours[theme].bg, fontWeight: '700' }}>⌕</Text>
+              <Text style={{ color: colours[theme].bg, fontSize: 26, fontWeight: '700' }}>⌕</Text>
             </View>
           </Pressable>
           {/* Above the summary rather than between the list rows: the top of the
@@ -332,94 +345,67 @@ export function PlanView({
             )}
 
             {view === 'map' && selectedLeg !== null && (
-              // Over the canvas rather than in the header: it describes a hop
-              // the finger is still on, and the eye should not have to travel
-              // to the top of the screen to read the answer to its own tap.
-              <View
-                style={{
-                  position: 'absolute',
-                  left: layout.screenPadding,
-                  right: layout.screenPadding,
-                  top: space.space3,
-                  alignItems: 'center',
-                }}
-                pointerEvents="none"
-                testID="plan-selected-leg"
-              >
-                <View
-                  className="bg-surface border border-border"
-                  style={{
-                    paddingHorizontal: space.space4,
-                    paddingVertical: space.space2,
-                    borderRadius: radius.radiusFull,
-                  }}
-                >
-                  <Text
-                    className="text-metric-md text-text-primary"
-                    style={{ fontVariant: ['tabular-nums'] }}
-                    accessibilityLabel={selectedLeg.spoken}
-                    accessibilityLiveRegion="polite"
-                  >
-                    {selectedLeg.value}
-                  </Text>
-                </View>
-              </View>
-            )}
-
-            {view === 'map' && (
               <View
                 style={{
                   position: 'absolute',
                   left: layout.screenPadding,
                   right: layout.screenPadding,
                   bottom: bottomInset + 78,
-                  padding: space.space3,
-                  borderRadius: radius.radiusMd,
+                  padding: space.space5,
+                  borderRadius: 28,
                   backgroundColor: colours[theme].textPrimary,
                 }}
                 testID="map-itinerary-card"
               >
-                <Text style={{ color: colours[theme].bg, fontSize: 10, opacity: 0.68 }}>
+                <Text
+                  style={{
+                    color: colours[theme].bg,
+                    fontSize: 13,
+                    lineHeight: 18,
+                    opacity: 0.68,
+                    fontWeight: '700',
+                  }}
+                >
                   OPTIMIZED ROUTE
                 </Text>
                 <Text
-                  numberOfLines={1}
+                  numberOfLines={2}
                   style={{
                     color: colours[theme].bg,
-                    fontSize: 14,
+                    fontSize: 28,
+                    lineHeight: 34,
                     fontWeight: '700',
-                    marginTop: space.space1,
-                  }}
-                >
-                  {stops[1] === undefined
-                    ? 'Your fastest itinerary'
-                    : `Stop 2 · ${stops[1].text.title}`}
-                </Text>
-                <View style={{ flexDirection: 'row', marginTop: space.space2, gap: space.space4 }}>
-                  {distance !== null && (
-                    <Text style={{ color: colours[theme].accent, fontSize: 12, fontWeight: '700' }}>
-                      {distance.value}
-                    </Text>
-                  )}
-                  {duration !== null && (
-                    <Text style={{ color: colours[theme].accent, fontSize: 12, fontWeight: '700' }}>
-                      {duration.value}
-                    </Text>
-                  )}
-                </View>
-                <View
-                  style={{
-                    height: 3,
-                    borderRadius: 2,
-                    backgroundColor: colours[theme].border,
                     marginTop: space.space2,
-                    overflow: 'hidden',
                   }}
                 >
-                  <View
-                    style={{ width: '58%', height: 3, backgroundColor: colours[theme].accent }}
-                  />
-                </View>
+                  {selectedLeg.stopNumber === undefined || selectedLeg.stopLabel === undefined
+                    ? 'Selected route segment'
+                    : `Stop ${selectedLeg.stopNumber} · ${selectedLeg.stopLabel}`}
+                </Text>
+                <Text
+                  style={{
+                    color: colours[theme].bg,
+                    opacity: 0.72,
+                    fontSize: 18,
+                    lineHeight: 26,
+                    marginTop: space.space2,
+                  }}
+                >
+                  Static segment details. Navigation opens in your selected app.
+                </Text>
+                <Text
+                  style={{
+                    color: colours[theme].accent,
+                    fontSize: 20,
+                    fontWeight: '700',
+                    marginTop: space.space4,
+                  }}
+                  accessibilityLabel={selectedLeg.spoken}
+                  accessibilityLiveRegion="polite"
+                  testID="plan-selected-leg"
+                >
+                  {selectedLeg.value}
+                </Text>
               </View>
             )}
 
@@ -461,7 +447,7 @@ export function PlanView({
 
       <View
         style={{
-          paddingHorizontal: layout.screenPadding,
+          paddingHorizontal: 0,
           // Clear of the dock the canvas runs underneath, and clear of it by
           // more than a hairline: Confirm is pressed one-handed in a van, and a
           // pill that shares an edge with the navigation is a mis-tap into
@@ -469,6 +455,27 @@ export function PlanView({
           paddingBottom: (view === 'map' ? space.space4 : space.space3) + bottomInset,
         }}
       >
+        {view === 'list' && stops.length > 0 && state.kind !== 'optimized' && (
+          <View
+            style={{
+              marginHorizontal: layout.screenPadding,
+              marginBottom: space.space5,
+              paddingHorizontal: space.space4,
+              paddingVertical: space.space4,
+              borderRadius: 26,
+              backgroundColor: colours[theme].accentSubtle,
+            }}
+            testID="plan-ready-card"
+          >
+            <Text
+              style={{ color: colours[theme].accent, fontSize: 22, fontWeight: '700' }}
+            >{`${stops.length} ${stops.length === 1 ? 'stop' : 'stops'} ready`}</Text>
+            <Text style={{ color: colours[theme].accent, fontSize: 17, marginTop: space.space2 }}>
+              Optimize to automatically reorder them.
+            </Text>
+          </View>
+        )}
+
         {actionState !== null && (
           <View style={{ flexDirection: 'row', alignItems: 'flex-end' }}>
             <View style={{ flex: 1 }}>
@@ -477,7 +484,7 @@ export function PlanView({
                 onPress={onPrimaryAction}
                 // Over the canvas it floats rather than closing a column, so it
                 // takes the width of its own label and is lifted off the drawing.
-                shape={view === 'map' ? 'pill' : 'block'}
+                shape="block"
                 testID="plan-action"
               />
             </View>

@@ -414,6 +414,8 @@ function SyncProbe(): React.JSX.Element {
   const addStop = useDraftRouteStore((store) => store.addStopToDraft);
   const label = useDraftRouteStore((store) => store.setStopLabel);
   const applyResult = useDraftRouteStore((store) => store.applyResult);
+  const reset = useDraftRouteStore((store) => store.reset);
+  const begin = useRouteProgressStore((store) => store.begin);
 
   return (
     <>
@@ -448,6 +450,22 @@ function SyncProbe(): React.JSX.Element {
         }}
       >
         optimize
+      </Text>
+      <Text
+        testID="handoff"
+        onPress={() => {
+          begin(useDraftRouteStore.getState().draft.routeId);
+        }}
+      >
+        handoff
+      </Text>
+      <Text
+        testID="reset"
+        onPress={() => {
+          reset('00000000-0000-4000-8000-000000000002');
+        }}
+      >
+        reset
       </Text>
     </>
   );
@@ -525,5 +543,69 @@ describe('when a route is written', () => {
 
     expect(JSON.stringify(saves)).not.toContain('coordinate');
     expect(JSON.stringify(saves)).not.toContain('latitude');
+  });
+
+  it('writes the handoff state that makes a confirmed route appear in History', async () => {
+    const { provider, saves } = fakeRoutes();
+    await renderWithServices(provider, <SyncProbe />);
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('add'));
+    });
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('optimize'));
+    });
+    await waitFor(() => {
+      expect(saves.some((save) => JSON.stringify(save).includes('"status":"optimized"'))).toBe(
+        true,
+      );
+    });
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('handoff'));
+    });
+
+    await waitFor(() => {
+      expect(saves.some((save) => JSON.stringify(save).includes('"status":"in_progress"'))).toBe(
+        true,
+      );
+    });
+  });
+
+  it('starts a fresh lifecycle for the next route instead of blocking its save', async () => {
+    const { provider, saves } = fakeRoutes();
+    await renderWithServices(provider, <SyncProbe />);
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('add'));
+      fireEvent.press(screen.getByTestId('optimize'));
+    });
+    await waitFor(() => {
+      expect(saves.length).toBeGreaterThan(0);
+    });
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('handoff'));
+    });
+    await waitFor(() => {
+      expect(saves.some((save) => JSON.stringify(save).includes('"status":"in_progress"'))).toBe(
+        true,
+      );
+    });
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('reset'));
+      fireEvent.press(screen.getByTestId('add'));
+      fireEvent.press(screen.getByTestId('optimize'));
+    });
+
+    await waitFor(() => {
+      expect(
+        saves.some(
+          (save) =>
+            JSON.stringify(save).includes('00000000-0000-4000-8000-000000000002') &&
+            JSON.stringify(save).includes('"status":"optimized"'),
+        ),
+      ).toBe(true);
+    });
   });
 });

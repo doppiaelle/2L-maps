@@ -21,9 +21,10 @@ import type { ThemeName } from '@/lib/design/tokens';
 
 export interface SettingsSectionProps {
   readonly theme: ThemeName;
+  onBack: () => void;
 }
 
-export function SettingsSection({ theme }: SettingsSectionProps): React.JSX.Element {
+export function SettingsSection({ theme, onBack }: SettingsSectionProps): React.JSX.Element {
   const { signOut } = useSession();
   const { quota, allowances } = useUsageQuota();
   const provider = usePreferencesStore((store) => store.preferences.navigationProvider);
@@ -50,6 +51,7 @@ export function SettingsSection({ theme }: SettingsSectionProps): React.JSX.Elem
       }
       providerLabel={provider === null ? 'Choose a navigation app' : `Navigating with ${provider}`}
       provider={provider}
+      onBack={onBack}
       onOpenPaywall={() => {
         router.push('/paywall');
       }}

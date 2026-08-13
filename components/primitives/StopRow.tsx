@@ -1,8 +1,8 @@
 import { Pressable, Text, View } from 'react-native';
 
-import { layout, radius } from '@/lib/design/tokens';
+import { colours, layout, radius, space } from '@/lib/design/tokens';
 import type { ThemeName } from '@/lib/design/tokens';
-import { MARKER_SIZE, markerStyle } from '@/lib/map/style';
+import { markerStyle } from '@/lib/map/style';
 import type { StopText } from '@/lib/route/stop-text';
 import type { StopProgressState } from '@/lib/route/progress';
 
@@ -93,6 +93,9 @@ export function StopRow({
   // tapped on the map.
   const presentation = markerStyle(theme, state, false);
   const { title, subtitle } = text;
+  const palette = colours[theme];
+  const ordinalFill = state === 'pending' ? palette.textPrimary : presentation.fill;
+  const ordinalText = state === 'pending' ? palette.bg : presentation.foreground;
 
   return (
     <Pressable
@@ -104,19 +107,19 @@ export function StopRow({
       accessibilityHint={
         hasCoordinate ? 'Opens stop details' : 'Needs its address re-entered before navigating'
       }
-      style={{ minHeight: layout.touchMin }}
-      className="flex-row items-center gap-space-3 px-screen-padding py-space-2"
+      style={{ minHeight: layout.touchMin, paddingVertical: space.space3 }}
+      className="flex-row items-center gap-space-4 px-screen-padding"
       testID={testID}
     >
       {/* The ordinal is the row's anchor: it is what the user reads out loud to
           themselves while driving, so it is the one number that never moves. */}
       <View
         style={{
-          width: MARKER_SIZE,
-          height: MARKER_SIZE,
+          width: 50,
+          height: 50,
           borderRadius: radius.radiusFull,
-          backgroundColor: presentation.fill,
-          borderWidth: 2,
+          backgroundColor: ordinalFill,
+          borderWidth: state === 'pending' ? 0 : 2,
           borderColor: presentation.border,
           alignItems: 'center',
           justifyContent: 'center',
@@ -125,38 +128,44 @@ export function StopRow({
         importantForAccessibility="no"
         testID="stop-ordinal"
       >
-        <Text className="text-label-sm" style={{ color: presentation.foreground }}>
+        <Text style={{ color: ordinalText, fontSize: 18, fontWeight: '700' }}>
           {presentation.glyph ?? position}
         </Text>
       </View>
 
       <View className="flex-1">
         <Text
-          className="text-body-strong flex-1"
-          style={{ color: presentation.foreground }}
+          style={{ color: palette.textPrimary, fontSize: 22, lineHeight: 28, fontWeight: '700' }}
           numberOfLines={2}
         >
           {title}
         </Text>
 
         {subtitle !== null && (
-          <Text className="text-caption text-text-secondary" numberOfLines={2}>
+          <Text
+            style={{ color: palette.textSecondary, fontSize: 17, lineHeight: 23, marginTop: 3 }}
+            numberOfLines={2}
+          >
             {subtitle}
           </Text>
         )}
 
-        {meta !== null && <Text className="text-caption text-text-secondary">{meta}</Text>}
+        {meta !== null && (
+          <Text style={{ color: palette.textSecondary, fontSize: 15, marginTop: 3 }}>{meta}</Text>
+        )}
 
         {!hasCoordinate && (
           // Warning, not danger: an expired coordinate is expected behaviour on
           // a route saved a month ago, not an error the user caused
           // (docs/07_DESIGN_SYSTEM.md).
-          <Text className="text-caption text-warning">Address needs refreshing</Text>
+          <Text style={{ color: palette.warning, fontSize: 15, marginTop: 3 }}>
+            Address needs refreshing
+          </Text>
         )}
       </View>
 
       {(onMoveUp !== undefined || onMoveDown !== undefined || onRemove !== undefined) && (
-        <View className="flex-row items-center" testID="stop-controls">
+        <View style={{ flexDirection: 'row', alignItems: 'center' }} testID="stop-controls">
           {/* Each control states the stop it acts on. "Move up" alone is
               ambiguous the moment a screen reader user is moving through a list
               of twenty-five of them. */}
@@ -212,12 +221,16 @@ function RowControl({
       style={{
         minWidth: layout.touchMin,
         minHeight: layout.touchMin,
-        opacity: isEnabled ? 1 : 0.3,
+        borderRadius: radius.radiusMd,
+        borderWidth: glyph === '✕' ? 1 : 0,
+        borderColor: '#E4E4E1',
+        alignItems: 'center',
+        justifyContent: 'center',
+        opacity: isEnabled ? 1 : 0.22,
       }}
-      className="items-center justify-center"
       testID={testID}
     >
-      <Text className="text-body text-text-secondary">{glyph}</Text>
+      <Text style={{ color: '#6B6B70', fontSize: glyph === '✕' ? 28 : 18 }}>{glyph}</Text>
     </Pressable>
   );
 }

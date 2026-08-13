@@ -1,6 +1,6 @@
 import { Pressable, Text, View } from 'react-native';
 
-import { colours, layout, radius, space } from '@/lib/design/tokens';
+import { colours, layout, radius } from '@/lib/design/tokens';
 import type { ThemeName } from '@/lib/design/tokens';
 import type { DockItem, DockSection } from '@/lib/ui/dock';
 
@@ -32,11 +32,11 @@ import type { DockItem, DockSection } from '@/lib/ui/dock';
  */
 
 /** The pill row's own height, in points. */
-export const DOCK_HEIGHT = 60;
+export const DOCK_HEIGHT = 78;
 
 /** The gap between the dock and each screen edge. Enough that the map reads as
  *  continuing underneath rather than being cut off by it. */
-export const DOCK_INSET = space.space3;
+export const DOCK_INSET = layout.screenPadding;
 
 /**
  * What the dock actually covers at the bottom of the screen, excluding the
@@ -100,15 +100,12 @@ export function Dock({
           // object", and a square-cornered bar floating in the middle of the
           // screen reads as a cropped bar.
           borderRadius: radius.radiusFull,
-          borderWidth: 1,
-          borderColor: palette.textPrimary,
-          // Translucent rather than opaque: the map moving underneath is what
-          // says the dock is above the map rather than a wall at the bottom.
-          backgroundColor: withAlpha(palette.textPrimary, 0.96),
+          borderWidth: 0,
+          backgroundColor: palette.textPrimary,
           // The pills breathe inside the container instead of touching its
           // border, which is the difference between four buttons in a box and
           // one dock with four sections in it.
-          padding: space.space1,
+          padding: 7,
           overflow: 'hidden',
         }}
         accessibilityRole="tablist"
@@ -166,7 +163,7 @@ function DockButton({
       accessibilityState={{ selected: isSelected }}
       style={{
         flex: 1,
-        minHeight: layout.touchMin - space.space2,
+        minHeight: 54,
         alignItems: 'center',
         justifyContent: 'center',
         gap: 0,
@@ -179,8 +176,7 @@ function DockButton({
       testID={testID}
     >
       <Text
-        style={{ color: tint }}
-        className="text-caption-strong"
+        style={{ color: tint, fontSize: 18, fontWeight: '700' }}
         accessibilityElementsHidden
         importantForAccessibility="no"
         numberOfLines={1}
@@ -189,23 +185,4 @@ function DockButton({
       </Text>
     </Pressable>
   );
-}
-
-/**
- * A hex token at partial opacity.
- *
- * The tokens are opaque hex because every other surface in the product is, and
- * adding an eight-digit variant to the palette for one component would put a
- * colour in the design system that only one file can use. Converted here instead,
- * from the same token, so the dock cannot drift from `surface`.
- */
-function withAlpha(hex: string, alpha: number): string {
-  const value = /^#([0-9a-f]{6})$/i.exec(hex)?.[1];
-  if (value === undefined) return hex;
-
-  const number = parseInt(value, 16);
-  const r = (number >> 16) & 0xff;
-  const g = (number >> 8) & 0xff;
-  const b = number & 0xff;
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }

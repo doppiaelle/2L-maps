@@ -74,7 +74,7 @@ export interface StopListProps {
 
 /** Two lines of address plus padding at the default Dynamic Type size. A caller
  *  at 200% passes its own measured value rather than letting the list guess. */
-export const DEFAULT_ROW_HEIGHT = 72;
+export const DEFAULT_ROW_HEIGHT = 82;
 
 const Row = memo(
   function Row({
@@ -213,8 +213,16 @@ export function StopList({
     return (
       <View testID={testID} className="px-screen-padding py-space-6 items-center">
         {header}
-        <Text className="text-title-md text-text-primary">No stops yet</Text>
-        <Text className="text-body text-text-secondary mt-space-2 text-center">
+        <Text
+          style={{ fontSize: 24, lineHeight: 30, fontWeight: '400' }}
+          className="text-text-primary"
+        >
+          No stops yet
+        </Text>
+        <Text
+          style={{ fontSize: 21, lineHeight: 31 }}
+          className="text-text-secondary mt-space-4 text-center"
+        >
           Add an address, paste a list, or photograph one.
         </Text>
       </View>
@@ -237,7 +245,7 @@ export function StopList({
       removeClippedSubviews={state.stops.length > LIST_VIRTUALISATION_THRESHOLD}
       initialNumToRender={Math.min(state.stops.length, LIST_VIRTUALISATION_THRESHOLD)}
       windowSize={5}
-      contentContainerStyle={{ paddingBottom: layout.touchMin * 2 }}
+      contentContainerStyle={{ paddingTop: 18, paddingBottom: layout.touchMin * 2 }}
       accessibilityLabel={`${state.stops.length} stops`}
     />
   );

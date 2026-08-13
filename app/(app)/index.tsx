@@ -66,6 +66,7 @@ export default function PlanScreen(): React.JSX.Element {
   const draft = useDraftRouteStore((store) => store.draft);
   const result = useDraftRouteStore((store) => store.result);
   const progress = useRouteProgressStore((store) => store.progress);
+  const abandonProgress = useRouteProgressStore((store) => store.abandon);
   const activeSection = useUiStore((store) => store.activeSection);
   const openSection = useUiStore((store) => store.openSection);
   const closeSection = useUiStore((store) => store.closeSection);
@@ -354,6 +355,18 @@ export default function PlanScreen(): React.JSX.Element {
   // on it — running behind the dock, lifting Confirm clear of it — is the same
   // for both.
   const isCanvasShowing = showsCanvas(routeView, result !== null);
+  const selectedLegDetails = (() => {
+    if (geometry === null || selectedLegIndex === null) return null;
+    const summary = legSummary(selectedLegIndex, geometry.legs);
+    if (summary === null) return null;
+
+    const stop = rows[selectedLegIndex + 1] ?? rows[selectedLegIndex];
+    return {
+      value: summary.value,
+      spoken: summary.spoken,
+      ...(stop === undefined ? {} : { stopLabel: stop.text.title, stopNumber: stop.position }),
+    };
+  })();
 
   return (
     <View
@@ -413,11 +426,7 @@ export default function PlanScreen(): React.JSX.Element {
                 />
               )
             }
-            selectedLeg={
-              geometry === null || selectedLegIndex === null
-                ? null
-                : legSummary(selectedLegIndex, geometry.legs)
-            }
+            selectedLeg={selectedLegDetails}
             onDismissMap={() => {
               /**
                * **The result stays.** This used to call `clearResult()`, so the
@@ -482,6 +491,7 @@ export default function PlanScreen(): React.JSX.Element {
               // the last one — History would otherwise show one route that keeps
               // changing shape.
               resetDraft(newRouteId());
+              abandonProgress();
               clearSelection();
             }}
             onResetOptimization={() => {
@@ -578,33 +588,35 @@ export default function PlanScreen(): React.JSX.Element {
 
       {activeSection === 'settings' && (
         <SectionPanel theme={theme} topInset={insets.top} testID="section-settings">
-          <SettingsSection theme={theme} />
+          <SettingsSection theme={theme} onBack={() => openSection('itinerary')} />
         </SectionPanel>
       )}
 
-      <Pressable
-        onPress={() => openSection(activeSection === 'settings' ? 'itinerary' : 'settings')}
-        accessibilityRole="button"
-        accessibilityLabel={activeSection === 'settings' ? 'Return to route' : 'Open settings'}
-        style={{
-          position: 'absolute',
-          top: insets.top + space.space2,
-          right: space.space3,
-          width: 44,
-          height: 44,
-          borderRadius: 22,
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: colours[theme].surfaceRaised,
-          borderWidth: 1,
-          borderColor: colours[theme].border,
-        }}
-        testID="open-settings"
-      >
-        <Text style={{ color: colours[theme].textPrimary }}>
-          {activeSection === 'settings' ? 'Back' : '••'}
-        </Text>
-      </Pressable>
+      {activeSection !== 'settings' && (
+        <Pressable
+          onPress={() => openSection('settings')}
+          accessibilityRole="button"
+          accessibilityLabel="Open settings"
+          style={{
+            position: 'absolute',
+            top: insets.top + space.space3,
+            right: space.space3,
+            width: 62,
+            height: 62,
+            borderRadius: 31,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: colours[theme].surfaceRaised,
+            borderWidth: 1,
+            borderColor: colours[theme].border,
+          }}
+          testID="open-settings"
+        >
+          <Text style={{ color: colours[theme].textPrimary, fontSize: 26, fontWeight: '700' }}>
+            ⚙
+          </Text>
+        </Pressable>
+      )}
 
       {isSearchOpen && activeSection === 'itinerary' && (
         <InlineStopSearch theme={theme} onClose={() => setIsSearchOpen(false)} />

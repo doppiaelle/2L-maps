@@ -4,8 +4,7 @@ import { AD_SLOT_HEIGHT, AdSlot } from './AdSlot';
 import { StopRow } from './StopRow';
 import type { StopState } from './StopRow';
 import { fallbackAllowances } from '@/lib/entitlement/plans';
-import { layout } from '@/lib/design/tokens';
-import { markerStyle } from '@/lib/map/style';
+import { colours, layout } from '@/lib/design/tokens';
 import type { AdsProvider } from '@/lib/providers/types';
 
 const noop = () => undefined;
@@ -51,19 +50,17 @@ describe('a stop is never distinguished by colour alone', () => {
     expect(screen.queryByText('!', { includeHiddenElements: true })).toBeNull();
   });
 
-  it('draws the same mark the map draws, from the same function', () => {
-    // The row used to keep its own palette — a mint-tinted disc with mint digits
-    // — so one stop was a mint dot in the list and a white pin on the map, and
-    // every stop looked accented in a system with one accent (CLAUDE.md §8
-    // rule 2).
+  it('draws pending stops as the strong numbered badge from the mobile design', () => {
+    // The list and the map are no longer the same surface: the map pin sits on
+    // geography, while the list ordinal anchors text. The pending row badge is
+    // deliberately solid in the approved mobile reference.
     renderRow({ state: 'pending', theme: 'light' });
-    const expected = markerStyle('light', 'pending', false);
 
     expect(
       screen.getByTestId('stop-ordinal', { includeHiddenElements: true }).props.style,
     ).toMatchObject({
-      backgroundColor: expected.fill,
-      borderColor: expected.border,
+      backgroundColor: colours.light.textPrimary,
+      borderColor: colours.light.textPrimary,
     });
   });
 });

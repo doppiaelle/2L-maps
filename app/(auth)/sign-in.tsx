@@ -3,7 +3,7 @@ import { Image, Platform, Pressable, Text, useColorScheme, View } from 'react-na
 
 import { useSession } from '@/features/auth/session-provider';
 import { usePendingDeepLinkContext } from '@/features/navigation/deep-link-provider';
-import { colours, layout, radius, space } from '@/lib/design/tokens';
+import { colours, layout, space } from '@/lib/design/tokens';
 
 /**
  * Sign in.
@@ -46,26 +46,37 @@ export default function SignInScreen(): React.JSX.Element {
       style={{
         flex: 1,
         backgroundColor: palette.bg,
-        padding: layout.screenPadding,
-        justifyContent: 'center',
+        paddingHorizontal: layout.screenPadding,
+        paddingTop: 96,
       }}
       testID="sign-in-screen"
     >
       <View style={{ alignItems: 'center', paddingHorizontal: space.space2 }}>
-        <Image
-          source={require('../../assets/brand/logo.png')}
-          resizeMode="contain"
-          style={{ width: 132, height: 96 }}
-          accessibilityLabel="2L Maps mascot"
-          testID="brand-logo"
-        />
+        <View
+          style={{
+            width: 170,
+            height: 170,
+            borderRadius: 85,
+            backgroundColor: palette.accentSubtle,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Image
+            source={require('../../assets/brand/logo.png')}
+            resizeMode="contain"
+            style={{ width: 150, height: 110 }}
+            accessibilityLabel="2L Maps mascot"
+            testID="brand-logo"
+          />
+        </View>
         <Text
           style={{
             color: palette.textPrimary,
-            fontSize: 26,
-            lineHeight: 32,
+            fontSize: 50,
+            lineHeight: 58,
             fontWeight: '700',
-            marginTop: space.space3,
+            marginTop: 88,
           }}
         >
           2L Maps
@@ -73,8 +84,8 @@ export default function SignInScreen(): React.JSX.Element {
         <Text
           style={{
             color: palette.accent,
-            fontSize: 13,
-            lineHeight: 18,
+            fontSize: 20,
+            lineHeight: 28,
             fontWeight: '700',
             marginTop: space.space1,
           }}
@@ -84,8 +95,8 @@ export default function SignInScreen(): React.JSX.Element {
         <Text
           style={{
             color: palette.textSecondary,
-            fontSize: 13,
-            lineHeight: 19,
+            fontSize: 18,
+            lineHeight: 30,
             textAlign: 'center',
             marginTop: space.space5,
           }}
@@ -111,15 +122,22 @@ export default function SignInScreen(): React.JSX.Element {
 
       <View
         style={{
-          marginTop: space.space6,
-          padding: space.space2,
-          borderRadius: radius.radiusMd,
+          marginTop: 86,
+          padding: space.space4,
+          borderRadius: 28,
           backgroundColor: palette.surface,
           borderWidth: 1,
           borderColor: palette.border,
         }}
       >
-        <Text style={{ color: palette.textSecondary, fontSize: 10, marginBottom: space.space1 }}>
+        <Text
+          style={{
+            color: palette.textSecondary,
+            fontSize: 18,
+            fontWeight: '700',
+            marginBottom: space.space3,
+          }}
+        >
           Welcome back
         </Text>
         {failure !== null && (
@@ -159,9 +177,9 @@ export default function SignInScreen(): React.JSX.Element {
       <Text
         style={{
           color: palette.textTertiary,
-          fontSize: 11,
+          fontSize: 16,
           textAlign: 'center',
-          marginTop: space.space5,
+          marginTop: space.space6,
         }}
       >
         Your routes, ordered for less driving.
@@ -192,9 +210,9 @@ function SignInButton({
       accessibilityLabel={label}
       accessibilityState={{ disabled: isWorking, busy: isWorking }}
       style={{
-        minHeight: 48,
-        borderRadius: radius.radiusSm,
-        marginTop: space.space1,
+        minHeight: 64,
+        borderRadius: 20,
+        marginTop: space.space2,
         alignItems: 'center',
         justifyContent: 'center',
         backgroundColor: isPrimary ? palette.textPrimary : palette.surfaceRaised,
@@ -206,11 +224,11 @@ function SignInButton({
       <Text
         style={{
           color: isPrimary ? palette.bg : palette.textPrimary,
-          fontSize: 13,
+          fontSize: 19,
           fontWeight: '700',
         }}
       >
-        {label}
+        {label === 'Continue with Google' ? `G   ${label}` : label}
       </Text>
     </Pressable>
   );
