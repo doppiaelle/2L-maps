@@ -2,33 +2,22 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { colours, layout, radius, space } from '@/lib/design/tokens';
 import type { ThemeName } from '@/lib/design/tokens';
-import type { ThemePreference } from '@/features/preferences/preferences-store';
 import type { NavigationProviderId } from '@/types';
 
 export interface SettingsViewProps {
-  readonly planLabel: string;
-  readonly usageLabel: string;
-  readonly provider: NavigationProviderId | null;
+  readonly provider: NavigationProviderId;
   onBack: () => void;
-  onOpenPaywall: () => void;
   onChooseProvider: (provider: NavigationProviderId) => void;
   onSignOut: () => void;
-  readonly themePreference: ThemePreference;
-  onChooseTheme: (theme: ThemePreference) => void;
   readonly theme: ThemeName;
   readonly testID?: string;
 }
 
 export function SettingsView({
-  planLabel,
-  usageLabel,
   provider,
   onBack,
-  onOpenPaywall,
   onChooseProvider,
   onSignOut,
-  themePreference,
-  onChooseTheme,
   theme,
   testID,
 }: SettingsViewProps): React.JSX.Element {
@@ -170,95 +159,8 @@ export function SettingsView({
           marginTop: space.space6,
         }}
       >
-        Appearance
-      </Text>
-      <View
-        style={{
-          flexDirection: 'row',
-          marginTop: space.space3,
-          padding: 6,
-          borderRadius: radius.radiusLg,
-          backgroundColor: palette.surface,
-          borderWidth: 1,
-          borderColor: palette.border,
-        }}
-        testID="settings-theme-selector"
-      >
-        {THEME_OPTIONS.map((option) => {
-          const selected = option.value === themePreference;
-          return (
-            <Pressable
-              key={option.label}
-              onPress={() => onChooseTheme(option.value)}
-              accessibilityRole="radio"
-              accessibilityLabel={`Use ${option.label.toLowerCase()} theme`}
-              accessibilityState={{ checked: selected }}
-              style={{
-                flex: 1,
-                minHeight: 44,
-                borderRadius: radius.radiusMd,
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: selected ? palette.textPrimary : 'transparent',
-              }}
-              testID={`settings-theme-${option.label.toLowerCase()}`}
-            >
-              <Text
-                style={{
-                  color: selected ? palette.bg : palette.textSecondary,
-                  fontSize: 14,
-                  fontWeight: '700',
-                }}
-              >
-                {option.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-
-      <Text
-        style={{
-          color: palette.textPrimary,
-          fontSize: 28,
-          lineHeight: 34,
-          fontWeight: '700',
-          marginTop: space.space6,
-        }}
-      >
         Account
       </Text>
-      <Pressable
-        onPress={onOpenPaywall}
-        accessibilityRole="button"
-        accessibilityLabel="See plans"
-        style={{
-          marginTop: space.space3,
-          padding: space.space4,
-          borderRadius: radius.radiusLg,
-          backgroundColor: palette.surface,
-          borderWidth: 1,
-          borderColor: palette.border,
-        }}
-      >
-        <Text
-          style={{ color: palette.textPrimary, fontSize: 17, fontWeight: '700' }}
-          testID="settings-plan"
-        >
-          {planLabel}
-        </Text>
-        <Text
-          style={{
-            color: palette.textSecondary,
-            fontSize: 15,
-            lineHeight: 22,
-            marginTop: space.space1,
-          }}
-          testID="settings-usage"
-        >
-          {usageLabel}
-        </Text>
-      </Pressable>
       <Pressable
         onPress={onSignOut}
         accessibilityRole="button"
@@ -266,7 +168,7 @@ export function SettingsView({
         accessibilityHint="Signs you out on this device. Your saved routes stay in your account."
         style={{
           minHeight: 56,
-          marginTop: space.space4,
+          marginTop: space.space3,
           borderRadius: radius.radiusLg,
           backgroundColor: theme === 'light' ? '#EFEFED' : palette.surfaceRaised,
           alignItems: 'center',
@@ -279,12 +181,6 @@ export function SettingsView({
     </ScrollView>
   );
 }
-
-const THEME_OPTIONS: readonly { label: string; value: ThemePreference }[] = [
-  { label: 'Light', value: 'light' },
-  { label: 'System', value: null },
-  { label: 'Dark', value: 'dark' },
-];
 
 const PROVIDERS: readonly { label: string; value: NavigationProviderId }[] = [
   { label: 'Google Maps', value: 'google-maps' },

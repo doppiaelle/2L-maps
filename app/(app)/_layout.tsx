@@ -23,20 +23,6 @@ export default function AppLayout(): React.JSX.Element {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="index" />
-      {/* Modals appear over Plan and dismiss back to it, never adding depth.
-          The paywall refuses a swipe dismissal: it needs a deliberate answer,
-          and the route survives underneath either way (docs/10 §6). */}
-      <Stack.Screen name="(modal)/add-stop" options={{ presentation: 'modal' }} />
-      <Stack.Screen name="(modal)/import" options={{ presentation: 'modal' }} />
-      <Stack.Screen name="(modal)/provider" options={{ presentation: 'modal' }} />
-      <Stack.Screen
-        name="(modal)/paywall"
-        options={{ presentation: 'modal', gestureEnabled: false }}
-      />
-      {/* `(modal)/summary` used to sit here. It was the end of J3 — the screen
-          that appeared when the last stop was marked Done — and both are gone
-          (ADR-0027). Nothing in the app can now assert that a day is finished,
-          so nothing shows a screen claiming it. */}
     </Stack>
   );
 }

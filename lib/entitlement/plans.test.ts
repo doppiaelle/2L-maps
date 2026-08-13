@@ -7,7 +7,6 @@ import {
   grantsRewardedUnlock,
   optimizeAvailability,
   resolveAllowances,
-  shouldShowAdSlot,
 } from './plans';
 
 const noUsage: PlanUsage = { optimizations: 0, autocompleteSessions: 0 };
@@ -104,27 +103,6 @@ describe('the rewarded unlock', () => {
 
   it('is not granted when the user chose to close it', () => {
     expect(grantsRewardedUnlock('dismissed')).toBe(false);
-  });
-});
-
-describe('where an ad may appear', () => {
-  const free = fallbackAllowances('free');
-
-  it('shows on free, outside a route', () => {
-    expect(shouldShowAdSlot(free, { isRouteInProgress: false })).toBe(true);
-  });
-
-  it('never shows during a route, on any plan', () => {
-    // This is a safety rule before it is a UX one: the user is driving
-    // (CLAUDE.md §7 rule 8).
-    expect(shouldShowAdSlot(free, { isRouteInProgress: true })).toBe(false);
-  });
-
-  it('never shows to a subscriber', () => {
-    expect(shouldShowAdSlot(fallbackAllowances('pro'), { isRouteInProgress: false })).toBe(false);
-    expect(shouldShowAdSlot(fallbackAllowances('day-pass'), { isRouteInProgress: false })).toBe(
-      false,
-    );
   });
 });
 

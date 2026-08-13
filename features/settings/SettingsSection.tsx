@@ -1,8 +1,5 @@
-import { router } from 'expo-router';
-
 import { SettingsView } from './SettingsView';
 import { useSession } from '@/features/auth/session-provider';
-import { useUsageQuota } from '@/features/quota/use-usage-quota';
 import { usePreferencesStore } from '@/features/stores';
 import type { ThemeName } from '@/lib/design/tokens';
 
@@ -26,40 +23,17 @@ export interface SettingsSectionProps {
 
 export function SettingsSection({ theme, onBack }: SettingsSectionProps): React.JSX.Element {
   const { signOut } = useSession();
-  const { quota, allowances } = useUsageQuota();
   const provider = usePreferencesStore((store) => store.preferences.navigationProvider);
-  const themePreference = usePreferencesStore((store) => store.preferences.theme);
-  const chooseTheme = usePreferencesStore((store) => store.chooseTheme);
   const chooseProvider = usePreferencesStore((store) => store.chooseNavigationProvider);
 
   return (
     <SettingsView
-      planLabel={
-        allowances.plan === 'pro'
-          ? '2L Maps Pro'
-          : allowances.plan === 'day-pass'
-            ? 'Day pass'
-            : 'Free'
-      }
-      // Worded here rather than in the view, because it is the caller that knows
-      // the quota can be absent — a view that had to handle that would be making
-      // a decision about what the user is told.
-      usageLabel={
-        quota === null
-          ? 'Allowance unavailable — showing free limits'
-          : `${quota.usage.optimizations} of ${allowances.optimizationsPerPeriod} optimizations used, resets ${quota.periodEndsAt}`
-      }
       provider={provider}
       onBack={onBack}
-      onOpenPaywall={() => {
-        router.push('/paywall');
-      }}
-      onChooseProvider={(next) => chooseProvider(next, true)}
+      onChooseProvider={chooseProvider}
       onSignOut={() => {
         void signOut();
       }}
-      themePreference={themePreference}
-      onChooseTheme={chooseTheme}
       theme={theme}
       testID="settings-screen"
     />

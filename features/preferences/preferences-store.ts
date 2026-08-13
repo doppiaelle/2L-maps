@@ -25,20 +25,16 @@ export type ThemePreference = 'light' | 'dark' | null;
 export type UnitPreference = 'metric' | 'imperial' | null;
 
 export interface Preferences {
-  /** Null until the user has chosen, or if their choice is no longer installed. */
-  readonly navigationProvider: NavigationProviderId | null;
+  /** The navigator selected in the single settings surface. */
+  readonly navigationProvider: NavigationProviderId;
   readonly theme: ThemePreference;
   readonly units: UnitPreference;
-  /** Skips the provider chooser after the first handoff. Off by default:
-   *  deciding for someone silently is worse than one extra tap. */
-  readonly alwaysUsePreferredProvider: boolean;
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
-  navigationProvider: null,
+  navigationProvider: 'google-maps',
   theme: null,
   units: null,
-  alwaysUsePreferredProvider: false,
 };
 
 export type PreferencesStorage = PersistStorage<{ preferences: Preferences }>;
@@ -48,10 +44,7 @@ export const PREFERENCES_STORAGE_KEY = '2l-maps.preferences';
 export interface PreferencesStore {
   readonly preferences: Preferences;
 
-  chooseNavigationProvider: (provider: NavigationProviderId, remember: boolean) => void;
-  /** Called when the remembered provider turns out not to be installed any
-   *  more. Clears the choice rather than failing the handoff with it. */
-  forgetNavigationProvider: () => void;
+  chooseNavigationProvider: (provider: NavigationProviderId) => void;
   chooseTheme: (theme: ThemePreference) => void;
   chooseUnits: (units: UnitPreference) => void;
 }
@@ -62,25 +55,11 @@ export function createPreferencesStore(storage?: PreferencesStorage) {
       (set, get) => ({
         preferences: DEFAULT_PREFERENCES,
 
-        chooseNavigationProvider: (provider, remember) => {
+        chooseNavigationProvider: (provider) => {
           set({
             preferences: {
               ...get().preferences,
               navigationProvider: provider,
-              alwaysUsePreferredProvider: remember,
-            },
-          });
-        },
-
-        forgetNavigationProvider: () => {
-          // Both fields, together. Remembering "always use my choice" while
-          // having forgotten the choice is a state that would silently skip the
-          // chooser and then hand off to nothing.
-          set({
-            preferences: {
-              ...get().preferences,
-              navigationProvider: null,
-              alwaysUsePreferredProvider: false,
             },
           });
         },
