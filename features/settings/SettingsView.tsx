@@ -1,6 +1,6 @@
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 
-import { colours, layout, space } from '@/lib/design/tokens';
+import { colours, layout, radius, space } from '@/lib/design/tokens';
 import type { ThemeName } from '@/lib/design/tokens';
 import type { ThemePreference } from '@/features/preferences/preferences-store';
 import type { NavigationProviderId } from '@/types';
@@ -8,11 +8,9 @@ import type { NavigationProviderId } from '@/types';
 export interface SettingsViewProps {
   readonly planLabel: string;
   readonly usageLabel: string;
-  readonly providerLabel: string;
   readonly provider: NavigationProviderId | null;
   onBack: () => void;
   onOpenPaywall: () => void;
-  onOpenProvider: () => void;
   onChooseProvider: (provider: NavigationProviderId) => void;
   onSignOut: () => void;
   readonly themePreference: ThemePreference;
@@ -24,11 +22,9 @@ export interface SettingsViewProps {
 export function SettingsView({
   planLabel,
   usageLabel,
-  providerLabel,
   provider,
   onBack,
   onOpenPaywall,
-  onOpenProvider,
   onChooseProvider,
   onSignOut,
   themePreference,
@@ -39,18 +35,25 @@ export function SettingsView({
   const palette = colours[theme];
 
   return (
-    <View style={{ flex: 1, paddingHorizontal: layout.screenPadding }} testID={testID}>
+    <ScrollView
+      contentContainerStyle={{
+        paddingHorizontal: layout.screenPadding,
+        paddingBottom: space.space7,
+      }}
+      showsVerticalScrollIndicator={false}
+      testID={testID}
+    >
       <View
-        style={{ minHeight: 74, flexDirection: 'row', alignItems: 'center', gap: space.space4 }}
+        style={{ minHeight: 58, flexDirection: 'row', alignItems: 'center', gap: space.space3 }}
       >
         <Pressable
           onPress={onBack}
           accessibilityRole="button"
           accessibilityLabel="Back to route"
           style={{
-            width: 62,
-            height: 62,
-            borderRadius: 22,
+            width: 48,
+            height: 48,
+            borderRadius: radius.radiusMd,
             alignItems: 'center',
             justifyContent: 'center',
             backgroundColor: palette.surface,
@@ -59,11 +62,11 @@ export function SettingsView({
           }}
           testID="settings-back"
         >
-          <Text style={{ color: palette.textPrimary, fontSize: 38, fontWeight: '700' }}>‹</Text>
+          <Text style={{ color: palette.textPrimary, fontSize: 30, fontWeight: '700' }}>‹</Text>
         </Pressable>
         <Text
           accessibilityRole="header"
-          style={{ color: palette.textPrimary, fontSize: 30, lineHeight: 38, fontWeight: '700' }}
+          style={{ color: palette.textPrimary, fontSize: 24, lineHeight: 30, fontWeight: '700' }}
         >
           Settings
         </Text>
@@ -72,23 +75,23 @@ export function SettingsView({
       <Text
         style={{
           color: palette.textPrimary,
-          fontSize: 46,
-          lineHeight: 56,
+          fontSize: 36,
+          lineHeight: 44,
           fontWeight: '700',
-          marginTop: 74,
+          marginTop: space.space6,
         }}
       >
         Navigation
       </Text>
-      <Text style={{ color: palette.textSecondary, fontSize: 19, lineHeight: 27 }}>
+      <Text style={{ color: palette.textSecondary, fontSize: 16, lineHeight: 23 }}>
         Choose which navigator opens after you confirm.
       </Text>
 
       <View
         style={{
-          marginTop: 58,
+          marginTop: space.space5,
           padding: space.space4,
-          borderRadius: 30,
+          borderRadius: radius.radiusLg,
           backgroundColor: palette.surface,
           borderWidth: 1,
           borderColor: palette.border,
@@ -110,9 +113,9 @@ export function SettingsView({
                 accessibilityState={{ checked: selected }}
                 accessibilityLabel={`Use ${item.label}`}
                 style={{
-                  minHeight: 64,
+                  minHeight: 52,
                   paddingHorizontal: space.space4,
-                  borderRadius: 22,
+                  borderRadius: radius.radiusMd,
                   borderWidth: selected ? 0 : 1,
                   borderColor: palette.border,
                   backgroundColor: selected ? palette.accent : palette.surface,
@@ -125,7 +128,7 @@ export function SettingsView({
                 <Text
                   style={{
                     color: selected ? palette.accentOn : palette.textPrimary,
-                    fontSize: 20,
+                    fontSize: 17,
                     fontWeight: '700',
                   }}
                 >
@@ -134,9 +137,9 @@ export function SettingsView({
                 {selected && (
                   <View
                     style={{
-                      width: 28,
-                      height: 28,
-                      borderRadius: 14,
+                      width: 24,
+                      height: 24,
+                      borderRadius: 12,
                       backgroundColor: palette.textPrimary,
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -144,9 +147,9 @@ export function SettingsView({
                   >
                     <View
                       style={{
-                        width: 12,
-                        height: 12,
-                        borderRadius: 6,
+                        width: 10,
+                        height: 10,
+                        borderRadius: 5,
                         backgroundColor: palette.accent,
                       }}
                     />
@@ -156,24 +159,15 @@ export function SettingsView({
             );
           })}
         </View>
-
-        <Pressable
-          onPress={onOpenProvider}
-          accessibilityRole="button"
-          accessibilityLabel="Check installed navigation apps"
-          style={{ minHeight: layout.touchMin, justifyContent: 'center', marginTop: space.space3 }}
-        >
-          <Text style={{ color: palette.textSecondary, fontSize: 15 }}>{providerLabel}</Text>
-        </Pressable>
       </View>
 
       <Text
         style={{
           color: palette.textPrimary,
-          fontSize: 38,
-          lineHeight: 46,
+          fontSize: 28,
+          lineHeight: 34,
           fontWeight: '700',
-          marginTop: 56,
+          marginTop: space.space6,
         }}
       >
         Appearance
@@ -183,7 +177,7 @@ export function SettingsView({
           flexDirection: 'row',
           marginTop: space.space3,
           padding: 6,
-          borderRadius: 24,
+          borderRadius: radius.radiusLg,
           backgroundColor: palette.surface,
           borderWidth: 1,
           borderColor: palette.border,
@@ -201,8 +195,8 @@ export function SettingsView({
               accessibilityState={{ checked: selected }}
               style={{
                 flex: 1,
-                minHeight: 52,
-                borderRadius: 18,
+                minHeight: 44,
+                borderRadius: radius.radiusMd,
                 alignItems: 'center',
                 justifyContent: 'center',
                 backgroundColor: selected ? palette.textPrimary : 'transparent',
@@ -212,7 +206,7 @@ export function SettingsView({
               <Text
                 style={{
                   color: selected ? palette.bg : palette.textSecondary,
-                  fontSize: 16,
+                  fontSize: 14,
                   fontWeight: '700',
                 }}
               >
@@ -226,10 +220,10 @@ export function SettingsView({
       <Text
         style={{
           color: palette.textPrimary,
-          fontSize: 38,
-          lineHeight: 46,
+          fontSize: 28,
+          lineHeight: 34,
           fontWeight: '700',
-          marginTop: 50,
+          marginTop: space.space6,
         }}
       >
         Account
@@ -241,14 +235,14 @@ export function SettingsView({
         style={{
           marginTop: space.space3,
           padding: space.space4,
-          borderRadius: 26,
+          borderRadius: radius.radiusLg,
           backgroundColor: palette.surface,
           borderWidth: 1,
           borderColor: palette.border,
         }}
       >
         <Text
-          style={{ color: palette.textPrimary, fontSize: 20, fontWeight: '700' }}
+          style={{ color: palette.textPrimary, fontSize: 17, fontWeight: '700' }}
           testID="settings-plan"
         >
           {planLabel}
@@ -271,18 +265,18 @@ export function SettingsView({
         accessibilityLabel="Sign out"
         accessibilityHint="Signs you out on this device. Your saved routes stay in your account."
         style={{
-          minHeight: 72,
+          minHeight: 56,
           marginTop: space.space4,
-          borderRadius: 24,
+          borderRadius: radius.radiusLg,
           backgroundColor: theme === 'light' ? '#EFEFED' : palette.surfaceRaised,
           alignItems: 'center',
           justifyContent: 'center',
         }}
         testID="settings-sign-out"
       >
-        <Text style={{ color: '#B95656', fontSize: 20, fontWeight: '700' }}>Sign out</Text>
+        <Text style={{ color: '#B95656', fontSize: 17, fontWeight: '700' }}>Sign out</Text>
       </Pressable>
-    </View>
+    </ScrollView>
   );
 }
 

@@ -78,7 +78,10 @@ export function ImportView({
       style={{ flex: 1, backgroundColor: palette.bg, padding: layout.screenPadding }}
       testID={testID}
     >
-      <Text accessibilityRole="header" className="text-title-md text-text-primary">
+      <Text
+        accessibilityRole="header"
+        style={{ color: palette.textPrimary, fontSize: 28, lineHeight: 34, fontWeight: '700' }}
+      >
         Paste your list
       </Text>
 
@@ -93,10 +96,10 @@ export function ImportView({
         placeholderTextColor={palette.textSecondary}
         accessibilityLabel="Paste your addresses, or a message containing them"
         style={{
-          minHeight: 120,
+          minHeight: 132,
           marginTop: space.space4,
           padding: space.space3,
-          borderRadius: radius.radiusMd,
+          borderRadius: radius.radiusLg,
           borderWidth: 1,
           borderColor: palette.border,
           color: palette.textPrimary,
@@ -116,9 +119,9 @@ export function ImportView({
         accessibilityLabel="Read the addresses out of this text"
         accessibilityState={{ disabled: !canParse, busy: isParsing }}
         style={{
-          minHeight: layout.actionMinHeight,
+          minHeight: 52,
           marginTop: space.space3,
-          borderRadius: radius.radiusLg,
+          borderRadius: radius.radiusMd,
           alignItems: 'center',
           justifyContent: 'center',
           backgroundColor: palette.surfaceRaised,

@@ -396,7 +396,7 @@ export default function PlanScreen(): React.JSX.Element {
             // to fall back on.
             view={isMapShowing ? 'map' : isCanvasShowing ? 'preparing' : 'list'}
             // Lifts Confirm clear of the dock the canvas runs underneath.
-            bottomInset={isCanvasShowing ? DOCK_OUTER_HEIGHT : 0}
+            bottomInset={isCanvasShowing ? insets.bottom + space.space5 : 0}
             mapSlot={
               !isCanvasShowing ? null : (
                 <RouteCanvas
@@ -587,7 +587,7 @@ export default function PlanScreen(): React.JSX.Element {
       )}
 
       {activeSection === 'settings' && (
-        <SectionPanel theme={theme} topInset={insets.top} testID="section-settings">
+        <SectionPanel theme={theme} topInset={insets.top} dockHeight={0} testID="section-settings">
           <SettingsSection theme={theme} onBack={() => openSection('itinerary')} />
         </SectionPanel>
       )}
@@ -601,9 +601,9 @@ export default function PlanScreen(): React.JSX.Element {
             position: 'absolute',
             top: insets.top + space.space3,
             right: space.space3,
-            width: 62,
-            height: 62,
-            borderRadius: 31,
+            width: 48,
+            height: 48,
+            borderRadius: 24,
             alignItems: 'center',
             justifyContent: 'center',
             backgroundColor: colours[theme].surfaceRaised,
@@ -612,7 +612,7 @@ export default function PlanScreen(): React.JSX.Element {
           }}
           testID="open-settings"
         >
-          <Text style={{ color: colours[theme].textPrimary, fontSize: 26, fontWeight: '700' }}>
+          <Text style={{ color: colours[theme].textPrimary, fontSize: 21, fontWeight: '700' }}>
             ⚙
           </Text>
         </Pressable>
@@ -622,19 +622,18 @@ export default function PlanScreen(): React.JSX.Element {
         <InlineStopSearch theme={theme} onClose={() => setIsSearchOpen(false)} />
       )}
 
-      <Dock
-        // The gesture bar sits below the dock rather than behind it.
-        bottomInset={insets.bottom}
-        items={dockItems(activeSection, { isRouteInProgress: progress !== null })}
-        onSelect={(section) => {
-          // `toggleSection` decides; the screen only routes. Tapping the open
-          // section returns to the map, which is the job the close control used
-          // to do (ADR-0020).
-          openSection(toggleSection(activeSection, section));
-        }}
-        theme={theme}
-        testID="plan-dock"
-      />
+      {activeSection !== 'settings' && !isCanvasShowing && (
+        <Dock
+          // The gesture bar sits below the dock rather than behind it.
+          bottomInset={insets.bottom}
+          items={dockItems(activeSection, { isRouteInProgress: progress !== null })}
+          onSelect={(section) => {
+            openSection(toggleSection(activeSection, section));
+          }}
+          theme={theme}
+          testID="plan-dock"
+        />
+      )}
 
       {handoffNotice !== null && (
         // No timer on this one. A route split into three parts, or a navigation
@@ -645,7 +644,11 @@ export default function PlanScreen(): React.JSX.Element {
           title={handoffNotice.title}
           detail={handoffNotice.detail}
           kind={handoffNotice.kind}
-          bottomOffset={DOCK_OUTER_HEIGHT + insets.bottom + space.space2}
+          bottomOffset={
+            isCanvasShowing
+              ? insets.bottom + space.space5
+              : DOCK_OUTER_HEIGHT + insets.bottom + space.space2
+          }
           theme={theme}
           onDismiss={() => {
             setHandoffNotice(null);

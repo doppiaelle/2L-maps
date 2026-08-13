@@ -1,9 +1,10 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Linking, Platform, useColorScheme } from 'react-native';
+import { Linking, Platform } from 'react-native';
 
 import { ProviderPickerView } from '@/features/handoff/ProviderPickerView';
 import { useDraftRouteStore, usePreferencesStore } from '@/features/stores';
+import { useAppTheme } from '@/features/preferences/use-app-theme';
 import { createNavigationProvider } from '@/lib/api/navigation-adapter';
 import type { NavigationProviderId } from '@/types';
 
@@ -17,7 +18,7 @@ import type { NavigationProviderId } from '@/types';
  * once, on mount, rather than assumed.
  */
 export default function ProviderScreen(): React.JSX.Element {
-  const scheme = useColorScheme();
+  const theme = useAppTheme();
 
   const stopCount = useDraftRouteStore((store) => store.draft.stops.length);
   const selected = usePreferencesStore((store) => store.preferences.navigationProvider);
@@ -58,7 +59,7 @@ export default function ProviderScreen(): React.JSX.Element {
         // third tap, not a destination.
         router.back();
       }}
-      theme={scheme === 'dark' ? 'dark' : 'light'}
+      theme={theme}
       testID="provider-screen"
     />
   );

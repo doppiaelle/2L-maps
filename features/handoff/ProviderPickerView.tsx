@@ -59,10 +59,20 @@ export function ProviderPickerView({
       style={{ flex: 1, backgroundColor: palette.bg, padding: layout.screenPadding }}
       testID={testID}
     >
-      <Text accessibilityRole="header" className="text-title-md text-text-primary">
+      <Text
+        accessibilityRole="header"
+        style={{ color: palette.textPrimary, fontSize: 28, lineHeight: 34, fontWeight: '700' }}
+      >
         Navigate with
       </Text>
-      <Text className="text-body text-text-secondary mt-space-2">
+      <Text
+        style={{
+          color: palette.textSecondary,
+          fontSize: 16,
+          lineHeight: 23,
+          marginTop: space.space2,
+        }}
+      >
         2L Maps plans the order. Your navigation app drives it.
       </Text>
 
@@ -73,7 +83,7 @@ export function ProviderPickerView({
           No navigation app was found on this device. Install Google Maps or Waze and come back.
         </Text>
       ) : (
-        <View style={{ marginTop: space.space4 }}>
+        <View style={{ marginTop: space.space5, gap: space.space2 }}>
           {available.map((provider) => (
             <ProviderRow
               key={provider}
@@ -176,18 +186,22 @@ function ProviderRow({
       accessibilityState={{ selected: isSelected }}
       accessibilityLabel={`${name}. ${cost}`}
       style={{
-        minHeight: layout.actionMinHeight,
+        minHeight: 68,
         justifyContent: 'center',
         paddingHorizontal: space.space4,
         marginBottom: space.space2,
-        borderRadius: radius.radiusMd,
+        borderRadius: radius.radiusLg,
         borderWidth: isSelected ? 2 : 1,
         borderColor: isSelected ? palette.accent : palette.border,
       }}
       testID="provider-option"
     >
-      <Text className="text-body-strong text-text-primary">{name}</Text>
-      <Text className="text-caption text-text-secondary">{cost}</Text>
+      <Text style={{ color: palette.textPrimary, fontSize: 18, lineHeight: 23, fontWeight: '700' }}>
+        {name}
+      </Text>
+      <Text style={{ color: palette.textSecondary, fontSize: 14, lineHeight: 19, marginTop: 2 }}>
+        {cost}
+      </Text>
       {caveat !== null && (
         <Text className="text-caption text-warning" testID="provider-caveat">
           {caveat}
