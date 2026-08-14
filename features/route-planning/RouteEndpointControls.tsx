@@ -65,8 +65,8 @@ export function RouteEndpointControls({
           accessibilityLabel="Reset current route"
           accessibilityHint="Removes all stops and starts a new route"
           style={{
-            width: 42,
-            height: 42,
+            width: 38,
+            height: 38,
             borderRadius: radius.radiusMd,
             borderWidth: 1,
             borderColor: palette.border,
@@ -77,7 +77,7 @@ export function RouteEndpointControls({
           }}
           testID="route-reset"
         >
-          <Text style={{ color: palette.textSecondary, fontSize: 20, fontWeight: '700' }}>↻</Text>
+          <Text style={{ color: palette.textSecondary, fontSize: 18, fontWeight: '700' }}>↻</Text>
         </Pressable>
       </View>
 
@@ -108,7 +108,7 @@ export function RouteEndpointControls({
                 accessibilityState={{ checked: isSelected }}
                 accessibilityLabel={option.accessibilityLabel}
                 style={{
-                  minHeight: 42,
+                  minHeight: 38,
                   paddingHorizontal: space.space3,
                   borderRadius: radius.radiusSm,
                   flexDirection: 'row',
@@ -121,7 +121,7 @@ export function RouteEndpointControls({
                 <Text
                   style={{
                     color: isSelected ? palette.accent : palette.textPrimary,
-                    fontSize: 14,
+                    fontSize: 13,
                     fontWeight: isSelected ? '700' : '600',
                   }}
                 >
@@ -170,8 +170,8 @@ function ChoiceButton({
       accessibilityState={{ expanded: selected }}
       style={{
         flex: 1,
-        minHeight: 42,
-        paddingHorizontal: space.space3,
+        minHeight: 38,
+        paddingHorizontal: space.space2,
         borderRadius: radius.radiusMd,
         borderWidth: 1,
         borderColor: selected ? palette.accent : palette.border,
@@ -184,17 +184,17 @@ function ChoiceButton({
       testID={testID}
     >
       <View style={{ flex: 1 }}>
-        <Text style={{ color: palette.textTertiary, fontSize: 10, fontWeight: '700' }}>
+        <Text style={{ color: palette.textTertiary, fontSize: 9, fontWeight: '700' }}>
           {label.toUpperCase()}
         </Text>
         <Text
           numberOfLines={1}
-          style={{ color: palette.textPrimary, fontSize: 13, fontWeight: '700', marginTop: 1 }}
+          style={{ color: palette.textPrimary, fontSize: 12, fontWeight: '700', marginTop: 1 }}
         >
           {value}
         </Text>
       </View>
-      <Text style={{ color: palette.textSecondary, fontSize: 13, marginLeft: space.space1 }}>
+      <Text style={{ color: palette.textSecondary, fontSize: 12, marginLeft: space.space1 }}>
         ⌄
       </Text>
     </Pressable>

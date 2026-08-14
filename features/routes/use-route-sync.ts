@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { useServices } from '@/features/api/services-provider';
+import { useServices, type Services } from '@/features/api/services-provider';
 import { useSession } from '@/features/auth/session-provider';
 import { useDraftRouteStore, useRouteProgressStore } from '@/features/stores';
 import { queryKeys } from '@/lib/query/client';
@@ -128,23 +128,28 @@ export function useRouteSync(): RouteSync {
         return false;
       }
 
-      const outcome = await services.routes.save(
-        toRows(snapshot.draft, userId, {
-          status: snapshot.status,
-          unreachableStopIds: unreachableIn(snapshot.result),
-          totals:
-            snapshot.result === null
-              ? null
-              : {
-                  tier: snapshot.result.tier,
-                  distanceMeters: snapshot.result.totalDistanceMeters,
-                  durationSeconds: snapshot.result.isDegraded
-                    ? null
-                    : snapshot.result.totalDurationSeconds,
-                  optimizedAt: snapshot.optimizedAt,
-                },
-        }),
-      );
+      const rows = toRows(snapshot.draft, userId, {
+        status: snapshot.status,
+        unreachableStopIds: unreachableIn(snapshot.result),
+        totals:
+          snapshot.result === null
+            ? null
+            : {
+                tier: snapshot.result.tier,
+                distanceMeters: snapshot.result.totalDistanceMeters,
+                durationSeconds: snapshot.result.isDegraded
+                  ? null
+                  : snapshot.result.totalDurationSeconds,
+                optimizedAt: snapshot.optimizedAt,
+              },
+      });
+
+      let outcome = await services.routes.save(rows);
+
+      if (!outcome.ok && outcome.failure.kind === 'unknown-place') {
+        const refreshed = await refreshPlaceCacheForSave(services, snapshot.draft);
+        if (refreshed) outcome = await services.routes.save(rows);
+      }
 
       if (outcome.ok) {
         setFailure(null);
@@ -269,4 +274,12 @@ export function useRouteSync(): RouteSync {
   }, [routeId, status, services, queryClient]);
 
   return { failure, isSaving, sync };
+}
+
+async function refreshPlaceCacheForSave(services: Services, draft: DraftRoute): Promise<boolean> {
+  const placeIds = [...new Set(draft.stops.map((stop) => stop.placeId))];
+  if (placeIds.length === 0) return false;
+
+  const result = await services.geocoding.resolveBatch(placeIds);
+  return result.ok;
 }

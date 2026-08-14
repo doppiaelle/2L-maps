@@ -40,15 +40,15 @@ export function SubscriptionView({
       testID={testID}
     >
       <View
-        style={{ minHeight: 58, flexDirection: 'row', alignItems: 'center', gap: space.space3 }}
+        style={{ minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: space.space3 }}
       >
         <Pressable
           onPress={onBack}
           accessibilityRole="button"
           accessibilityLabel="Back to settings"
           style={{
-            width: 48,
-            height: 48,
+            width: 44,
+            height: 44,
             borderRadius: radius.radiusMd,
             alignItems: 'center',
             justifyContent: 'center',
@@ -58,11 +58,11 @@ export function SubscriptionView({
           }}
           testID="subscription-back"
         >
-          <Text style={{ color: palette.textPrimary, fontSize: 30, fontWeight: '700' }}>‹</Text>
+          <Text style={{ color: palette.textPrimary, fontSize: 28, fontWeight: '700' }}>‹</Text>
         </Pressable>
         <Text
           accessibilityRole="header"
-          style={{ color: palette.textPrimary, fontSize: 24, lineHeight: 30, fontWeight: '700' }}
+          style={{ color: palette.textPrimary, fontSize: 22, lineHeight: 28, fontWeight: '700' }}
         >
           Subscription
         </Text>
@@ -71,15 +71,15 @@ export function SubscriptionView({
       <Text
         style={{
           color: palette.textPrimary,
-          fontSize: 36,
-          lineHeight: 44,
+          fontSize: 30,
+          lineHeight: 36,
           fontWeight: '700',
           marginTop: space.space6,
         }}
       >
         Choose your plan
       </Text>
-      <Text style={{ color: palette.textSecondary, fontSize: 16, lineHeight: 23 }}>
+      <Text style={{ color: palette.textSecondary, fontSize: 15, lineHeight: 21 }}>
         Compare route, search and History allowances.
       </Text>
 
@@ -157,7 +157,7 @@ export function SubscriptionView({
         }}
         testID="subscription-status"
       >
-        <Text style={{ color: palette.textPrimary, fontSize: 17, fontWeight: '700' }}>
+        <Text style={{ color: palette.textPrimary, fontSize: 16, fontWeight: '700' }}>
           {selectedIsCurrent ? 'This is your current plan' : 'Purchases are coming soon'}
         </Text>
         <Text

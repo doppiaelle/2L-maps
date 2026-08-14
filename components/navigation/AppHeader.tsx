@@ -28,7 +28,7 @@ export function AppHeader({
   return (
     <View
       style={{
-        minHeight: 58,
+        minHeight: 52,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -39,8 +39,8 @@ export function AppHeader({
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.space3 }}>
           <View
             style={{
-              width: 48,
-              height: 48,
+              width: 42,
+              height: 42,
               borderRadius: radius.radiusMd,
               alignItems: 'center',
               justifyContent: 'center',
@@ -49,17 +49,17 @@ export function AppHeader({
             <Image
               source={require('../../assets/brand/logo.png')}
               resizeMode="contain"
-              style={{ width: 48, height: 42 }}
+              style={{ width: 42, height: 36 }}
               accessibilityLabel="2L Maps"
               testID="brand-logo"
             />
           </View>
-          <Text style={{ color: palette.textPrimary, fontSize: 24, fontWeight: '700' }}>Maps</Text>
+          <Text style={{ color: palette.textPrimary, fontSize: 22, fontWeight: '700' }}>Maps</Text>
         </View>
       ) : (
         <Text
           accessibilityRole="header"
-          style={{ color: palette.textPrimary, fontSize: 24, fontWeight: '700' }}
+          style={{ color: palette.textPrimary, fontSize: 22, fontWeight: '700' }}
         >
           {title}
         </Text>
@@ -71,9 +71,9 @@ export function AppHeader({
           accessibilityRole="button"
           accessibilityLabel={actionLabel}
           style={{
-            minWidth: 48,
-            minHeight: 48,
-            borderRadius: 24,
+            minWidth: 44,
+            minHeight: 44,
+            borderRadius: 22,
             alignItems: 'center',
             justifyContent: 'center',
             backgroundColor: palette.surface,
@@ -81,12 +81,12 @@ export function AppHeader({
             borderColor: palette.border,
           }}
         >
-          <Text style={{ color: palette.textPrimary, fontSize: 20, fontWeight: '700' }}>
+          <Text style={{ color: palette.textPrimary, fontSize: 18, fontWeight: '700' }}>
             {actionGlyph}
           </Text>
         </Pressable>
       ) : (
-        <View style={{ width: 56 }} />
+        <View style={{ width: 44 }} />
       )}
     </View>
   );

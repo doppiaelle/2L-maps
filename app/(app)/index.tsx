@@ -1,5 +1,13 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Linking, Pressable, Text, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Linking,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+} from 'react-native';
 
 import { useHandoff } from '@/features/handoff/use-handoff';
 import { useLocation } from '@/features/location/location-provider';
@@ -30,7 +38,7 @@ import { dockItems, toggleSection } from '@/lib/ui/dock';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colours, layout, space } from '@/lib/design/tokens';
-import { buildPlanRows, placeIdsToResolve } from '@/lib/route/plan-rows';
+import { buildPlanRows, placeIdsToResolve, type PlanRow } from '@/lib/route/plan-rows';
 import { legSummary } from '@/lib/map/leg-selection';
 import { buildRouteGeometry, planRoute } from '@/lib/map/route-geometry';
 import { routeViewAfter, showsMap } from '@/lib/route/route-view';
@@ -88,6 +96,8 @@ export default function PlanScreen(): React.JSX.Element {
   // token-derived layout, so the first tap is correct even before a layout event.
   const [routeSearchY, setRouteSearchY] = useState(173);
   const [settingsEntry, setSettingsEntry] = useState<'settings' | 'subscription'>('settings');
+  const sectionScrollRef = useRef<ScrollView>(null);
+  const [sectionWidth, setSectionWidth] = useState(0);
 
   const destination = useLaunchDestination({
     isStoreHydrated: true,
@@ -291,18 +301,55 @@ export default function PlanScreen(): React.JSX.Element {
   }, [hasFailed]);
 
   const isMapShowing = showsMap(routeView, result !== null);
+
+  useEffect(() => {
+    if (activeSection === 'settings' || isMapShowing || sectionWidth === 0) return;
+    sectionScrollRef.current?.scrollTo({
+      x: activeSection === 'history' ? sectionWidth : 0,
+      animated: true,
+    });
+  }, [activeSection, isMapShowing, sectionWidth]);
+
+  const rowsByStopId = useMemo(() => new Map(rows.map((row) => [row.id, row])), [rows]);
+  const mapContextLabels = useMemo(() => labelsForMapContext(rows), [rows]);
+
   const selectedLegDetails = (() => {
     if (geometry === null || selectedLegIndex === null) return null;
     const summary = legSummary(selectedLegIndex, geometry.legs);
     if (summary === null) return null;
 
-    const stop = rows[selectedLegIndex + 1] ?? rows[selectedLegIndex];
+    const leg = geometry.legs[selectedLegIndex];
+    if (leg === undefined) return null;
+    const from = endpointForLeg(leg.fromStopId, rowsByStopId, {
+      title: draft.routeStart === 'current-location' ? 'My location' : 'Starting point',
+      detail: 'Route start',
+    });
+    const to = endpointForLeg(leg.toStopId, rowsByStopId, {
+      title:
+        draft.routeEnd === 'current-location'
+          ? 'My location'
+          : draft.routeEnd === 'return-to-start'
+            ? 'Starting point'
+            : 'Final stop',
+      detail: 'Route end',
+    });
+    const total = geometry.legs.reduce((sum, item) => sum + item.distanceMeters, 0);
+    const progress = total <= 0 ? 1 : Math.max(0.08, Math.min(1, leg.distanceMeters / total));
     return {
       value: summary.value,
       spoken: summary.spoken,
-      ...(stop === undefined ? {} : { stopLabel: stop.text.title, stopNumber: stop.position }),
+      title: `${from.title} → ${to.title}`,
+      detail: `${from.detail} to ${to.detail}`,
+      progress,
     };
   })();
+
+  const handleSectionScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (sectionWidth <= 0) return;
+    const nextSection =
+      Math.round(event.nativeEvent.contentOffset.x / sectionWidth) === 1 ? 'history' : 'itinerary';
+    if (activeSection !== nextSection) openSection(nextSection);
+  };
 
   const applyEndpointChoice = (
     start: RouteStartPreference,
@@ -339,6 +386,89 @@ export default function PlanScreen(): React.JSX.Element {
 
   const needsCurrentLocation = draft.originIsCurrentLocation && location.state.kind !== 'ready';
 
+  const routeContent = (
+    <PlanView
+      state={state}
+      intent={actionIntentOf(state, availability)}
+      view={isMapShowing ? 'map' : 'list'}
+      bottomInset={isMapShowing ? insets.bottom + space.space5 : 0}
+      mapSlot={
+        !isMapShowing ? null : (
+          <RouteCanvas
+            stops={markers}
+            route={planRoute(geometry, positionedStops)}
+            phase="ready"
+            selectedLegIndex={selectedLegIndex}
+            onSelectLeg={setSelectedLegIndex}
+            selectedStopId={selectedStopId}
+            undrawableStopIds={undrawableStopIds}
+            scenerySeed={draft.routeId}
+            contextLabels={mapContextLabels}
+            theme={theme}
+            testID="plan-route-canvas"
+          />
+        )
+      }
+      selectedLeg={selectedLegDetails}
+      canShowMap={result !== null}
+      onShowMap={() => {
+        if (result !== null) setRouteView('map');
+      }}
+      controlsSlot={
+        <RouteEndpointControls
+          start={draft.routeStart}
+          end={draft.routeEnd}
+          locationState={location.state.kind}
+          onChooseStart={(choice) => {
+            void chooseStart(choice);
+          }}
+          onChooseEnd={(choice) => {
+            void chooseEnd(choice);
+          }}
+          onReset={resetRoute}
+          disabled={isOptimizing}
+          theme={theme}
+        />
+      }
+      noticeSlot={
+        routeSync.failure === null ? null : (
+          <RouteSaveNotice
+            failure={routeSync.failure}
+            isSaving={routeSync.isSaving}
+            onRetry={() => {
+              void routeSync.sync();
+            }}
+            theme={theme}
+          />
+        )
+      }
+      onOpenSearch={() => setIsSearchOpen(true)}
+      onSearchLayout={setRouteSearchY}
+      onDismissMap={() => {
+        setRouteView(
+          routeViewAfter({ kind: 'dismissed' }, { current: routeView, hasResult: true }),
+        );
+      }}
+      stops={rows}
+      onSelectStop={selectStop}
+      onRemoveStop={removeStopById}
+      onPrimaryAction={() => {
+        if (state.kind !== 'optimized') {
+          if (needsCurrentLocation) {
+            void location.enable();
+            return;
+          }
+          optimize();
+          return;
+        }
+
+        void handoff.start();
+      }}
+      theme={theme}
+      testID="plan-view"
+    />
+  );
+
   return (
     <View
       // **The background was never set**, so under the dock — past where the
@@ -359,124 +489,51 @@ export default function PlanScreen(): React.JSX.Element {
         }}
         testID="plan-content"
       >
-        {activeSection === 'itinerary' && (
+        {activeSection !== 'settings' && (
           <SectionPanel
             theme={theme}
-            // The status bar. Without it the section began under the clock.
             topInset={insets.top}
-            // The drawn route runs the whole height with the dock floating on it;
-            // the stop list stops above the dock, or its last row is unreachable.
             extendsBehindDock={isMapShowing}
-            testID="section-itinerary"
+            testID={isMapShowing ? 'section-itinerary' : 'section-pages'}
           >
-            <PlanView
-              state={state}
-              intent={actionIntentOf(state, availability)}
-              // The map is a face of this section, not a screen behind it
-              // (ADR-0022). `showsMap` is the floor: a view of 'map' with no
-              // result would draw an empty canvas, and the drawn map has no tiles
-              // to fall back on.
-              view={isMapShowing ? 'map' : 'list'}
-              // Lifts Confirm clear of the dock the canvas runs underneath.
-              bottomInset={isMapShowing ? insets.bottom + space.space5 : 0}
-              mapSlot={
-                !isMapShowing ? null : (
-                  <RouteCanvas
-                    stops={markers}
-                    route={planRoute(geometry, positionedStops)}
-                    phase="ready"
-                    // Tapping a hop shows what Google measured for it — data the
-                    // field mask already buys and nothing was showing (ADR-0027).
-                    selectedLegIndex={selectedLegIndex}
-                    onSelectLeg={setSelectedLegIndex}
-                    selectedStopId={selectedStopId}
-                    undrawableStopIds={undrawableStopIds}
-                    // The route's own id. Stable across renders and across
-                    // devices, so the drawn town is the same every time this
-                    // route is opened — and a different one for a different route.
-                    scenerySeed={draft.routeId}
-                    theme={theme}
-                    testID="plan-route-canvas"
-                  />
-                )
-              }
-              selectedLeg={selectedLegDetails}
-              controlsSlot={
-                <RouteEndpointControls
-                  start={draft.routeStart}
-                  end={draft.routeEnd}
-                  locationState={location.state.kind}
-                  onChooseStart={(choice) => {
-                    void chooseStart(choice);
-                  }}
-                  onChooseEnd={(choice) => {
-                    void chooseEnd(choice);
-                  }}
-                  onReset={resetRoute}
-                  disabled={isOptimizing}
-                  theme={theme}
-                />
-              }
-              noticeSlot={
-                routeSync.failure === null ? null : (
-                  <RouteSaveNotice
-                    failure={routeSync.failure}
-                    isSaving={routeSync.isSaving}
-                    onRetry={() => {
-                      void routeSync.sync();
-                    }}
-                    theme={theme}
-                  />
-                )
-              }
-              onOpenSearch={() => setIsSearchOpen(true)}
-              onSearchLayout={setRouteSearchY}
-              onDismissMap={() => {
-                /**
-                 * **The result stays.** This used to call `clearResult()`, so the
-                 * three lines threw away an optimization the user had already paid
-                 * for: the route stopped being optimized, Confirm turned back into
-                 * Optimize, and the only way back to the map was to spend another
-                 * unit of quota on an answer we were still holding.
-                 *
-                 * What the control says is "back to the stop list", and that is now
-                 * all it does.
-                 */
-                setRouteView(
-                  routeViewAfter({ kind: 'dismissed' }, { current: routeView, hasResult: true }),
-                );
-              }}
-              stops={rows}
-              onSelectStop={selectStop}
-              onRemoveStop={removeStopById}
-              onPrimaryAction={() => {
-                // The control's own state already says which of the two this is; the
-                // screen only has to route the tap. `planStateOf` decided that, and
-                // re-deriving it here would be the same rule in two places.
-                if (state.kind !== 'optimized') {
-                  if (needsCurrentLocation) {
-                    void location.enable();
-                    return;
-                  }
-                  optimize();
-                  return;
-                }
-
-                // Confirm. `useHandoff` records the departure **before** it opens
-                // anything — that write is what moves the route to `in_progress`
-                // and therefore into History, which is exactly what was not
-                // happening (`docs/11_STATE_MANAGEMENT.md` §7).
-                void handoff.start();
-              }}
-              theme={theme}
-              testID="plan-view"
-            />
-          </SectionPanel>
-        )}
-
-        {activeSection === 'history' && (
-          <SectionPanel theme={theme} topInset={insets.top} testID="section-history">
-            <HistorySection onOpenRoute={closeSection} theme={theme} />
+            {isMapShowing ? (
+              routeContent
+            ) : (
+              <View
+                style={{ flex: 1 }}
+                onLayout={(event) => {
+                  const width = event.nativeEvent.layout.width;
+                  setSectionWidth((current) => (current === width ? current : width));
+                }}
+              >
+                <ScrollView
+                  ref={sectionScrollRef}
+                  horizontal
+                  pagingEnabled
+                  directionalLockEnabled
+                  nestedScrollEnabled
+                  scrollEnabled={!isSearchOpen}
+                  showsHorizontalScrollIndicator={false}
+                  keyboardShouldPersistTaps="handled"
+                  onMomentumScrollEnd={handleSectionScrollEnd}
+                  onScrollEndDrag={handleSectionScrollEnd}
+                  testID="section-pager"
+                >
+                  <View
+                    style={{ width: sectionWidth > 0 ? sectionWidth : '100%' }}
+                    testID="section-itinerary"
+                  >
+                    {routeContent}
+                  </View>
+                  <View
+                    style={{ width: sectionWidth > 0 ? sectionWidth : '100%' }}
+                    testID="section-history"
+                  >
+                    <HistorySection onOpenRoute={closeSection} theme={theme} />
+                  </View>
+                </ScrollView>
+              </View>
+            )}
           </SectionPanel>
         )}
 
@@ -547,4 +604,31 @@ export default function PlanScreen(): React.JSX.Element {
       )}
     </View>
   );
+}
+
+function endpointForLeg(
+  stopId: string | null,
+  rowsByStopId: ReadonlyMap<string, PlanRow>,
+  fallback: { readonly title: string; readonly detail: string },
+): { readonly title: string; readonly detail: string } {
+  if (stopId === null) return fallback;
+  const row = rowsByStopId.get(stopId);
+  if (row === undefined) return { title: 'Unknown stop', detail: 'Route point' };
+
+  return {
+    title: `Stop ${row.position} · ${row.text.title}`,
+    detail: row.text.subtitle ?? row.address ?? row.text.title,
+  };
+}
+
+function labelsForMapContext(rows: readonly PlanRow[]): readonly string[] {
+  const labels: string[] = [];
+  for (const row of rows) {
+    labels.push(row.text.title);
+    if (row.text.subtitle !== null) {
+      labels.push(...row.text.subtitle.split(',').map((part) => part.trim()));
+    }
+    if (row.address !== null) labels.push(...row.address.split(',').map((part) => part.trim()));
+  }
+  return [...new Set(labels.filter((label) => label.length >= 3))].slice(0, 12);
 }

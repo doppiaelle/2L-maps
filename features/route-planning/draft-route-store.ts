@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist, type PersistStorage } from 'zustand/middleware';
 
-import { isRouteId, newRouteId } from '@/lib/route/route-id';
+import { isRouteId, isStopId, newRouteId, newStopId } from '@/lib/route/route-id';
 import {
   addStop,
   applyOptimizedOrder,
@@ -137,7 +137,7 @@ export type DraftStorage = PersistStorage<Pick<DraftRouteState, 'draft'>>;
  * fields, and reading it without filling them would sort stops by `undefined`
  * and claim an order nobody optimized.
  */
-export const DRAFT_SCHEMA_VERSION = 2;
+export const DRAFT_SCHEMA_VERSION = 3;
 
 /**
  * Fill in what an older stored draft is missing.
@@ -190,6 +190,7 @@ export function migrateDraft(persisted: unknown, _version: number): { draft: Dra
       // the only answer that cannot invent history.
       stops: stops.map((stop, index) => ({
         ...(stop as Stop),
+        id: isStopId(stop.id) ? stop.id : newStopId(),
         position: index,
         entryOrder: typeof stop.entryOrder === 'number' ? stop.entryOrder : index,
       })),

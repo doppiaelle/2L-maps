@@ -18,7 +18,11 @@ const auth: AuthProvider = {
   signOut: () => Promise.resolve(),
 };
 
-function renderWithServices(routes: RoutesProvider, ui: React.ReactElement) {
+function renderWithServices(
+  routes: RoutesProvider,
+  ui: React.ReactElement,
+  fetchImpl?: typeof fetch,
+) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
@@ -29,6 +33,7 @@ function renderWithServices(routes: RoutesProvider, ui: React.ReactElement) {
           baseUrl="https://example.test/functions/v1"
           routes={routes}
           favourites={{ list: async () => null, recordUse: async () => undefined }}
+          {...(fetchImpl === undefined ? {} : { fetchImpl })}
         >
           {ui}
         </ServicesProvider>
@@ -139,6 +144,66 @@ describe('route persistence', () => {
       }));
     });
     await waitFor(() => expect(saves.length).toBeGreaterThan(0));
+  });
+
+  it('refreshes the place cache once when History rejects a missing place row', async () => {
+    const saves: unknown[] = [];
+    const requests: string[] = [];
+    const routes: RoutesProvider = {
+      save: async (write) => {
+        saves.push(write);
+        return saves.length === 1
+          ? ({ ok: false, failure: { kind: 'unknown-place' } } as SaveOutcome)
+          : ({ ok: true } as SaveOutcome);
+      },
+      list: async () => [],
+      load: async () => null,
+      advance: async () => ({ ok: true }) as SaveOutcome,
+    };
+    const fetchImpl = (async (input) => {
+      requests.push(String(input));
+      return {
+        ok: true,
+        json: async () => ({
+          resolved: [
+            {
+              placeId: 'place-1',
+              formattedAddress: 'Via Test 1, Roma',
+              lat: 41.9,
+              lng: 12.5,
+            },
+          ],
+          unresolved: [],
+        }),
+      } as Response;
+    }) as typeof fetch;
+
+    renderWithServices(routes, <SyncProbe />, fetchImpl);
+    await act(async () => undefined);
+    await act(async () => {
+      useDraftRouteStore.setState((state) => ({
+        ...state,
+        draft: {
+          ...state.draft,
+          isOptimized: true,
+          stops: [
+            {
+              id: 'stop-1',
+              placeId: 'place-1',
+              label: null,
+              placeText: null,
+              note: null,
+              position: 0,
+              entryOrder: 0,
+              coordinate: null,
+            },
+          ],
+        },
+      }));
+    });
+
+    await waitFor(() => expect(saves).toHaveLength(2));
+    expect(requests).toEqual(['https://example.test/functions/v1/place-details']);
   });
 
   it('persists in_progress before Confirm backgrounds the app', async () => {

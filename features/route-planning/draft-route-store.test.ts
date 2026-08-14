@@ -1,5 +1,6 @@
 import type { Stop } from '@/types';
 
+import { isStopId } from '@/lib/route/route-id';
 import { createDraftRouteStore, memoryDraftStorage, migrateDraft } from './draft-route-store';
 
 /**
@@ -303,6 +304,32 @@ describe('reading a draft written by an older build', () => {
 
     expect(migrated.draft.stops[0]?.entryOrder).toBe(2);
     expect(migrated.draft.isOptimized).toBe(true);
+  });
+
+  it('repairs old stop ids before they can reach History', () => {
+    const migrated = migrateDraft(
+      {
+        draft: {
+          routeId: 'route-1',
+          stops: [
+            {
+              id: 'old-local-id',
+              placeId: 'p-a',
+              label: null,
+              placeText: null,
+              note: null,
+              position: 0,
+              entryOrder: 0,
+              coordinate: null,
+            },
+          ],
+        },
+      },
+      2,
+    );
+
+    expect(migrated.draft.stops[0]?.id).not.toBe('old-local-id');
+    expect(isStopId(migrated.draft.stops[0]?.id)).toBe(true);
   });
 });
 

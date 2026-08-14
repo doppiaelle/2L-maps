@@ -1,4 +1,4 @@
-import { isRouteId, newRouteId, newStopId } from './route-id';
+import { isRouteId, isStopId, newRouteId, newStopId } from './route-id';
 
 /**
  * A new route's identifier.
@@ -76,8 +76,12 @@ describe('the id a stop carries', () => {
     expect(newStopId(() => 0)).toHaveLength(newStopId(() => 0.999).length);
   });
 
-  it('is hexadecimal, so nothing has to escape it', () => {
-    expect(newStopId()).toMatch(/^[0-9a-f]+$/);
+  it('is a UUID, because the database stores stops by UUID', () => {
+    const id = newStopId();
+
+    expect(id).toMatch(SERVER_UUID);
+    expect(isStopId(id)).toBe(true);
+    expect(isStopId('not-a-stop-id')).toBe(false);
   });
 
   it('distinguishes two deliveries at the same address', () => {
