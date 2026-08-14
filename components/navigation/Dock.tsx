@@ -32,7 +32,7 @@ import type { DockItem, DockSection } from '@/lib/ui/dock';
  */
 
 /** The pill row's own height, in points. */
-export const DOCK_HEIGHT = 64;
+export const DOCK_HEIGHT = 56;
 
 /** The gap between the dock and each screen edge. Enough that the map reads as
  *  continuing underneath rather than being cut off by it. */
@@ -105,7 +105,7 @@ export function Dock({
           // The pills breathe inside the container instead of touching its
           // border, which is the difference between four buttons in a box and
           // one dock with four sections in it.
-          padding: 6,
+          padding: 5,
           overflow: 'hidden',
         }}
         accessibilityRole="tablist"
@@ -176,7 +176,7 @@ function DockButton({
       testID={testID}
     >
       <Text
-        style={{ color: tint, fontSize: 16, fontWeight: '700' }}
+        style={{ color: tint, fontSize: 15, fontWeight: '700' }}
         accessibilityElementsHidden
         importantForAccessibility="no"
         numberOfLines={1}

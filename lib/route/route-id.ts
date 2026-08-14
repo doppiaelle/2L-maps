@@ -22,6 +22,10 @@
 
 /** Version 4, variant 1 — the shape `z.string().uuid()` accepts. */
 export function newRouteId(random: () => number = Math.random): string {
+  return newUuidV4(random);
+}
+
+function newUuidV4(random: () => number): string {
   const hex: string[] = [];
   for (let index = 0; index < 16; index += 1) {
     hex.push(
@@ -51,6 +55,10 @@ export function newRouteId(random: () => number = Math.random): string {
 /** Whether a stored id is one the server will accept, so a draft persisted
  *  before this existed can be migrated rather than refused at optimize time. */
 export function isRouteId(value: unknown): value is string {
+  return isUuidV4(value);
+}
+
+function isUuidV4(value: unknown): value is string {
   return (
     typeof value === 'string' &&
     /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
@@ -71,15 +79,17 @@ export function isRouteId(value: unknown): value is string {
  *
  * Embedding it was never necessary. The place id travels in its own field on the
  * same object; this only has to be **unique within one route**, which is what
- * makes two deliveries in the same building two stops rather than one. Sixteen
- * hex characters is far more than enough for a list capped at 25.
+ * makes two deliveries in the same building two stops rather than one.
+ *
+ * It is a UUID anyway because `stops.id` is a UUID in Supabase. A shorter local
+ * id worked for optimize and then failed at History, after the route itself had
+ * already been saved on this phone.
  */
 export function newStopId(random: () => number = Math.random): string {
-  let id = '';
-  for (let index = 0; index < 8; index += 1) {
-    id += Math.floor(random() * 256)
-      .toString(16)
-      .padStart(2, '0');
-  }
-  return id;
+  return newUuidV4(random);
+}
+
+/** Whether a stored stop id can be written to the database. */
+export function isStopId(value: unknown): value is string {
+  return isUuidV4(value);
 }

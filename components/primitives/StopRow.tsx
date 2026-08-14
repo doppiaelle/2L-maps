@@ -1,6 +1,6 @@
 import { Pressable, Text, View } from 'react-native';
 
-import { colours, layout, radius, space } from '@/lib/design/tokens';
+import { colours, layout, radius } from '@/lib/design/tokens';
 import type { ThemeName } from '@/lib/design/tokens';
 import type { StopText } from '@/lib/route/stop-text';
 import type { StopProgressState } from '@/lib/route/progress';
@@ -96,7 +96,7 @@ export function StopRow({
       accessibilityHint={
         hasCoordinate ? 'Opens stop details' : 'Needs its address re-entered before navigating'
       }
-      style={{ minHeight: layout.touchMin, paddingVertical: space.space2 }}
+      style={{ minHeight: layout.touchMin, paddingVertical: 6 }}
       className="flex-row items-center gap-space-3 px-screen-padding"
       testID={testID}
     >
@@ -104,8 +104,8 @@ export function StopRow({
           themselves while driving, so it is the one number that never moves. */}
       <View
         style={{
-          width: 44,
-          height: 44,
+          width: 40,
+          height: 40,
           borderRadius: radius.radiusFull,
           backgroundColor: palette.textPrimary,
           alignItems: 'center',
@@ -115,12 +115,12 @@ export function StopRow({
         importantForAccessibility="no"
         testID="stop-ordinal"
       >
-        <Text style={{ color: palette.bg, fontSize: 16, fontWeight: '700' }}>{position}</Text>
+        <Text style={{ color: palette.bg, fontSize: 15, fontWeight: '700' }}>{position}</Text>
       </View>
 
       <View className="flex-1">
         <Text
-          style={{ color: palette.textPrimary, fontSize: 18, lineHeight: 23, fontWeight: '700' }}
+          style={{ color: palette.textPrimary, fontSize: 16, lineHeight: 21, fontWeight: '700' }}
           numberOfLines={2}
         >
           {title}
@@ -128,7 +128,7 @@ export function StopRow({
 
         {subtitle !== null && (
           <Text
-            style={{ color: palette.textSecondary, fontSize: 14, lineHeight: 19, marginTop: 2 }}
+            style={{ color: palette.textSecondary, fontSize: 13, lineHeight: 18, marginTop: 1 }}
             numberOfLines={2}
           >
             {subtitle}
@@ -138,7 +138,14 @@ export function StopRow({
 
       {onRemove !== undefined && (
         <View style={{ flexDirection: 'row', alignItems: 'center' }} testID="stop-controls">
-          <RowControl glyph="✕" label={`Remove ${title}`} onPress={onRemove} testID="stop-remove" />
+          <RowControl
+            glyph="✕"
+            label={`Remove ${title}`}
+            onPress={onRemove}
+            borderColor={palette.border}
+            colour={palette.textSecondary}
+            testID="stop-remove"
+          />
         </View>
       )}
     </Pressable>
@@ -159,11 +166,15 @@ function RowControl({
   glyph,
   label,
   onPress,
+  borderColor,
+  colour,
   testID,
 }: {
   glyph: string;
   label: string;
   onPress: (() => void) | undefined;
+  borderColor: string;
+  colour: string;
   testID: string;
 }): React.JSX.Element {
   return (
@@ -176,13 +187,13 @@ function RowControl({
         minHeight: layout.touchMin,
         borderRadius: radius.radiusMd,
         borderWidth: glyph === '✕' ? 1 : 0,
-        borderColor: '#E4E4E1',
+        borderColor,
         alignItems: 'center',
         justifyContent: 'center',
       }}
       testID={testID}
     >
-      <Text style={{ color: '#6B6B70', fontSize: glyph === '✕' ? 28 : 18 }}>{glyph}</Text>
+      <Text style={{ color: colour, fontSize: glyph === '✕' ? 20 : 17 }}>{glyph}</Text>
     </Pressable>
   );
 }

@@ -3,6 +3,7 @@ import {
   dominantBearing,
   FALLOFF,
   MAX_BLOCKS,
+  MAX_LABELS,
   MAX_ROADS,
   SCENERY_MAX_SPAN_METRES,
   sceneryFor,
@@ -91,6 +92,7 @@ describe('the frame budget', () => {
 
     expect(scenery.roads.length).toBeLessThanOrEqual(MAX_ROADS);
     expect(scenery.blocks.length).toBeLessThanOrEqual(MAX_BLOCKS);
+    expect(scenery.labels.length).toBeLessThanOrEqual(MAX_LABELS);
   });
 
   it('completes a full-size canvas quickly', () => {
@@ -195,6 +197,16 @@ describe('the grid follows the route', () => {
     expect(scenery.roads.some((r) => !r.isArterial)).toBe(true);
   });
 
+  it('adds quiet labels to the same invented road network', () => {
+    const scenery = sceneryFor({ path: diagonalPath, size: canvas, seed: 'labels' });
+
+    expect(scenery.labels.length).toBeGreaterThan(0);
+    for (const label of scenery.labels) {
+      expect(label.kind).toBe('road');
+      expect(label.opacity).toBeLessThan(0.4);
+    }
+  });
+
   it('builds urban contents inside route-conditioned blocks', () => {
     const scenery = sceneryFor({ path: diagonalPath, size: canvas, seed: 'urban-graph' });
     expect(scenery.blocks.length).toBeGreaterThan(0);
@@ -230,6 +242,7 @@ describe('when there is nothing to draw around', () => {
       roads: [],
       blocks: [],
       areas: [],
+      labels: [],
     });
   });
 
@@ -238,11 +251,13 @@ describe('when there is nothing to draw around', () => {
       roads: [],
       blocks: [],
       areas: [],
+      labels: [],
     });
     expect(sceneryFor({ path: [], size: canvas, seed: 's' })).toEqual({
       roads: [],
       blocks: [],
       areas: [],
+      labels: [],
     });
   });
 });
@@ -301,7 +316,7 @@ describe('it only draws streets where streets are believable', () => {
       metresPerPoint: spanOf(900_000),
     });
 
-    expect(scenery).toEqual({ roads: [], blocks: [], areas: [] });
+    expect(scenery).toEqual({ roads: [], blocks: [], areas: [], labels: [] });
   });
 
   it('stops abruptly rather than fading into a quieter lie', () => {

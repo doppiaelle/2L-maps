@@ -23,10 +23,20 @@ export interface SceneryArea extends SceneryBlock {
   readonly blockId: string;
 }
 
+export interface SceneryLabel {
+  readonly id: string;
+  readonly text: string;
+  readonly point: Point;
+  readonly rotation: number;
+  readonly kind: 'road' | 'place';
+  readonly opacity: number;
+}
+
 export interface Scenery {
   readonly roads: readonly SceneryRoad[];
   readonly blocks: readonly SceneryBlock[];
   readonly areas: readonly SceneryArea[];
+  readonly labels: readonly SceneryLabel[];
 }
 
 export const SCENERY_MAX_SPAN_METRES = 60_000;
@@ -34,11 +44,24 @@ export const FALLOFF = 0.52;
 export const MAX_ROADS = 130;
 export const MAX_BLOCKS = 80;
 export const MAX_AREAS = 130;
+export const MAX_LABELS = 24;
 
-const EMPTY: Scenery = { roads: [], blocks: [], areas: [] };
+const EMPTY: Scenery = { roads: [], blocks: [], areas: [], labels: [] };
 const CORRIDOR = 48;
 const CROSS_REACH = 96;
 const MIN_SEGMENT = 12;
+const ROAD_NAMES = [
+  'Via Centrale',
+  'Corso Verde',
+  'Viale Roma',
+  'Via Manzoni',
+  'Corso Italia',
+  'Via Garibaldi',
+  'Viale Europa',
+  'Via del Mercato',
+  'Strada Nord',
+  'Via delle Poste',
+] as const;
 
 export interface SceneryInputs {
   readonly path: readonly Point[];
@@ -68,6 +91,7 @@ export function sceneryFor({ path, size, seed, metresPerPoint }: SceneryInputs):
   const roads: SceneryRoad[] = [];
   const blocks: SceneryBlock[] = [];
   const areas: SceneryArea[] = [];
+  const labels: SceneryLabel[] = [];
 
   for (let index = 0; index < route.length - 1; index += 1) {
     const from = route[index];
@@ -91,6 +115,7 @@ export function sceneryFor({ path, size, seed, metresPerPoint }: SceneryInputs):
       index % 3 === 0,
       fade(distanceToPath(midpoint(leftFrom, leftTo), path), falloff),
     );
+    pushRoadLabel(labels, `left-${index}`, leftFrom, leftTo, seed, index, 0.34);
     pushRoad(
       roads,
       `right-${index}`,
@@ -99,6 +124,7 @@ export function sceneryFor({ path, size, seed, metresPerPoint }: SceneryInputs):
       index % 3 === 0,
       fade(distanceToPath(midpoint(rightFrom, rightTo), path), falloff),
     );
+    pushRoadLabel(labels, `right-${index}`, rightFrom, rightTo, seed, index + 3, 0.28);
 
     // Cross streets connect both route-following roads and continue one block
     // beyond them, so the network reads as a city rather than as rails.
@@ -110,6 +136,15 @@ export function sceneryFor({ path, size, seed, metresPerPoint }: SceneryInputs):
         add(from, normal, CROSS_REACH),
         index % 4 === 0,
         opacity,
+      );
+      pushRoadLabel(
+        labels,
+        `cross-${index}`,
+        add(from, normal, -CROSS_REACH),
+        add(from, normal, CROSS_REACH),
+        seed,
+        index + 7,
+        0.24,
       );
     }
 
@@ -182,9 +217,23 @@ export function sceneryFor({ path, size, seed, metresPerPoint }: SceneryInputs):
       true,
       1,
     );
+    pushRoadLabel(
+      labels,
+      'cross-last',
+      add(last, normal, -CROSS_REACH),
+      add(last, normal, CROSS_REACH),
+      seed,
+      99,
+      0.22,
+    );
   }
 
-  return { roads: roads.slice(0, MAX_ROADS), blocks, areas: areas.slice(0, MAX_AREAS) };
+  return {
+    roads: roads.slice(0, MAX_ROADS),
+    blocks,
+    areas: areas.slice(0, MAX_AREAS),
+    labels: labels.slice(0, MAX_LABELS),
+  };
 }
 
 function areaInside(
@@ -219,6 +268,31 @@ function pushRoad(
 ): void {
   if (into.length >= MAX_ROADS || opacity <= 0.02) return;
   into.push({ id, from, to, isArterial, opacity });
+}
+
+function pushRoadLabel(
+  into: SceneryLabel[],
+  id: string,
+  from: Point,
+  to: Point,
+  seed: string,
+  salt: number,
+  opacity: number,
+): void {
+  if (into.length >= MAX_LABELS || opacity <= 0.02) return;
+  const length = Math.hypot(to.x - from.x, to.y - from.y);
+  if (length < 42) return;
+
+  const name = ROAD_NAMES[Math.abs(hashString(`${seed}:${salt}:${id}`)) % ROAD_NAMES.length];
+  if (name === undefined) return;
+  into.push({
+    id: `label-${id}`,
+    text: name,
+    point: midpoint(from, to),
+    rotation: (Math.atan2(to.y - from.y, to.x - from.x) * 180) / Math.PI,
+    kind: 'road',
+    opacity,
+  });
 }
 
 function resamplePath(path: readonly Point[], maximum: number): Point[] {
@@ -291,11 +365,7 @@ function isNearCanvas(point: Point, size: { width: number; height: number }): bo
 }
 
 export function seededRandom(seed: string): () => number {
-  let hash = 0x811c9dc5;
-  for (let index = 0; index < seed.length; index += 1) {
-    hash ^= seed.charCodeAt(index);
-    hash = Math.imul(hash, 0x01000193) >>> 0;
-  }
+  const hash = hashString(seed);
   let state = hash === 0 ? 0x9e3779b9 : hash;
   return () => {
     state = (state + 0x6d2b79f5) >>> 0;
@@ -304,4 +374,13 @@ export function seededRandom(seed: string): () => number {
     value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
     return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
   };
+}
+
+function hashString(seed: string): number {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < seed.length; index += 1) {
+    hash ^= seed.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash;
 }

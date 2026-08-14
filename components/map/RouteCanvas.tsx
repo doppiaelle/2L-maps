@@ -2,7 +2,7 @@ import { memo, useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
-import Svg, { Circle, G, Line, Path, Rect } from 'react-native-svg';
+import Svg, { Circle, G, Line, Path, Rect, Text as SvgText } from 'react-native-svg';
 
 import { MapAttribution } from './MapAttribution';
 import { colours, mapColours, radius, space, stroke } from '@/lib/design/tokens';
@@ -11,11 +11,11 @@ import type { LatLng } from '@/lib/geo/haversine';
 import { landmassFor } from '@/lib/map/landmass';
 import { fitProjection, metresPerPoint, pathThrough } from '@/lib/map/projection';
 import { sceneryFor } from '@/lib/map/scenery';
-import type { Scenery } from '@/lib/map/scenery';
+import type { Scenery, SceneryLabel } from '@/lib/map/scenery';
 import type { Point } from '@/lib/map/projection';
 import { simplify } from '@/lib/map/simplify';
 import { legAtScreenPoint } from '@/lib/map/leg-selection';
-import { clampViewport, FITTED, MAX_SCALE, MIN_SCALE } from '@/lib/map/viewport';
+import { clampViewport, FITTED, MAX_SCALE, MIN_SCALE, zoomAbout } from '@/lib/map/viewport';
 import { MARKER_SIZE, MARKER_SIZE_SELECTED, markerStyle } from '@/lib/map/style';
 import type { DrawnRoute } from '@/lib/map/route-geometry';
 import type { StopProgressState } from '@/lib/route/progress';
@@ -74,6 +74,9 @@ export interface RouteCanvasProps {
    * hold still ([`lib/map/scenery.ts`](../../lib/map/scenery.ts)).
    */
   readonly scenerySeed?: string;
+  /** Low-priority names already present in memory, used as map hints without
+   *  fetching map tiles or asking another API for surroundings. */
+  readonly contextLabels?: readonly string[];
   /**
    * Whether this is the answer or the wait for it.
    *
@@ -109,7 +112,7 @@ const CANVAS_PADDING = MARKER_SIZE_SELECTED / 2 + space.space3;
 
 /** Nothing to draw around. Frozen so the empty case is one object rather than a
  *  new pair of arrays on every render. */
-const EMPTY_SCENERY: Scenery = { roads: [], blocks: [], areas: [] };
+const EMPTY_SCENERY: Scenery = { roads: [], blocks: [], areas: [], labels: [] };
 
 /** The navigator's triangle, pointing along positive x before rotation. Drawn
  *  once and turned to the route's first bearing — a shape that says "you start
@@ -123,6 +126,7 @@ export const RouteCanvas = memo(function RouteCanvas({
   theme,
   undrawableStopIds = [],
   scenerySeed = '',
+  contextLabels = [],
   phase = 'ready',
   selectedLegIndex = null,
   onSelectLeg,
@@ -180,6 +184,7 @@ export const RouteCanvas = memo(function RouteCanvas({
         // The town is generated around the *simplified* line, so the scenery and
         // the route agree about where the route is.
         scenery: sceneryFor({ path: projected, size, seed: scenerySeed, metresPerPoint: ground }),
+        labels: contextLabelsFor(pins, contextLabels, ground),
         heading: projected,
       };
     }
@@ -194,6 +199,7 @@ export const RouteCanvas = memo(function RouteCanvas({
         // has no result at all. Nothing to tap in either case.
         legs: [],
         scenery: sceneryFor({ path: through, size, seed: scenerySeed, metresPerPoint: ground }),
+        labels: contextLabelsFor(pins, contextLabels, ground),
         heading: through,
         // Separate paths rather than one dashed line through every stop. A
         // single path would join at the stops and read as continuous, which is
@@ -205,8 +211,17 @@ export const RouteCanvas = memo(function RouteCanvas({
       };
     }
 
-    return { pins, land, road: null, legs: [], segments: [], scenery: EMPTY_SCENERY, heading: [] };
-  }, [stops, route, size, scenerySeed]);
+    return {
+      pins,
+      land,
+      road: null,
+      legs: [],
+      segments: [],
+      scenery: EMPTY_SCENERY,
+      labels: [],
+      heading: [],
+    };
+  }, [stops, route, size, scenerySeed, contextLabels]);
 
   // Only a *result* can be degraded. While preparing, the connectors are the
   // stops in the order they were typed and claim nothing about distance or
@@ -489,6 +504,10 @@ export const RouteCanvas = memo(function RouteCanvas({
                 );
               })}
 
+              {[...drawn.scenery.labels, ...drawn.labels].map((label) => (
+                <MapLabel key={label.id} label={label} theme={theme} />
+              ))}
+
               {drawn.road !== null && (
                 <>
                   <Path
@@ -588,8 +607,10 @@ export const RouteCanvas = memo(function RouteCanvas({
                 <Pin
                   key={pin.stopId}
                   point={pin.point}
+                  position={pin.position}
                   state={pin.state}
                   isSelected={!isPreparing && pin.stopId === selectedStopId}
+                  showLabel={!isPreparing}
                   theme={theme}
                   opacity={isPreparing ? PREPARING_OPACITY : 1}
                 />
@@ -598,24 +619,6 @@ export const RouteCanvas = memo(function RouteCanvas({
           </Animated.View>
         </GestureDetector>
       )}
-
-      {/* The pin numbers, as real text rather than SVG glyphs: `Text` gets
-          Dynamic Type and the platform's own font, and an SVG `<Text>` gets
-          neither (`CLAUDE.md` §10 rule 5).
-
-          **Withheld while preparing.** The numbers are the answer: showing the
-          entry order in them and then renumbering under the user's eyes would
-          make the wait look like a result that changed its mind. */}
-      {!isPreparing &&
-        drawn.pins.map((pin) => (
-          <PinLabel
-            key={pin.stopId}
-            point={pin.point}
-            position={pin.position}
-            state={pin.state}
-            theme={theme}
-          />
-        ))}
 
       {!isPreparing && (
         <>
@@ -644,9 +647,16 @@ export const RouteCanvas = memo(function RouteCanvas({
           >
             <Pressable
               onPress={() => {
-                const next = Math.min(MAX_SCALE, zoom.value * 1.35);
-                zoom.value = next;
-                setViewport({ scale: next, translateX: offsetX.value, translateY: offsetY.value });
+                const next = zoomAbout(
+                  { scale: zoom.value, translateX: offsetX.value, translateY: offsetY.value },
+                  { x: size.width / 2, y: size.height / 2 },
+                  1.35,
+                  size,
+                );
+                zoom.value = next.scale;
+                offsetX.value = next.translateX;
+                offsetY.value = next.translateY;
+                setViewport(next);
               }}
               accessibilityRole="button"
               accessibilityLabel="Zoom in"
@@ -665,11 +675,16 @@ export const RouteCanvas = memo(function RouteCanvas({
             </Pressable>
             <Pressable
               onPress={() => {
-                const next = Math.max(MIN_SCALE, zoom.value / 1.35);
-                zoom.value = next;
-                offsetX.value = 0;
-                offsetY.value = 0;
-                setViewport({ scale: next, translateX: 0, translateY: 0 });
+                const next = zoomAbout(
+                  { scale: zoom.value, translateX: offsetX.value, translateY: offsetY.value },
+                  { x: size.width / 2, y: size.height / 2 },
+                  1 / 1.35,
+                  size,
+                );
+                zoom.value = next.scale;
+                offsetX.value = next.translateX;
+                offsetY.value = next.translateY;
+                setViewport(next);
               }}
               accessibilityRole="button"
               accessibilityLabel="Zoom out"
@@ -816,6 +831,100 @@ function depthFor(theme: ThemeName): {
   };
 }
 
+function MapLabel({ label, theme }: { label: SceneryLabel; theme: ThemeName }): React.JSX.Element {
+  const map = mapColours[theme];
+  const fontSize = label.kind === 'place' ? 10 : 8.5;
+  const weight = label.kind === 'place' ? '700' : '600';
+  const anchor = label.kind === 'place' ? 'middle' : 'middle';
+  const transform =
+    label.kind === 'road'
+      ? `rotate(${label.rotation} ${label.point.x} ${label.point.y})`
+      : undefined;
+
+  return (
+    <G
+      testID="map-context-label"
+      accessibilityLabel={label.text}
+      transform={transform}
+      opacity={label.opacity}
+    >
+      <SvgText
+        x={label.point.x}
+        y={label.point.y}
+        fill={map.labelHalo}
+        stroke={map.labelHalo}
+        strokeWidth={2.4}
+        fontSize={fontSize}
+        fontWeight={weight}
+        textAnchor={anchor}
+      >
+        {label.text}
+      </SvgText>
+      <SvgText
+        x={label.point.x}
+        y={label.point.y}
+        fill={map.label}
+        fontSize={fontSize}
+        fontWeight={weight}
+        textAnchor={anchor}
+      >
+        {label.text}
+      </SvgText>
+    </G>
+  );
+}
+
+function contextLabelsFor(
+  pins: readonly { readonly position: number; readonly point: Point }[],
+  labels: readonly string[],
+  metresPerPointValue: number,
+): SceneryLabel[] {
+  if (pins.length === 0 || labels.length === 0) return [];
+  const limit = metresPerPointValue > 1_200 ? 2 : metresPerPointValue > 550 ? 4 : 7;
+  const unique = uniqueLabels(labels).slice(0, Math.min(limit, pins.length + 2));
+
+  return unique.flatMap((text, index): SceneryLabel[] => {
+    const pin = pins[index % pins.length];
+    if (pin === undefined) return [];
+
+    const side = index % 2 === 0 ? 1 : -1;
+    const row = index % 3;
+    return [
+      {
+        id: `context-${index}-${pin.position}`,
+        text,
+        point: {
+          x: pin.point.x + side * (26 + row * 8),
+          y: pin.point.y + (row - 1) * 18,
+        },
+        rotation: 0,
+        kind: 'place',
+        opacity: metresPerPointValue > 1_200 ? 0.16 : 0.22,
+      },
+    ];
+  });
+}
+
+function uniqueLabels(labels: readonly string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const label of labels) {
+    const normalized = normalizeMapLabel(label);
+    if (normalized === null || seen.has(normalized.toLowerCase())) continue;
+    seen.add(normalized.toLowerCase());
+    out.push(normalized);
+  }
+  return out;
+}
+
+function normalizeMapLabel(value: string): string | null {
+  const trimmed = value.replace(/\s+/g, ' ').trim();
+  if (trimmed.length < 3) return null;
+  const first = trimmed.split(',')[0]?.trim() ?? trimmed;
+  if (first.length < 3) return null;
+  return first.length > 28 ? `${first.slice(0, 26).trim()}…` : first;
+}
+
 /**
  * One stop.
  *
@@ -824,14 +933,18 @@ function depthFor(theme: ThemeName): {
  */
 const Pin = memo(function Pin({
   point,
+  position,
   state,
   isSelected,
+  showLabel,
   theme,
   opacity = 1,
 }: {
   point: Point;
+  position: number;
   state: StopProgressState;
   isSelected: boolean;
+  showLabel: boolean;
   theme: ThemeName;
   opacity?: number;
 }): React.JSX.Element {
@@ -857,46 +970,23 @@ const Pin = memo(function Pin({
         strokeWidth={2}
         opacity={opacity}
       />
+      {showLabel && (
+        <SvgText
+          testID="route-canvas-pin-label"
+          x={point.x}
+          y={point.y + 4}
+          fill={style.foreground}
+          fontSize={13}
+          fontWeight="700"
+          textAnchor="middle"
+          opacity={opacity}
+        >
+          {style.glyph ?? position}
+        </SvgText>
+      )}
     </>
   );
 });
-
-/** The ordinal, or the glyph that replaces it. Never colour alone: a completed
- *  stop shows a checkmark as well as mint (`CLAUDE.md` §10 rule 4). */
-function PinLabel({
-  point,
-  position,
-  state,
-  theme,
-}: {
-  point: Point;
-  position: number;
-  state: StopProgressState;
-  theme: ThemeName;
-}): React.JSX.Element {
-  const style = markerStyle(theme, state, false);
-
-  return (
-    <View
-      pointerEvents="none"
-      style={{
-        position: 'absolute',
-        left: point.x - MARKER_SIZE / 2,
-        top: point.y - MARKER_SIZE / 2,
-        width: MARKER_SIZE,
-        height: MARKER_SIZE,
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
-    >
-      <Text style={{ color: style.foreground, fontSize: 13, fontWeight: '600' }}>
-        {style.glyph ?? position}
-      </Text>
-    </View>
-  );
-}
 
 /**
  * The navigator's triangle at the route's start.

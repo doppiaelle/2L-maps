@@ -43,10 +43,10 @@ export function HistoryView({
         accessibilityRole="header"
         style={{
           color: palette.textPrimary,
-          fontSize: 34,
-          lineHeight: 40,
+          fontSize: 30,
+          lineHeight: 36,
           fontWeight: '700',
-          marginTop: space.space5,
+          marginTop: space.space4,
         }}
       >
         History
@@ -54,8 +54,8 @@ export function HistoryView({
       <Text
         style={{
           color: palette.textSecondary,
-          fontSize: 16,
-          lineHeight: 23,
+          fontSize: 15,
+          lineHeight: 21,
           marginTop: space.space1,
         }}
       >
@@ -115,8 +115,8 @@ function HistoryState({
   return (
     <View
       style={{
-        marginTop: space.space6,
-        padding: space.space5,
+        marginTop: space.space5,
+        padding: space.space4,
         borderRadius: radius.radiusLg,
         backgroundColor: palette.surface,
         borderWidth: 1,
@@ -125,12 +125,12 @@ function HistoryState({
       }}
       testID={testID}
     >
-      <Text style={{ color: palette.textPrimary, fontSize: 20, fontWeight: '700' }}>{title}</Text>
+      <Text style={{ color: palette.textPrimary, fontSize: 18, fontWeight: '700' }}>{title}</Text>
       <Text
         style={{
           color: palette.textSecondary,
-          fontSize: 15,
-          lineHeight: 21,
+          fontSize: 14,
+          lineHeight: 20,
           textAlign: 'center',
           marginTop: space.space2,
         }}
@@ -142,7 +142,7 @@ function HistoryState({
           onPress={onAction}
           accessibilityRole="button"
           style={{
-            minHeight: 48,
+            minHeight: 44,
             marginTop: space.space4,
             paddingHorizontal: space.space5,
             borderRadius: radius.radiusMd,
@@ -151,7 +151,7 @@ function HistoryState({
             justifyContent: 'center',
           }}
         >
-          <Text style={{ color: palette.accentOn, fontSize: 16, fontWeight: '700' }}>
+          <Text style={{ color: palette.accentOn, fontSize: 15, fontWeight: '700' }}>
             {actionLabel}
           </Text>
         </Pressable>
@@ -178,7 +178,7 @@ function RouteRow({
       accessibilityRole="button"
       accessibilityLabel={`Open ${row.spoken}`}
       style={{
-        minHeight: 96,
+        minHeight: 84,
         marginBottom: space.space3,
         padding: space.space3,
         borderRadius: radius.radiusLg,
@@ -191,19 +191,19 @@ function RouteRow({
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.space2 }}>
         <View style={{ flex: 1 }}>
           <Text
-            style={{ color: palette.textPrimary, fontSize: 18, lineHeight: 23, fontWeight: '700' }}
+            style={{ color: palette.textPrimary, fontSize: 16, lineHeight: 21, fontWeight: '700' }}
             numberOfLines={1}
           >
             {row.title}
           </Text>
-          <Text style={{ color: palette.textSecondary, fontSize: 14, marginTop: space.space1 }}>
+          <Text style={{ color: palette.textSecondary, fontSize: 13, marginTop: space.space1 }}>
             {row.meta}
           </Text>
           {row.metrics !== null && (
             <Text
               style={{
                 color: palette.accent,
-                fontSize: 14,
+                fontSize: 13,
                 fontWeight: '700',
                 marginTop: space.space1,
               }}
@@ -214,15 +214,15 @@ function RouteRow({
         </View>
         <View
           style={{
-            width: 44,
-            height: 44,
+            width: 40,
+            height: 40,
             borderRadius: radius.radiusMd,
             backgroundColor: palette.textPrimary,
             alignItems: 'center',
             justifyContent: 'center',
           }}
         >
-          <Text style={{ color: palette.bg, fontSize: 28, fontWeight: '700' }}>→</Text>
+          <Text style={{ color: palette.bg, fontSize: 24, fontWeight: '700' }}>→</Text>
         </View>
       </View>
     </Pressable>

@@ -23,9 +23,12 @@ export interface PlanViewProps {
   readonly selectedLeg?: {
     readonly value: string;
     readonly spoken: string;
-    readonly stopLabel?: string;
-    readonly stopNumber?: number;
+    readonly title: string;
+    readonly detail: string;
+    readonly progress: number;
   } | null;
+  readonly canShowMap?: boolean;
+  onShowMap?: () => void;
   readonly bottomInset?: number;
   readonly controlsSlot?: React.ReactNode;
   readonly noticeSlot?: React.ReactNode;
@@ -46,6 +49,8 @@ export function PlanView({
   mapSlot,
   onDismissMap,
   selectedLeg = null,
+  canShowMap = false,
+  onShowMap,
   bottomInset = 0,
   controlsSlot,
   noticeSlot,
@@ -66,7 +71,44 @@ export function PlanView({
       {view === 'list' && (
         <View style={{ paddingHorizontal: layout.screenPadding }}>
           <AppHeader showBrand theme={theme} testID="route-app-header" />
-          <Text style={titleStyle(palette.textPrimary)}>Your route</Text>
+          <View
+            style={{
+              marginTop: space.space4,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: space.space3,
+            }}
+          >
+            <Text style={titleStyle(palette.textPrimary)}>Your route</Text>
+            {onShowMap !== undefined && (
+              <Pressable
+                onPress={canShowMap ? onShowMap : undefined}
+                disabled={!canShowMap}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  canShowMap ? 'Show optimized map' : 'Optimized map is not available yet'
+                }
+                accessibilityState={{ disabled: !canShowMap }}
+                style={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: radius.radiusMd,
+                  borderWidth: 1,
+                  borderColor: palette.border,
+                  backgroundColor: palette.surface,
+                  opacity: canShowMap ? 1 : 0.42,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                testID="route-show-map"
+              >
+                <Text style={{ color: palette.textPrimary, fontSize: 17, fontWeight: '700' }}>
+                  ⌖
+                </Text>
+              </Pressable>
+            )}
+          </View>
           <Text style={subtitleStyle(palette.textSecondary)}>
             Add the places you need to visit.
           </Text>
@@ -77,8 +119,8 @@ export function PlanView({
             accessibilityLabel="Search an address or place"
             accessibilityHint="Opens address suggestions over this route"
             style={{
-              minHeight: 60,
-              marginTop: space.space5,
+              minHeight: 52,
+              marginTop: space.space4,
               paddingLeft: space.space4,
               paddingRight: space.space2,
               flexDirection: 'row',
@@ -91,13 +133,13 @@ export function PlanView({
             }}
             testID="route-search-field"
           >
-            <Text style={{ color: palette.textTertiary, fontSize: 17 }} numberOfLines={1}>
+            <Text style={{ color: palette.textTertiary, fontSize: 15 }} numberOfLines={1}>
               Search an address or place…
             </Text>
             <View
               style={{
-                width: 48,
-                height: 48,
+                width: 42,
+                height: 42,
                 borderRadius: radius.radiusMd,
                 backgroundColor: palette.textPrimary,
                 alignItems: 'center',
@@ -133,8 +175,8 @@ export function PlanView({
                   position: 'absolute',
                   top: space.space3,
                   left: space.space3,
-                  width: 52,
-                  height: 52,
+                  width: 44,
+                  height: 44,
                   borderRadius: radius.radiusMd,
                   backgroundColor: palette.textPrimary,
                   alignItems: 'center',
@@ -142,7 +184,7 @@ export function PlanView({
                 }}
                 testID="plan-dismiss-map"
               >
-                <Text style={{ color: palette.bg, fontSize: 32, fontWeight: '700' }}>‹</Text>
+                <Text style={{ color: palette.bg, fontSize: 28, fontWeight: '700' }}>‹</Text>
               </Pressable>
             )}
             {isMap && selectedLeg !== null && (
@@ -152,7 +194,7 @@ export function PlanView({
                   left: layout.screenPadding,
                   right: layout.screenPadding,
                   bottom: bottomInset + space.space6,
-                  padding: space.space4,
+                  padding: space.space3,
                   borderRadius: radius.radiusLg,
                   backgroundColor: palette.textPrimary,
                 }}
@@ -165,33 +207,32 @@ export function PlanView({
                   numberOfLines={2}
                   style={{
                     color: palette.bg,
-                    fontSize: 22,
-                    lineHeight: 28,
+                    fontSize: 20,
+                    lineHeight: 25,
                     fontWeight: '700',
                     marginTop: space.space2,
                   }}
                 >
-                  {selectedLeg.stopNumber === undefined || selectedLeg.stopLabel === undefined
-                    ? 'Selected route segment'
-                    : `Stop ${selectedLeg.stopNumber} · ${selectedLeg.stopLabel}`}
+                  {selectedLeg.title}
                 </Text>
                 <Text
+                  numberOfLines={2}
                   style={{
                     color: palette.bg,
                     opacity: 0.72,
-                    fontSize: 15,
-                    lineHeight: 21,
+                    fontSize: 14,
+                    lineHeight: 19,
                     marginTop: space.space2,
                   }}
                 >
-                  Route follows the real road network between stops.
+                  {selectedLeg.detail}
                 </Text>
                 <Text
                   style={{
                     color: palette.accent,
-                    fontSize: 18,
+                    fontSize: 17,
                     fontWeight: '700',
-                    marginTop: space.space4,
+                    marginTop: space.space3,
                   }}
                   accessibilityLabel={selectedLeg.spoken}
                   testID="plan-selected-leg"
@@ -200,7 +241,7 @@ export function PlanView({
                 </Text>
                 <View
                   style={{
-                    height: 7,
+                    height: 6,
                     marginTop: space.space3,
                     borderRadius: radius.radiusFull,
                     overflow: 'hidden',
@@ -209,7 +250,7 @@ export function PlanView({
                 >
                   <View
                     style={{
-                      width: '66%',
+                      width: `${Math.round(selectedLeg.progress * 100)}%`,
                       height: '100%',
                       borderRadius: radius.radiusFull,
                       backgroundColor: palette.accent,
@@ -228,18 +269,18 @@ export function PlanView({
             <View
               style={{
                 marginHorizontal: layout.screenPadding,
-                marginBottom: space.space5,
-                paddingHorizontal: space.space4,
+                marginBottom: space.space4,
+                paddingHorizontal: space.space3,
                 paddingVertical: space.space3,
                 borderRadius: radius.radiusLg,
                 backgroundColor: palette.accentSubtle,
               }}
               testID="plan-ready-card"
             >
-              <Text style={{ color: palette.accent, fontSize: 18, fontWeight: '700' }}>
+              <Text style={{ color: palette.accent, fontSize: 16, fontWeight: '700' }}>
                 {`${stops.length} ${stops.length === 1 ? 'stop' : 'stops'} ready`}
               </Text>
-              <Text style={{ color: palette.accent, fontSize: 15, marginTop: space.space1 }}>
+              <Text style={{ color: palette.accent, fontSize: 14, marginTop: space.space1 }}>
                 Optimize to automatically reorder them.
               </Text>
             </View>
@@ -274,13 +315,13 @@ function actionFor(intent: ActionIntent): PrimaryActionState | null {
 function titleStyle(color: string) {
   return {
     color,
-    fontSize: 34,
-    lineHeight: 40,
+    fontSize: 30,
+    lineHeight: 36,
     fontWeight: '700' as const,
-    marginTop: space.space5,
+    flex: 1,
   };
 }
 
 function subtitleStyle(color: string) {
-  return { color, fontSize: 16, lineHeight: 23, marginTop: space.space1 };
+  return { color, fontSize: 15, lineHeight: 21, marginTop: space.space1 };
 }

@@ -75,8 +75,7 @@ describe('what it draws', () => {
 
   it('numbers the pins, so the order is readable without colour', () => {
     laidOut(canvas(road, [stop('s1', 1), stop('s2', 2)]));
-    expect(screen.getByText('1', visually)).toBeTruthy();
-    expect(screen.getByText('2', visually)).toBeTruthy();
+    expect(screen.getAllByTestId('route-canvas-pin-label', visually)).toHaveLength(2);
   });
 });
 
@@ -180,6 +179,19 @@ describe('the drawn town', () => {
     laidOut(canvas(road, [stop('s1', 1), stop('s2', 2)], { scenerySeed: 'route-1' }));
 
     expect(screen.getByTestId('route-canvas-origin')).toBeTruthy();
+  });
+
+  it('draws quiet route context labels without another map service', () => {
+    laidOut(
+      canvas(road, [stop('s1', 1), stop('s2', 2)], {
+        contextLabels: ['Duomo di Milano', 'Naviglio Grande'],
+        scenerySeed: 'route-1',
+      }),
+    );
+
+    const labels = screen.getAllByTestId('map-context-label', visually);
+    expect(labels.length).toBeGreaterThan(0);
+    expect(labels.some((label) => label.props.accessibilityLabel === 'Duomo di Milano')).toBe(true);
   });
 
   it('draws the same town twice for the same route', () => {
