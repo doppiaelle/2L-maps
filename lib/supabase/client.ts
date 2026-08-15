@@ -10,6 +10,7 @@ import { createFavouritesProvider } from './favourites-adapter';
 import type { FavouritesPort, FavouritesProvider } from './favourites-adapter';
 import { createRoutesProvider } from './routes-adapter';
 import type { RoutesPort, RoutesProvider } from './routes-adapter';
+import { trace } from '@/lib/diagnostics/app-trace';
 import type { AuthProvider } from '@/lib/providers/types';
 
 /**
@@ -97,11 +98,32 @@ export function createSupabaseAuth(config: SupabaseConfig | null): AuthProvider 
 export function createPostgrestPort(client: SupabaseClient): RoutesPort {
   return {
     upsert: async (table, rows) => {
+      const startedAt = Date.now();
+      trace({
+        level: 'debug',
+        area: 'supabase',
+        event: 'upsert_start',
+        data: { table, rowCount: rows.length },
+      });
       const { error } = await client.from(table).upsert(rows as never[]);
+      tracePostgrestResult('upsert', table, startedAt, error);
       return { error: error === null ? null : { message: error.message } };
     },
 
     select: async (table, query) => {
+      const startedAt = Date.now();
+      trace({
+        level: 'debug',
+        area: 'supabase',
+        event: 'select_start',
+        data: {
+          table,
+          hasMatch: query.match !== undefined,
+          hasIn: query.in !== undefined,
+          isNull: query.isNull ?? null,
+          limit: query.limit ?? null,
+        },
+      });
       let builder = client.from(table).select(query.columns);
 
       for (const [column, value] of Object.entries(query.match ?? {})) {
@@ -115,24 +137,43 @@ export function createPostgrestPort(client: SupabaseClient): RoutesPort {
       if (query.limit !== undefined) builder = builder.limit(query.limit);
 
       const { data, error } = await builder;
+      tracePostgrestResult('select', table, startedAt, error, {
+        rowCount: Array.isArray(data) ? data.length : null,
+      });
       return { data, error: error === null ? null : { message: error.message } };
     },
 
     update: async (table, values, match) => {
+      const startedAt = Date.now();
+      trace({
+        level: 'debug',
+        area: 'supabase',
+        event: 'update_start',
+        data: { table, valueKeys: Object.keys(values), matchKeys: Object.keys(match) },
+      });
       let builder = client.from(table).update(values);
       for (const [column, value] of Object.entries(match)) {
         builder = builder.eq(column, value);
       }
       const { error } = await builder;
+      tracePostgrestResult('update', table, startedAt, error);
       return { error: error === null ? null : { message: error.message } };
     },
 
     deleteRows: async (table, match) => {
+      const startedAt = Date.now();
+      trace({
+        level: 'debug',
+        area: 'supabase',
+        event: 'delete_start',
+        data: { table, matchKeys: Object.keys(match) },
+      });
       let builder = client.from(table).delete();
       for (const [column, value] of Object.entries(match)) {
         builder = builder.eq(column, value);
       }
       const { error } = await builder;
+      tracePostgrestResult('delete', table, startedAt, error);
       return { error: error === null ? null : { message: error.message } };
     },
   };
@@ -154,10 +195,56 @@ export function createSupabaseFavourites(config: SupabaseConfig | null): Favouri
   const port: FavouritesPort = {
     select: createPostgrestPort(client).select,
     recordUse: async (placeId) => {
+      const startedAt = Date.now();
+      trace({
+        level: 'debug',
+        area: 'supabase',
+        event: 'rpc_start',
+        data: { rpc: 'record_place_use', hasPlaceId: placeId.length > 0 },
+      });
       const { error } = await client.rpc('record_place_use', { p_place_id: placeId });
+      tracePostgrestResult('rpc', 'record_place_use', startedAt, error);
       return { error: error === null ? null : { message: error.message } };
     },
   };
 
   return createFavouritesProvider(port);
+}
+
+function tracePostgrestResult(
+  operation: string,
+  table: string,
+  startedAt: number,
+  error: {
+    readonly message: string;
+    readonly code?: string;
+    readonly details?: string;
+    readonly hint?: string;
+  } | null,
+  extra: Readonly<Record<string, unknown>> = {},
+): void {
+  if (error === null) {
+    trace({
+      level: 'debug',
+      area: 'supabase',
+      event: `${operation}_ok`,
+      data: { table, durationMs: Date.now() - startedAt, ...extra },
+    });
+    return;
+  }
+
+  trace({
+    level: 'error',
+    area: 'supabase',
+    event: `${operation}_error`,
+    data: {
+      table,
+      durationMs: Date.now() - startedAt,
+      message: error.message,
+      code: error.code ?? null,
+      details: error.details ?? null,
+      hint: error.hint ?? null,
+      ...extra,
+    },
+  });
 }
