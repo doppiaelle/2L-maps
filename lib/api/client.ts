@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { trace } from '@/lib/diagnostics/app-trace';
+
 /**
  * The typed client for our own Edge Functions.
  *
@@ -111,10 +113,18 @@ export class ApiClient {
     init: RequestInit,
     signal?: AbortSignal,
   ): Promise<ApiResult<T>> {
+    const startedAt = Date.now();
+    const method = init.method ?? 'GET';
     // Already cancelled before we got here — usually a keystroke superseded by
     // the next one while the token was being read. Issuing the request anyway
     // would pay for a result nobody will look at.
     if (signal?.aborted === true) {
+      trace({
+        level: 'debug',
+        area: 'api',
+        event: 'request_cancelled_before_start',
+        data: { method, path },
+      });
       return { ok: false, failure: failure('NETWORK_UNAVAILABLE', 'Request cancelled') };
     }
 
@@ -133,6 +143,12 @@ export class ApiClient {
 
     const token = await this.getAccessToken();
     if (token === null) {
+      trace({
+        level: 'warn',
+        area: 'api',
+        event: 'request_skipped',
+        data: { method, path, reason: 'no-session-token' },
+      });
       // Not worth a round trip: the server would answer 401 and we would have
       // spent a request to learn what we already know.
       return { ok: false, failure: failure('UNAUTHENTICATED', 'Sign in to continue') };
@@ -144,6 +160,12 @@ export class ApiClient {
 
     let response: Response;
     try {
+      trace({
+        level: 'debug',
+        area: 'api',
+        event: 'request_start',
+        data: { method, path, timeoutMs: this.timeoutMs },
+      });
       response = await this.fetchImpl(`${this.baseUrl}${path}`, {
         ...init,
         signal: composed,
@@ -154,6 +176,18 @@ export class ApiClient {
         },
       });
     } catch {
+      const timedOut = timeout.signal.aborted;
+      trace({
+        level: cancelledByCaller ? 'debug' : 'warn',
+        area: 'api',
+        event: 'request_failed',
+        data: {
+          method,
+          path,
+          durationMs: Date.now() - startedAt,
+          reason: cancelledByCaller ? 'cancelled' : timedOut ? 'timeout' : 'network',
+        },
+      });
       // The thrown value is deliberately not read. A transport error's message
       // can carry the request URL, and the URL carries the bearer token in some
       // engines' formatting — none of that may reach a user-facing failure.
@@ -161,7 +195,6 @@ export class ApiClient {
       if (cancelledByCaller) {
         return { ok: false, failure: failure('NETWORK_UNAVAILABLE', 'Request cancelled') };
       }
-      const timedOut = timeout.signal.aborted;
       return {
         ok: false,
         failure: timedOut
@@ -175,11 +208,32 @@ export class ApiClient {
     const payload: unknown = await response.json().catch(() => null);
 
     if (!response.ok) {
-      return { ok: false, failure: toFailure(payload, response.status) };
+      const mapped = toFailure(payload, response.status);
+      trace({
+        level: 'warn',
+        area: 'api',
+        event: 'response_error',
+        data: {
+          method,
+          path,
+          status: response.status,
+          durationMs: Date.now() - startedAt,
+          code: mapped.code,
+          message: mapped.message,
+          details: mapped.details,
+        },
+      });
+      return { ok: false, failure: mapped };
     }
 
     const parsed = schema.safeParse(payload);
     if (!parsed.success) {
+      trace({
+        level: 'error',
+        area: 'api',
+        event: 'response_malformed',
+        data: { method, path, status: response.status, durationMs: Date.now() - startedAt },
+      });
       // The contract and the server disagree. Failing loudly here is far better
       // than letting a half-shaped object reach a screen and crash there, where
       // the cause is three layers away.
@@ -189,6 +243,12 @@ export class ApiClient {
       };
     }
 
+    trace({
+      level: 'debug',
+      area: 'api',
+      event: 'response_ok',
+      data: { method, path, status: response.status, durationMs: Date.now() - startedAt },
+    });
     return { ok: true, data: parsed.data };
   }
 }
