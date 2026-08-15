@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useServices, type Services } from '@/features/api/services-provider';
 import { useSession } from '@/features/auth/session-provider';
 import { useDraftRouteStore, useRouteProgressStore } from '@/features/stores';
+import { shortId, trace } from '@/lib/diagnostics/app-trace';
 import { queryKeys } from '@/lib/query/client';
 import type { DraftRoute } from '@/lib/route/draft';
 import {
@@ -116,6 +117,17 @@ export function useRouteSync(): RouteSync {
     async (snapshot: RouteWriteSnapshot): Promise<boolean> => {
       const userId = session?.userId;
       if (services === null || userId === undefined) {
+        trace({
+          level: 'warn',
+          area: 'route_sync',
+          event: 'write_skipped',
+          data: {
+            routeId: shortId(snapshot.draft.routeId),
+            status: snapshot.status,
+            hasServices: services !== null,
+            hasUserId: userId !== undefined,
+          },
+        });
         setFailure({ kind: 'failed' });
         return false;
       }
@@ -124,6 +136,12 @@ export function useRouteSync(): RouteSync {
       // A transition the lifecycle forbids is a defect upstream, and writing it
       // would let a completed day be reopened. Refused here rather than sent.
       if (from !== null && !canTransition(from, snapshot.status)) {
+        trace({
+          level: 'error',
+          area: 'route_sync',
+          event: 'illegal_transition',
+          data: { routeId: shortId(snapshot.draft.routeId), from, to: snapshot.status },
+        });
         setFailure({ kind: 'illegal-transition', from, to: snapshot.status });
         return false;
       }
@@ -144,14 +162,50 @@ export function useRouteSync(): RouteSync {
               },
       });
 
+      trace({
+        level: 'info',
+        area: 'route_sync',
+        event: 'write_start',
+        data: {
+          routeId: shortId(snapshot.draft.routeId),
+          status: snapshot.status,
+          previousStatus: from,
+          stopCount: snapshot.draft.stops.length,
+          isOptimized: snapshot.draft.isOptimized,
+          hasResult: snapshot.result !== null,
+          resultTier: snapshot.result?.tier ?? null,
+          isDegraded: snapshot.result?.isDegraded ?? null,
+        },
+      });
       let outcome = await services.routes.save(rows);
 
       if (!outcome.ok && outcome.failure.kind === 'unknown-place') {
+        trace({
+          level: 'warn',
+          area: 'route_sync',
+          event: 'unknown_place_refresh_start',
+          data: {
+            routeId: shortId(snapshot.draft.routeId),
+            stopCount: snapshot.draft.stops.length,
+          },
+        });
         const refreshed = await refreshPlaceCacheForSave(services, snapshot.draft);
+        trace({
+          level: refreshed ? 'info' : 'error',
+          area: 'route_sync',
+          event: 'unknown_place_refresh_done',
+          data: { routeId: shortId(snapshot.draft.routeId), refreshed },
+        });
         if (refreshed) outcome = await services.routes.save(rows);
       }
 
       if (outcome.ok) {
+        trace({
+          level: 'info',
+          area: 'route_sync',
+          event: 'write_ok',
+          data: { routeId: shortId(snapshot.draft.routeId), status: snapshot.status },
+        });
         setFailure(null);
         lastWrittenStatus.current = snapshot.status;
         // History is now stale. Invalidating rather than writing into the cache
@@ -170,6 +224,16 @@ export function useRouteSync(): RouteSync {
        * fixes (`CLAUDE.md` §9 rule 7).
        */
       console.warn(`[route-sync] save failed, kind=${outcome.failure.kind}`);
+      trace({
+        level: 'error',
+        area: 'route_sync',
+        event: 'write_failed',
+        data: {
+          routeId: shortId(snapshot.draft.routeId),
+          status: snapshot.status,
+          kind: outcome.failure.kind,
+        },
+      });
       setFailure(outcome.failure);
       return false;
     },
@@ -262,13 +326,32 @@ export function useRouteSync(): RouteSync {
 
     if (superseded === null || services === null) return;
 
+    trace({
+      level: 'info',
+      area: 'route_sync',
+      event: 'superseded_advance_start',
+      data: { routeId: shortId(superseded.routeId), from: superseded.from, to: superseded.to },
+    });
     void services.routes
       .advance(superseded.routeId, superseded.from, superseded.to)
       .then((outcome) => {
         // A refused transition is not a user-facing failure: the previous route
         // is already in a terminal state, which is where this was taking it.
         if (outcome.ok) {
+          trace({
+            level: 'info',
+            area: 'route_sync',
+            event: 'superseded_advance_ok',
+            data: { routeId: shortId(superseded.routeId) },
+          });
           void queryClient.invalidateQueries({ queryKey: queryKeys.savedRoutes() });
+        } else {
+          trace({
+            level: 'warn',
+            area: 'route_sync',
+            event: 'superseded_advance_failed',
+            data: { routeId: shortId(superseded.routeId), kind: outcome.failure.kind },
+          });
         }
       });
   }, [routeId, status, services, queryClient]);
@@ -281,5 +364,11 @@ async function refreshPlaceCacheForSave(services: Services, draft: DraftRoute): 
   if (placeIds.length === 0) return false;
 
   const result = await services.geocoding.resolveBatch(placeIds);
+  trace({
+    level: result.ok ? 'debug' : 'warn',
+    area: 'route_sync',
+    event: 'place_cache_resolve_batch_done',
+    data: { routeId: shortId(draft.routeId), placeCount: placeIds.length, ok: result.ok },
+  });
   return result.ok;
 }

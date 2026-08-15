@@ -10,6 +10,7 @@ import {
   type RouteWrite,
   type SavedRouteSummary,
 } from '@/lib/route/persistence';
+import { shortId, trace } from '@/lib/diagnostics/app-trace';
 import type { DraftRoute } from '@/lib/route/draft';
 import type { RouteProgress } from '@/lib/route/progress';
 
@@ -198,8 +199,34 @@ export interface RoutesProvider {
 export function createRoutesProvider(port: RoutesPort): RoutesProvider {
   return {
     save: async (write) => {
+      trace({
+        level: 'info',
+        area: 'routes',
+        event: 'save_start',
+        data: {
+          routeId: shortId(write.route.id),
+          status: write.route.status,
+          stopCount: write.stops.length,
+          isRoundTrip: write.route.is_round_trip,
+          originIsCurrentLocation: write.route.origin_is_current_location,
+          hasTotals: write.route.total_distance_m !== null,
+        },
+      });
       const routeResult = await port.upsert('routes', [write.route]);
-      if (routeResult.error !== null) return { ok: false, failure: classify(routeResult.error) };
+      if (routeResult.error !== null) {
+        const failure = classify(routeResult.error);
+        trace({
+          level: 'error',
+          area: 'routes',
+          event: 'save_route_upsert_failed',
+          data: {
+            routeId: shortId(write.route.id),
+            kind: failure.kind,
+            message: routeResult.error.message,
+          },
+        });
+        return { ok: false, failure };
+      }
 
       // The route first, then its stops: `stops.route_id` references `routes`,
       // so the other order fails the foreign key on a route that is about to
@@ -207,17 +234,50 @@ export function createRoutesProvider(port: RoutesPort): RoutesProvider {
       // no transaction across requests — which is survivable here, since the
       // next save replays both and the upsert makes the replay free.
       const removal = await port.deleteRows('stops', { route_id: write.route.id });
-      if (removal.error !== null) return { ok: false, failure: classify(removal.error) };
+      if (removal.error !== null) {
+        const failure = classify(removal.error);
+        trace({
+          level: 'error',
+          area: 'routes',
+          event: 'save_stops_delete_failed',
+          data: {
+            routeId: shortId(write.route.id),
+            kind: failure.kind,
+            message: removal.error.message,
+          },
+        });
+        return { ok: false, failure };
+      }
 
       if (write.stops.length > 0) {
         const stopsResult = await port.upsert('stops', write.stops);
-        if (stopsResult.error !== null) return { ok: false, failure: classify(stopsResult.error) };
+        if (stopsResult.error !== null) {
+          const failure = classify(stopsResult.error);
+          trace({
+            level: 'error',
+            area: 'routes',
+            event: 'save_stops_upsert_failed',
+            data: {
+              routeId: shortId(write.route.id),
+              kind: failure.kind,
+              message: stopsResult.error.message,
+            },
+          });
+          return { ok: false, failure };
+        }
       }
 
+      trace({
+        level: 'info',
+        area: 'routes',
+        event: 'save_ok',
+        data: { routeId: shortId(write.route.id), status: write.route.status },
+      });
       return { ok: true };
     },
 
     list: async (limit) => {
+      trace({ level: 'debug', area: 'routes', event: 'list_start', data: { limit } });
       const { data, error } = await port.select('routes', {
         columns: `${ROUTE_COLUMNS},updated_at,${SUMMARY_STOP_COLUMNS}`,
         // Soft-deleted routes are gone from the user's point of view. The row
@@ -227,14 +287,36 @@ export function createRoutesProvider(port: RoutesPort): RoutesProvider {
         order: { column: 'updated_at', ascending: false },
         limit,
       });
-      if (error !== null) return null;
+      if (error !== null) {
+        trace({
+          level: 'error',
+          area: 'routes',
+          event: 'list_failed',
+          data: { message: error.message },
+        });
+        return null;
+      }
 
       const parsed = z.array(summaryRowSchema).safeParse(data);
       // A shape we did not expect is not an empty history. Null says "we could
       // not read this", which the screen shows as an error with a retry rather
       // than as "you have never saved a route".
-      if (!parsed.success) return null;
+      if (!parsed.success) {
+        trace({
+          level: 'error',
+          area: 'routes',
+          event: 'list_malformed',
+          data: { issues: parsed.error.issues.length },
+        });
+        return null;
+      }
 
+      trace({
+        level: 'debug',
+        area: 'routes',
+        event: 'list_ok',
+        data: { count: parsed.data.length },
+      });
       return parsed.data.map((row): SavedRouteSummary => {
         const stops = row.stops ?? [];
         return {
@@ -260,6 +342,12 @@ export function createRoutesProvider(port: RoutesPort): RoutesProvider {
     },
 
     load: async (routeId) => {
+      trace({
+        level: 'debug',
+        area: 'routes',
+        event: 'load_start',
+        data: { routeId: shortId(routeId) },
+      });
       const routeResponse = await port.select('routes', {
         // `updated_at` comes along because it is when the route last changed
         // status, and the change that matters is the one to `in_progress` — the
@@ -268,24 +356,62 @@ export function createRoutesProvider(port: RoutesPort): RoutesProvider {
         match: { id: routeId },
         isNull: 'deleted_at',
       });
-      if (routeResponse.error !== null) return null;
+      if (routeResponse.error !== null) {
+        trace({
+          level: 'error',
+          area: 'routes',
+          event: 'load_route_failed',
+          data: { routeId: shortId(routeId), message: routeResponse.error.message },
+        });
+        return null;
+      }
 
       const routes = z.array(loadedRouteRowSchema).safeParse(routeResponse.data);
       const route = routes.success ? routes.data[0] : undefined;
       // A deep link to somebody else's route, or to one that was deleted, lands
       // here. RLS already returned nothing; this is what turns nothing into a
       // state the screen can show.
-      if (route === undefined) return null;
+      if (route === undefined) {
+        trace({
+          level: routes.success ? 'warn' : 'error',
+          area: 'routes',
+          event: routes.success ? 'load_not_found' : 'load_route_malformed',
+          data: { routeId: shortId(routeId) },
+        });
+        return null;
+      }
 
       const stopsResponse = await port.select('stops', {
         columns: STOP_COLUMNS,
         match: { route_id: routeId },
       });
-      if (stopsResponse.error !== null) return null;
+      if (stopsResponse.error !== null) {
+        trace({
+          level: 'error',
+          area: 'routes',
+          event: 'load_stops_failed',
+          data: { routeId: shortId(routeId), message: stopsResponse.error.message },
+        });
+        return null;
+      }
 
       const stops = z.array(stopRowSchema).safeParse(stopsResponse.data);
-      if (!stops.success) return null;
+      if (!stops.success) {
+        trace({
+          level: 'error',
+          area: 'routes',
+          event: 'load_stops_malformed',
+          data: { routeId: shortId(routeId), issues: stops.error.issues.length },
+        });
+        return null;
+      }
 
+      trace({
+        level: 'debug',
+        area: 'routes',
+        event: 'load_ok',
+        data: { routeId: shortId(routeId), stopCount: stops.data.length },
+      });
       return {
         draft: fromRows(route, stops.data),
         status: route.status,
@@ -298,6 +424,12 @@ export function createRoutesProvider(port: RoutesPort): RoutesProvider {
       // constraint for this — an enum column accepts any of its values — so the
       // state machine is only real if something enforces it.
       if (!canTransition(from, to)) {
+        trace({
+          level: 'warn',
+          area: 'routes',
+          event: 'advance_illegal_transition',
+          data: { routeId: shortId(routeId), from, to },
+        });
         return { ok: false, failure: { kind: 'illegal-transition', from, to } };
       }
 
@@ -307,7 +439,23 @@ export function createRoutesProvider(port: RoutesPort): RoutesProvider {
       if (to === 'completed') values['completed_at'] = new Date().toISOString();
 
       const { error } = await port.update('routes', values, { id: routeId });
-      return error === null ? { ok: true } : { ok: false, failure: classify(error) };
+      if (error === null) {
+        trace({
+          level: 'info',
+          area: 'routes',
+          event: 'advance_ok',
+          data: { routeId: shortId(routeId), from, to },
+        });
+        return { ok: true };
+      }
+      const failure = classify(error);
+      trace({
+        level: 'error',
+        area: 'routes',
+        event: 'advance_failed',
+        data: { routeId: shortId(routeId), from, to, kind: failure.kind, message: error.message },
+      });
+      return { ok: false, failure };
     },
   };
 }

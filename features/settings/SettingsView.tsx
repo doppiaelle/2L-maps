@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { colours, layout, radius, space } from '@/lib/design/tokens';
@@ -9,8 +10,12 @@ export interface SettingsViewProps {
   readonly currentPlan: PlanTier;
   onBack: () => void;
   onChooseProvider: (provider: NavigationProviderId) => void;
+  onClearTrace: () => void;
   onOpenSubscription: () => void;
+  onShareTrace: () => void;
   onSignOut: () => void;
+  readonly traceEventCount: number;
+  readonly traceText: string;
   readonly theme: ThemeName;
   readonly testID?: string;
 }
@@ -20,12 +25,17 @@ export function SettingsView({
   currentPlan,
   onBack,
   onChooseProvider,
+  onClearTrace,
   onOpenSubscription,
+  onShareTrace,
   onSignOut,
   theme,
+  traceEventCount,
+  traceText,
   testID,
 }: SettingsViewProps): React.JSX.Element {
   const palette = colours[theme];
+  const [traceOpen, setTraceOpen] = useState(false);
 
   return (
     <ScrollView
@@ -122,6 +132,109 @@ export function SettingsView({
           <Text style={{ color: palette.bg, fontSize: 22, fontWeight: '700' }}>→</Text>
         </View>
       </Pressable>
+
+      <Text
+        style={{
+          color: palette.textPrimary,
+          fontSize: 24,
+          lineHeight: 30,
+          fontWeight: '700',
+          marginTop: space.space6,
+        }}
+      >
+        Diagnostics
+      </Text>
+      <View
+        style={{
+          marginTop: space.space3,
+          padding: space.space3,
+          borderRadius: radius.radiusLg,
+          backgroundColor: palette.surface,
+          borderWidth: 1,
+          borderColor: palette.border,
+        }}
+      >
+        <Pressable
+          onPress={() => setTraceOpen((open) => !open)}
+          accessibilityRole="button"
+          accessibilityLabel="Open app trace"
+          style={{
+            minHeight: 48,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+          testID="settings-diagnostics-toggle"
+        >
+          <View>
+            <Text style={{ color: palette.textPrimary, fontSize: 16, fontWeight: '700' }}>
+              App trace
+            </Text>
+            <Text style={{ color: palette.textSecondary, fontSize: 13, marginTop: space.space1 }}>
+              {traceEventCount} events since launch
+            </Text>
+          </View>
+          <View
+            style={{
+              width: 34,
+              height: 34,
+              borderRadius: radius.radiusSm,
+              backgroundColor: palette.textPrimary,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Text style={{ color: palette.bg, fontSize: 20, fontWeight: '700' }}>
+              {traceOpen ? '×' : '›'}
+            </Text>
+          </View>
+        </Pressable>
+
+        {traceOpen && (
+          <View style={{ marginTop: space.space3 }} testID="settings-diagnostics-panel">
+            <View style={{ flexDirection: 'row', gap: space.space2 }}>
+              <TraceAction
+                label="Share"
+                onPress={onShareTrace}
+                palette={palette}
+                testID="settings-diagnostics-share"
+              />
+              <TraceAction
+                label="Clear"
+                onPress={onClearTrace}
+                palette={palette}
+                testID="settings-diagnostics-clear"
+              />
+            </View>
+            <ScrollView
+              nestedScrollEnabled
+              style={{
+                maxHeight: 240,
+                marginTop: space.space3,
+                borderRadius: radius.radiusMd,
+                backgroundColor: theme === 'light' ? '#F4F4F2' : '#0B0B0C',
+                borderWidth: 1,
+                borderColor: palette.border,
+              }}
+              contentContainerStyle={{ padding: space.space3 }}
+              testID="settings-diagnostics-scroll"
+            >
+              <Text
+                selectable
+                style={{
+                  color: palette.textSecondary,
+                  fontSize: 11,
+                  lineHeight: 16,
+                  fontFamily: 'monospace',
+                }}
+                testID="settings-diagnostics-trace"
+              >
+                {traceText}
+              </Text>
+            </ScrollView>
+          </View>
+        )}
+      </View>
 
       <Text
         style={{
@@ -249,6 +362,38 @@ const PROVIDERS: readonly { label: string; value: NavigationProviderId }[] = [
   { label: 'Apple Maps', value: 'apple-maps' },
   { label: 'Waze', value: 'waze' },
 ];
+
+function TraceAction({
+  label,
+  onPress,
+  palette,
+  testID,
+}: {
+  readonly label: string;
+  onPress: () => void;
+  readonly palette: (typeof colours)[ThemeName];
+  readonly testID: string;
+}): React.JSX.Element {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      style={{
+        minHeight: 38,
+        flex: 1,
+        borderRadius: radius.radiusMd,
+        borderWidth: 1,
+        borderColor: palette.border,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+      testID={testID}
+    >
+      <Text style={{ color: palette.textPrimary, fontSize: 14, fontWeight: '700' }}>{label}</Text>
+    </Pressable>
+  );
+}
 
 function planLabel(plan: PlanTier): string {
   if (plan === 'day-pass') return 'Day pass';

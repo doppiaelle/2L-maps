@@ -1,10 +1,17 @@
 import { useEffect, useState } from 'react';
+import { Share } from 'react-native';
 
 import { SettingsView } from './SettingsView';
 import { SubscriptionView } from './SubscriptionView';
 import { useSession } from '@/features/auth/session-provider';
 import { useUsageQuota } from '@/features/quota/use-usage-quota';
 import { usePreferencesStore } from '@/features/stores';
+import {
+  clearAppTrace,
+  formatAppTrace,
+  getAppTraceEntries,
+  subscribeAppTrace,
+} from '@/lib/diagnostics/app-trace';
 import type { ThemeName } from '@/lib/design/tokens';
 import type { PlanTier } from '@/types';
 
@@ -39,9 +46,20 @@ export function SettingsSection({
   const currentPlan = quota.allowances.plan;
   const [view, setView] = useState(initialView);
   const [selectedPlan, setSelectedPlan] = useState<PlanTier>(currentPlan);
+  const [, setTraceVersion] = useState(0);
 
   useEffect(() => setView(initialView), [initialView]);
   useEffect(() => setSelectedPlan(currentPlan), [currentPlan]);
+  useEffect(
+    () =>
+      subscribeAppTrace(() => {
+        setTraceVersion((version) => version + 1);
+      }),
+    [],
+  );
+
+  const traceEntries = getAppTraceEntries();
+  const traceText = formatAppTrace(traceEntries);
 
   if (view === 'subscription') {
     return (
@@ -63,10 +81,16 @@ export function SettingsSection({
       currentPlan={currentPlan}
       onBack={onBack}
       onChooseProvider={chooseProvider}
+      onClearTrace={clearAppTrace}
       onOpenSubscription={() => setView('subscription')}
+      onShareTrace={() => {
+        void Share.share({ message: traceText });
+      }}
       onSignOut={() => {
         void signOut();
       }}
+      traceEventCount={traceEntries.length}
+      traceText={traceText}
       theme={theme}
       testID="settings-screen"
     />

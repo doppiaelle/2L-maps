@@ -12,8 +12,12 @@ describe('settings', () => {
         currentPlan="free"
         onBack={jest.fn()}
         onChooseProvider={jest.fn()}
+        onClearTrace={jest.fn()}
         onOpenSubscription={jest.fn()}
+        onShareTrace={jest.fn()}
         onSignOut={jest.fn()}
+        traceEventCount={0}
+        traceText="No trace events yet."
         theme="light"
       />,
     );
@@ -22,6 +26,41 @@ describe('settings', () => {
     expect(screen.getByTestId('settings-subscription')).toBeTruthy();
     expect(screen.queryByText('Always use this app')).toBeNull();
     expect(screen.queryByText('Navigate with')).toBeNull();
+  });
+
+  it('opens the temporary app trace panel from settings', () => {
+    const onShareTrace = jest.fn();
+    const onClearTrace = jest.fn();
+    const traceText = ['0001 boot', '0002 routes.save_failed'].join('\n');
+
+    render(
+      <SettingsView
+        provider="google-maps"
+        currentPlan="free"
+        onBack={jest.fn()}
+        onChooseProvider={jest.fn()}
+        onClearTrace={onClearTrace}
+        onOpenSubscription={jest.fn()}
+        onShareTrace={onShareTrace}
+        onSignOut={jest.fn()}
+        traceEventCount={2}
+        traceText={traceText}
+        theme="dark"
+      />,
+    );
+
+    expect(screen.queryByTestId('settings-diagnostics-panel')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('settings-diagnostics-toggle'));
+
+    expect(screen.getByTestId('settings-diagnostics-panel')).toBeTruthy();
+    expect(screen.getByTestId('settings-diagnostics-trace').props.children).toBe(traceText);
+
+    fireEvent.press(screen.getByTestId('settings-diagnostics-share'));
+    fireEvent.press(screen.getByTestId('settings-diagnostics-clear'));
+
+    expect(onShareTrace).toHaveBeenCalledTimes(1);
+    expect(onClearTrace).toHaveBeenCalledTimes(1);
   });
 });
 
