@@ -120,6 +120,61 @@ describe('row-level security is enabled everywhere', () => {
   });
 });
 
+describe('client grants match the RLS surface', () => {
+  const tableAllowed = async (table: string, privilege: string) => {
+    const result = await database.asService(
+      `select has_table_privilege('authenticated', $1, $2) as allowed`,
+      [`public.${table}`, privilege],
+    );
+    return (result.rows[0] as { allowed: boolean }).allowed;
+  };
+
+  const functionAllowed = async (signature: string, privilege: string) => {
+    const result = await database.asService(
+      `select has_function_privilege('authenticated', $1, $2) as allowed`,
+      [`public.${signature}`, privilege],
+    );
+    return (result.rows[0] as { allowed: boolean }).allowed;
+  };
+
+  it('lets PostgREST enter the public schema', async () => {
+    const result = await database.asService(
+      `select has_schema_privilege('authenticated', 'public', 'usage') as allowed`,
+    );
+    expect((result.rows[0] as { allowed: boolean }).allowed).toBe(true);
+  });
+
+  it('grants full access only to personal route data and favourites', async () => {
+    for (const table of ['routes', 'stops', 'favourites']) {
+      for (const privilege of ['select', 'insert', 'update', 'delete']) {
+        expect(await tableAllowed(table, privilege)).toBe(true);
+      }
+    }
+  });
+
+  it('keeps shared and accounting tables read-only or unreachable', async () => {
+    expect(await tableAllowed('places_cache', 'select')).toBe(true);
+    for (const privilege of ['insert', 'update', 'delete']) {
+      expect(await tableAllowed('places_cache', privilege)).toBe(false);
+    }
+
+    for (const table of ['user_entitlements', 'usage_events', 'optimization_jobs']) {
+      expect(await tableAllowed(table, 'select')).toBe(true);
+      for (const privilege of ['insert', 'update', 'delete']) {
+        expect(await tableAllowed(table, privilege)).toBe(false);
+      }
+    }
+
+    for (const privilege of ['select', 'insert', 'update', 'delete']) {
+      expect(await tableAllowed('optimization_cache', privilege)).toBe(false);
+    }
+  });
+
+  it('lets the client call the address-book RPC', async () => {
+    expect(await functionAllowed('record_place_use(text)', 'execute')).toBe(true);
+  });
+});
+
 describe('RLS holds between two real users', () => {
   let alice = '';
   let bob = '';
@@ -190,7 +245,7 @@ describe('RLS holds between two real users', () => {
         `insert into user_entitlements (user_id, status) values ($1, 'active')`,
         [bob],
       ),
-    ).rejects.toThrow(/row-level security/i);
+    ).rejects.toThrow(/permission denied|row-level security/i);
   });
 
   it('refuses to let a user write usage events', async () => {
@@ -200,7 +255,7 @@ describe('RLS holds between two real users', () => {
         `insert into usage_events (user_id, endpoint) values ($1, '/optimize')`,
         [bob],
       ),
-    ).rejects.toThrow(/row-level security/i);
+    ).rejects.toThrow(/permission denied|row-level security/i);
   });
 
   it('lets any authenticated user read the shared place cache', async () => {
@@ -213,7 +268,7 @@ describe('RLS holds between two real users', () => {
   it('refuses to let a user poison the shared place cache', async () => {
     await expect(
       database.asUser(bob, `insert into places_cache (place_id, lat, lng) values ('fake', 0, 0)`),
-    ).rejects.toThrow(/row-level security/i);
+    ).rejects.toThrow(/permission denied|row-level security/i);
   });
 });
 

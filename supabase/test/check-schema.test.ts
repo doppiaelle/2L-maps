@@ -81,12 +81,12 @@ describe('against a fully migrated database', () => {
     expect(rows.filter((row) => row.state !== 'ok')).toEqual([]);
   });
 
-  it('covers all four kinds of object, so none is checked by accident', async () => {
+  it('covers every kind of object, so none is checked by accident', async () => {
     const result = await database.asService(statements()[CHECK] as string);
     const rows = result.rows as Row[];
 
     expect(new Set(rows.map((row) => row.kind))).toEqual(
-      new Set(['column', 'table', 'enum', 'function']),
+      new Set(['column', 'table', 'enum', 'function', 'privilege']),
     );
   });
 

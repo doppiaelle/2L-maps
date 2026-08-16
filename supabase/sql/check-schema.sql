@@ -61,7 +61,18 @@ with required (kind, object, detail, needed_by) as (
     ('table',    'places_cache',      '',                    '/places-autocomplete'),
     ('column',   'places_cache',      'coords_refreshed_at', '/place-details'),
     ('table',    'favourites',        '',                    'the address book'),
-    ('function', 'record_place_use',  '',                    'the address book')
+    ('function', 'record_place_use',  '',                    'the address book'),
+    -- The phone uses PostgREST as `authenticated`, and Postgres checks table
+    -- privileges before RLS policies. If these grants are missing, a perfectly
+    -- valid owner policy still fails with "permission denied for table routes".
+    ('privilege', 'routes',              'select,insert,update,delete', 'History sync'),
+    ('privilege', 'stops',               'select,insert,update,delete', 'History sync'),
+    ('privilege', 'favourites',          'select,insert,update,delete', 'the address book'),
+    ('privilege', 'places_cache',        'select',                      'history addresses and suggestions'),
+    ('privilege', 'user_entitlements',   'select',                      'every metered endpoint'),
+    ('privilege', 'usage_events',        'select',                      'usage screen and quota checks'),
+    ('privilege', 'optimization_jobs',   'select',                      'optimization status polling'),
+    ('privilege', 'record_place_use(text)', 'execute',                  'the address book')
 ),
 found as (
   select
@@ -87,6 +98,17 @@ found as (
         join pg_namespace n on n.oid = p.pronamespace
         where n.nspname = 'public' and p.proname = r.object
       )
+      when 'privilege' then case
+        when r.object like '%(%' then has_function_privilege(
+          'authenticated',
+          'public.' || r.object,
+          r.detail
+        )
+        else (
+          select bool_and(has_table_privilege('authenticated', 'public.' || r.object, trim(p.privilege)))
+          from unnest(string_to_array(r.detail, ',')) as p(privilege)
+        )
+      end
       else false
     end as present
   from required r

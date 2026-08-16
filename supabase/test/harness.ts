@@ -114,15 +114,6 @@ export async function createTestDatabase(): Promise<TestDatabase> {
     }
   }
 
-  // Supabase grants these to `authenticated` by default. Without them the role
-  // gets "permission denied" instead of an RLS-filtered result, which would make
-  // every policy test pass for the wrong reason.
-  await db.exec(`
-    grant usage on schema public to authenticated;
-    grant select, insert, update, delete on all tables in schema public to authenticated;
-    grant usage, select on all sequences in schema public to authenticated;
-  `);
-
   /**
    * Everything here runs inside one transaction, because `set local` only holds
    * for the duration of one — outside it the role reverts immediately and the

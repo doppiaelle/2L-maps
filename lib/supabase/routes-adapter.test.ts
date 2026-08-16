@@ -120,6 +120,15 @@ describe('saving', () => {
     expect(outcome).toEqual({ ok: false, failure: { kind: 'not-permitted' } });
   });
 
+  it('names a missing table grant as a permission problem', async () => {
+    const { port } = portWith({
+      upsertError: { message: 'permission denied for table routes' },
+    });
+
+    const outcome = await createRoutesProvider(port).save(write());
+    expect(outcome).toEqual({ ok: false, failure: { kind: 'not-permitted' } });
+  });
+
   it('names being offline, where the next action is to do nothing', async () => {
     const { port } = portWith({ upsertError: { message: 'Network request failed' } });
 
