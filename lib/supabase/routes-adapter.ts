@@ -481,7 +481,12 @@ function classify(error: { message: string }): SaveFailure {
     return { kind: 'unknown-place' };
   }
 
-  if (message.includes('row-level security') || message.includes('policy')) {
+  if (
+    message.includes('row-level security') ||
+    message.includes('policy') ||
+    message.includes('permission denied') ||
+    message.includes('42501')
+  ) {
     return { kind: 'not-permitted' };
   }
 

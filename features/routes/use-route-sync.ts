@@ -80,15 +80,24 @@ export function useRouteSync(): RouteSync {
   // Which write is in flight, so two status changes in quick succession do not
   // produce overlapping upserts that land out of order.
   const inFlight = useRef<Promise<boolean> | null>(null);
+  const pendingSignature = useRef<string | null>(null);
+  const acceptedSignature = useRef<string | null>(null);
+  const latestFailure = useRef<SaveFailure | null>(null);
   /** The route this hook was last looking at, so the moment it becomes a
    *  different one is observable. That moment is the only thing left that can
    *  close a day. */
   const previousRoute = useRef<{ routeId: string; status: RouteStatus } | null>(null);
+  useEffect(() => {
+    latestFailure.current = failure;
+  }, [failure]);
 
   const routeId = draft.routeId;
   if (activeRouteId.current !== routeId) {
     activeRouteId.current = routeId;
     lastWrittenStatus.current = null;
+    pendingSignature.current = null;
+    acceptedSignature.current = null;
+    latestFailure.current = null;
   }
 
   const progressForCurrentRoute = progress?.routeId === draft.routeId ? progress : null;
@@ -115,6 +124,7 @@ export function useRouteSync(): RouteSync {
 
   const writeSnapshot = useCallback(
     async (snapshot: RouteWriteSnapshot): Promise<boolean> => {
+      const signature = signatureFor(snapshot);
       const userId = session?.userId;
       if (services === null || userId === undefined) {
         trace({
@@ -128,7 +138,9 @@ export function useRouteSync(): RouteSync {
             hasUserId: userId !== undefined,
           },
         });
-        setFailure({ kind: 'failed' });
+        const nextFailure: SaveFailure = { kind: 'failed' };
+        latestFailure.current = nextFailure;
+        setFailure(nextFailure);
         return false;
       }
 
@@ -142,7 +154,9 @@ export function useRouteSync(): RouteSync {
           event: 'illegal_transition',
           data: { routeId: shortId(snapshot.draft.routeId), from, to: snapshot.status },
         });
-        setFailure({ kind: 'illegal-transition', from, to: snapshot.status });
+        const nextFailure: SaveFailure = { kind: 'illegal-transition', from, to: snapshot.status };
+        latestFailure.current = nextFailure;
+        setFailure(nextFailure);
         return false;
       }
 
@@ -206,6 +220,8 @@ export function useRouteSync(): RouteSync {
           event: 'write_ok',
           data: { routeId: shortId(snapshot.draft.routeId), status: snapshot.status },
         });
+        acceptedSignature.current = signature;
+        latestFailure.current = null;
         setFailure(null);
         lastWrittenStatus.current = snapshot.status;
         // History is now stale. Invalidating rather than writing into the cache
@@ -234,6 +250,7 @@ export function useRouteSync(): RouteSync {
           kind: outcome.failure.kind,
         },
       });
+      latestFailure.current = outcome.failure;
       setFailure(outcome.failure);
       return false;
     },
@@ -265,6 +282,36 @@ export function useRouteSync(): RouteSync {
           : new Date().toISOString(),
     };
     latestSnapshot.current = snapshot;
+    const signature = signatureFor(snapshot);
+
+    if (acceptedSignature.current === signature && latestFailure.current === null) {
+      trace({
+        level: 'debug',
+        area: 'route_sync',
+        event: 'write_deduped',
+        data: {
+          routeId: shortId(snapshot.draft.routeId),
+          status: snapshot.status,
+          reason: 'accepted',
+        },
+      });
+      return Promise.resolve(true);
+    }
+
+    if (pendingSignature.current === signature && inFlight.current !== null) {
+      trace({
+        level: 'debug',
+        area: 'route_sync',
+        event: 'write_deduped',
+        data: {
+          routeId: shortId(snapshot.draft.routeId),
+          status: snapshot.status,
+          reason: 'pending',
+        },
+      });
+      return inFlight.current;
+    }
+    pendingSignature.current = signature;
 
     // Serialised. Two upserts of the same route racing would be harmless for the
     // route row and wrong for the stops, where the second delete can land after
@@ -275,6 +322,7 @@ export function useRouteSync(): RouteSync {
     inFlight.current = queued;
     setIsSaving(true);
     void queued.finally(() => {
+      if (pendingSignature.current === signature) pendingSignature.current = null;
       if (inFlight.current === queued) {
         inFlight.current = null;
         setIsSaving(false);
@@ -321,6 +369,9 @@ export function useRouteSync(): RouteSync {
     previousRoute.current = { routeId, status };
     if (hasChangedRoute) {
       lastWrittenStatus.current = null;
+      pendingSignature.current = null;
+      acceptedSignature.current = null;
+      latestFailure.current = null;
       setFailure(null);
     }
 
@@ -357,6 +408,28 @@ export function useRouteSync(): RouteSync {
   }, [routeId, status, services, queryClient]);
 
   return { failure, isSaving, sync };
+}
+
+function signatureFor(snapshot: RouteWriteSnapshot): string {
+  return JSON.stringify({
+    routeId: snapshot.draft.routeId,
+    status: snapshot.status,
+    optimizedAt: snapshot.optimizedAt,
+    isOptimized: snapshot.draft.isOptimized,
+    resultTier: snapshot.result?.tier ?? null,
+    isDegraded: snapshot.result?.isDegraded ?? null,
+    totalDistanceMeters: snapshot.result?.totalDistanceMeters ?? null,
+    totalDurationSeconds:
+      snapshot.result === null || snapshot.result.isDegraded
+        ? null
+        : snapshot.result.totalDurationSeconds,
+    stops: snapshot.draft.stops.map((stop) => ({
+      id: stop.id,
+      placeId: stop.placeId,
+      position: stop.position,
+      entryOrder: stop.entryOrder,
+    })),
+  });
 }
 
 async function refreshPlaceCacheForSave(services: Services, draft: DraftRoute): Promise<boolean> {
