@@ -12,6 +12,16 @@ package-lock.json
 # size for a diff nobody reads. The script is what changes it (ADR-0028).
 assets/geo/land.json
 
+# Written by `supabase gen types typescript` and compared byte-for-byte against
+# a fresh run of it: `.github/workflows/migrate.yml` fails when the committed
+# file differs from what the CLI just produced, which is the check that stops a
+# "typed" client from being a lie (CLAUDE.md §3).
+#
+# Formatting it therefore does not make `format` green — it moves the failure to
+# `migrate`, where the next regeneration finds a diff it cannot explain. The
+# generator owns this file's shape; prettier owns the files people write.
+types/database.generated.ts
+
 # Documentation is hand-formatted: hard-wrapped at 100 columns with aligned
 # ASCII diagrams and tables sized for reading, not for a formatter. Prettier
 # re-pads every table and reflows the prose, which is churn rather than

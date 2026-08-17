@@ -464,6 +464,7 @@ achievable at all.
 | 2026-08-06 | List remains visible and unchanged during optimization | Losing the visible order on failure is the worst outcome | Design |
 | 2026-08-06 | Route summary states honestly when saving is zero | An inflated number, once disbelieved, discredits every other number | Design |
 | 2026-08-17 | Sign in rebuilt on a photograph: logo and wordmark at the top, the provider button in the lower third | The screen was a card in the middle of an empty background and said nothing about what the product does. The blur is baked into the asset so the first screen adds no native module | Design |
+| 2026-08-17 | Sign in's implementation moved to `features/auth/SignInScreen.tsx`; the route file is a re-export | A test beside the screen under `app/` is swept into Expo Router's `require.context` and becomes a route, which put the testing library in the release bundle and turned `verify` and `android-preview` red | Engineering |
 
 ## 16. Rationale
 
