@@ -1,6 +1,6 @@
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
-import { layout, radius, space } from '@/lib/design/tokens';
+import { elevPill, layout } from '@/lib/design/tokens';
 
 /**
  * The one control the product is built around.
@@ -99,7 +99,7 @@ export function PrimaryAction({
                 // Lifted off the drawing it floats over. Without it, mint on the
                 // light theme's paper-coloured land is the same weak pairing the
                 // route casing exists to solve (docs/07_DESIGN_SYSTEM.md).
-                ...PILL_ELEVATION,
+                ...elevPill,
               }
             : { minHeight: layout.actionMinHeight }
         }
@@ -135,19 +135,3 @@ export function PrimaryAction({
     </View>
   );
 }
-
-/**
- * The pill's shadow, in the one place its numbers live.
- *
- * A drop shadow rather than a border: the control has to read as being *above*
- * the canvas, and a border would read as another shape drawn on it. Android
- * takes `elevation`; iOS takes the four `shadow*` properties, and giving it only
- * `elevation` is the usual way a floating control ends up flat on one platform.
- */
-const PILL_ELEVATION = {
-  elevation: 6,
-  shadowColor: '#000000',
-  shadowOpacity: 0.18,
-  shadowRadius: radius.radiusSm,
-  shadowOffset: { width: 0, height: space.space1 },
-} as const;
