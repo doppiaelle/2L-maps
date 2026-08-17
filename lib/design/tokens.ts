@@ -278,6 +278,22 @@ export const metrics = {
 
 /** Voice 2 — geometric sans, for everything else. Body never goes below 13. */
 export const text = {
+  /**
+   * The wordmark, and the only thing this size.
+   *
+   * Voice 2 rather than voice 1: `metric-xl` is the same 44 pt but it is
+   * condensed, tracked tight and **tabular** — a figure style for a number that
+   * changes, which "2L Maps" is not. A brand name set in the metric voice reads
+   * as a measurement (`CLAUDE.md` §8 rule 6).
+   */
+  display: {
+    size: 44,
+    weight: '700',
+    lineHeight: 50,
+    tracking: -1,
+    uppercase: false,
+    tabular: false,
+  },
   titleLg: {
     size: 22,
     weight: '600',
@@ -356,6 +372,98 @@ export const radius = {
   radiusLg: 22,
   radiusFull: 999,
 } as const;
+
+/**
+ * `elev-pill` from docs/07_DESIGN_SYSTEM.md §8 — the one elevation kept in dark
+ * theme as well as light.
+ *
+ * The other two are expressed as a lightness step on a dark surface, which is
+ * only available to something sitting *on* a surface. This row is for a control
+ * that floats over a drawing or a photograph, where there is no surface to step
+ * off, so the shadow is what it has.
+ *
+ * Android takes `elevation`; iOS takes the four `shadow*` properties, and giving
+ * it only `elevation` is the usual way a floating control ends up flat on one
+ * platform. The shadow colour is black in both themes and is not a palette
+ * entry: it is an absence of light, not a colour of this system.
+ */
+export const elevPill = {
+  elevation: 6,
+  shadowColor: '#000000',
+  shadowOpacity: 0.18,
+  shadowRadius: 8,
+  shadowOffset: { width: 0, height: 4 },
+} as const;
+
+// ─── Brand and backdrop ──────────────────────────────────────────────────────
+
+/**
+ * The sign-in wordmark's logo, in points.
+ *
+ * A width and an aspect, never a width and a height: `assets/brand/logo.png` is
+ * 384 × 256, and a pair of independent numbers is how a mascot ends up stretched
+ * on the one screen every user sees before anything else.
+ */
+export const brandLogo = { width: 180, aspectRatio: 1.5 } as const;
+
+/**
+ * Third-party marks, whose colours are theirs and not ours.
+ *
+ * Kept out of `ColourTokens` deliberately, for the same reason `mapColours` is:
+ * those become Tailwind class names, and `bg-google-blue` reachable from any
+ * component would put four more accents into a system that has exactly one
+ * (`CLAUDE.md` §8 rule 2). These are only ever the fill of a provider's own
+ * glyph — a mark we are permitted to draw, not permitted to recolour — so they
+ * are constants of the sign-in button and of nothing else.
+ */
+export const brandMarks = {
+  googleBlue: '#4285F4',
+  googleGreen: '#34A853',
+  googleYellow: '#FBBC05',
+  googleRed: '#EA4335',
+} as const;
+
+/**
+ * The scrims over the sign-in photograph.
+ *
+ * A photograph is not a surface a contrast ratio can be computed against — it is
+ * a different colour under every glyph. Two things make it one. The asset carries
+ * a **baked graduated blur**, strongest at the top and gone a little past the
+ * midpoint, so the ground under the wordmark has no detail left to compete with;
+ * and these scrims flatten what remains toward `bg`, which is the surface the
+ * contrast test in `tokens.test.ts` already proves the text against.
+ *
+ * **Opacities, not colours.** The scrim is always the active theme's `bg` — that
+ * is what makes one photograph belong to both themes instead of to whichever one
+ * it was shot in. Spelling the same four hex values again here would be a second
+ * copy of the neutral ramp, free to drift from the first (`CLAUDE.md` §13 rule 9),
+ * and an `rgba()` string in a gradient stop is also the form Android's SVG
+ * backend is least reliable about.
+ */
+export interface BackdropTokens {
+  /** Flat, over the entire photograph, under everything else. */
+  readonly tintOpacity: number;
+  /** At the top edge, behind the logo, wordmark and tagline. Reaches zero at
+   *  `BACKDROP_SCRIM_TOP_FRACTION`. */
+  readonly scrimTopOpacity: number;
+  /** At the bottom edge, behind the sign-in controls. Reaches zero at
+   *  `BACKDROP_SCRIM_BOTTOM_FRACTION`. */
+  readonly scrimBottomOpacity: number;
+}
+
+export const backdrop: Readonly<Record<ThemeName, BackdropTokens>> = {
+  light: { tintOpacity: 0.16, scrimTopOpacity: 0.72, scrimBottomOpacity: 0.92 },
+  // Heavier, and it has more to do: the photograph's upper half is near-white
+  // fog, which under a dark theme is a floodlight behind the wordmark rather
+  // than a background.
+  dark: { tintOpacity: 0.52, scrimTopOpacity: 0.88, scrimBottomOpacity: 0.94 },
+};
+
+/** Fractions of the screen height each gradient covers. The top one stops short
+ *  of where the baked blur does, so the scrim never has a visible edge on a part
+ *  of the picture that is already sharp. */
+export const BACKDROP_SCRIM_TOP_FRACTION = 0.46;
+export const BACKDROP_SCRIM_BOTTOM_FRACTION = 0.34;
 
 // ─── Motion ──────────────────────────────────────────────────────────────────
 

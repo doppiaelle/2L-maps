@@ -196,6 +196,49 @@ its town.
 strokes and pins grow with the picture: nothing is redrawn at a finer level of detail, because
 there is no finer level of detail to redraw it at (`lib/map/viewport.ts`).
 
+### The sign-in backdrop
+
+One screen in this product stands on a photograph: Sign in. A photograph is not a surface a
+contrast ratio can be computed against — it is a different colour under every glyph — so two
+things turn it into one.
+
+**The blur is in the asset.** `assets/brand/sign-in-backdrop.jpg` carries a graduated Gaussian
+baked at build time: full strength at the top edge, eased to nothing by **55%** of the height.
+The wordmark sits on ground with no detail left to compete with, and the interchange below stays
+as photographed. Nothing about this blur ever changes, so nothing about it belongs in a render —
+a live blur would mean a native module, and therefore the Android prebuild gate
+([ADR-0014](adr/0014-android-first-verification.md)), on the first screen of the app.
+
+**The scrims are `bg` at an opacity**, never their own colours. That is what makes one
+photograph belong to both themes rather than to the one it was shot in, and it is why these are
+opacities in the table below and not a second copy of the neutral ramp free to drift from the
+first.
+
+| Token | Light | Dark | Covers |
+|---|---|---|---|
+| `tint-opacity` | 0.16 | **0.52** | The whole frame, flat, under everything |
+| `scrim-top-opacity` | 0.72 | 0.88 | Top **46%**, `bg` → transparent downward |
+| `scrim-bottom-opacity` | 0.92 | 0.94 | Bottom **34%**, `bg` → transparent upward |
+
+Dark's tint is three times light's and has more to do: the photograph's upper half is near-white
+fog, which under a dark theme is a floodlight behind the wordmark rather than a background.
+
+The top scrim stops short of where the baked blur does, so it never has a visible edge on a part
+of the picture that is already sharp. The middle of the frame is left as photographed — which is
+the only reason it is a photograph and not a colour.
+
+### Third-party marks
+
+| Mark | Values | Rule |
+|---|---|---|
+| Google `G` | `#4285F4` `#34A853` `#FBBC05` `#EA4335` | Drawn as SVG, never recoloured, never tinted |
+
+**These are not tokens and are deliberately unreachable as class names.** Colour tokens become
+Tailwind utilities, and `bg-google-blue` reachable from any component would put four more accents
+into a system that has exactly one. They live in `brandMarks` beside `mapColours`, for the same
+reason that one is separate: they are the fill of a provider's own glyph — a mark we are
+permitted to draw and not permitted to restyle — and of nothing else.
+
 ---
 
 ## 7. Typography
@@ -222,12 +265,19 @@ length and for users with dyslexia, so it never carries body copy
 
 | Token | Size | Weight | Line height | Use |
 |---|---|---|---|---|
+| `display` | 44 | 700 | 50 | The wordmark on Sign in, and nothing else |
 | `title-lg` | 22 | 600 | 28 | Screen titles |
 | `title-md` | 17 | 600 | 22 | Sheet headers, card titles |
 | `body` | 16 | 400 | 22 | Default. Stop addresses |
 | `body-strong` | 16 | 600 | 22 | Stop labels |
 | `caption` | 13 | 400 | 18 | Meta lines: `2.4 km · 8 min` |
 | `caption-strong` | 13 | 600 | 18 | Emphasis in meta lines |
+
+**`display` is voice 2 at the size of `metric-xl`, and the two are not
+interchangeable.** `metric-xl` is condensed, tracked to −1% and **tabular** — a figure style,
+built so a changing number does not shift the layout under a thumb. A brand name set in it reads
+as a measurement. `display` has one user, the sign-in wordmark, and a second user would be a
+sign that a screen is competing with the one screen allowed to shout.
 
 **Minimum shipped size is 10 pt** (`label-xs`) and only for uppercase labels. Body text never
 goes below 13.
@@ -267,7 +317,11 @@ surface lightness rather than shadow, since shadows are invisible on near-black.
 | `elev-sheet` | `0 −4 24 rgba(0,0,0,0.10)` | `surface` lightness step |
 | `elev-card` | `0 2 12 rgba(0,0,0,0.06)` | `surface-raised` |
 | `elev-marker` | `0 2 8 rgba(0,0,0,0.20)` | same |
-| `elev-pill` | `0 4 8 rgba(0,0,0,0.18)` | same. The floating Confirm. Kept in dark too, unlike the other two: it sits on the canvas rather than on a surface, so there is no lightness step available to express it with |
+| `elev-pill` | `0 4 8 rgba(0,0,0,0.18)` | same. The floating Confirm, and the sign-in buttons over the photograph. Kept in dark too, unlike the other two: it sits on a canvas or a picture rather than on a surface, so there is no lightness step available to express it with |
+
+`elev-pill` is the one elevation expressed in code, as `elevPill` in `lib/design/tokens.ts`. It
+had two identical copies — one in `PrimaryAction`, one in the sign-in button — which is exactly
+the pair of numbers §13 rule 9 exists to prevent.
 
 **One mark for a stop, drawn by one function.** The ordinal badge in the list and the pin on the
 canvas both come from `markerStyle` in `lib/map/style.ts` — same 32 pt disc, same fill, same
@@ -377,6 +431,11 @@ and the trade is recorded rather than quietly made — see
 | 2026-08-06 | `warning`, not `danger`, for degraded results | A T0 result is lower-confidence, not an error | Design |
 | 2026-08-06 | Route casing added in light theme only | Mint on paper-white is the system's weakest contrast pairing | Design |
 | 2026-08-06 | `motion-deliberate` reserved for marker reorder | The reorder is the product's proof moment and deserves to be seen | Design |
+| 2026-08-17 | `display` added as voice 2 at 44 | The wordmark needed `metric-xl`'s size without its condensed tabular figure style, which reads as a measurement | Design |
+| 2026-08-17 | Sign-in backdrop scrims specified as opacities over `bg`, not as colours | One photograph has to belong to both themes, and a second copy of the neutral ramp would be free to drift from the first | Design |
+| 2026-08-17 | The sign-in blur baked into the asset rather than rendered | A live blur means a native module — and the Android prebuild gate — on the first screen of the app, to recompute a constant every frame | Design |
+| 2026-08-17 | `brandMarks` added outside `ColourTokens` | Colour tokens become class names, and `bg-google-blue` reachable anywhere puts four more accents into a system with one | Design |
+| 2026-08-17 | `elev-pill` expressed once, in `elevPill` | It had two identical copies in components, which is the duplication §13 rule 9 exists to prevent | Design |
 
 ## 17. Rationale
 

@@ -1,16 +1,28 @@
 import { useState } from 'react';
-import { Image, Platform, Pressable, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Image,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { GoogleMark } from '@/components/brand/GoogleMark';
+import { SignInBackdrop } from '@/components/brand/SignInBackdrop';
 import { useSession } from '@/features/auth/session-provider';
 import { usePendingDeepLinkContext } from '@/features/navigation/deep-link-provider';
 import { useAppTheme } from '@/features/preferences/use-app-theme';
-import { colours, layout, space } from '@/lib/design/tokens';
+import { brandLogo, colours, elevPill, layout, radius, space, text } from '@/lib/design/tokens';
+import type { ThemeName } from '@/lib/design/tokens';
 
 /**
  * Sign in.
  *
  * Apple and Google only ([`docs/08_SCREEN_SPECIFICATIONS.md`](../../docs/08_SCREEN_SPECIFICATIONS.md)
- * §6). No password to lose, no email to verify, and nothing for us to store: the
+ * §8). No password to lose, no email to verify, and nothing for us to store: the
  * only identity this product keeps is the `user_id` the JWT already carries.
  *
  * **Apple is offered on iOS only**, because Sign in with Apple on Android is a
@@ -22,11 +34,19 @@ import { colours, layout, space } from '@/lib/design/tokens';
  * **A held deep link is named rather than swallowed.** Somebody who tapped a
  * route link and landed on a sign-in screen needs to be told the link survived,
  * or they will assume it did not (docs/10 §6).
+ *
+ * **The composition is two blocks and the air between them.** Identity at the
+ * top, over the quiet end of the photograph; the controls in the lower third,
+ * where a thumb reaches without the phone changing hands (`CLAUDE.md` §7 rule 2).
+ * Nothing sits in the middle, because the middle of a phone screen is the part a
+ * one-handed grip cannot comfortably reach and the part of this picture that has
+ * something to look at.
  */
 export default function SignInScreen(): React.JSX.Element {
   const { signIn } = useSession();
   const theme = useAppTheme();
   const palette = colours[theme];
+  const insets = useSafeAreaInsets();
   const { target } = usePendingDeepLinkContext();
   const [failure, setFailure] = useState<'unavailable' | 'failed' | null>(null);
   const [isWorking, setIsWorking] = useState(false);
@@ -43,193 +63,204 @@ export default function SignInScreen(): React.JSX.Element {
   };
 
   return (
-    <View
-      style={{
-        flex: 1,
-        backgroundColor: palette.bg,
-        paddingHorizontal: layout.screenPadding,
-        paddingTop: 64,
-      }}
-      testID="sign-in-screen"
-    >
-      <View style={{ alignItems: 'center', paddingHorizontal: space.space2 }}>
-        <View
-          style={{
-            width: 128,
-            height: 128,
-            borderRadius: 64,
-            backgroundColor: palette.accentSubtle,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
+    <View style={{ flex: 1, backgroundColor: palette.bg }} testID="sign-in-screen">
+      <SignInBackdrop theme={theme} />
+
+      {/* Scrolls only when it has to. At 200% Dynamic Type the wordmark and two
+          buttons no longer fit a small screen, and a layout that cannot scroll
+          truncates instead of reflowing (`CLAUDE.md` §10 rule 5). */}
+      <ScrollView
+        contentContainerStyle={{
+          flexGrow: 1,
+          paddingHorizontal: layout.screenPadding,
+          paddingTop: insets.top + space.space7,
+          paddingBottom: insets.bottom + space.space5,
+        }}
+        alwaysBounceVertical={false}
+      >
+        <View style={{ alignItems: 'center' }}>
           <Image
             source={require('../../assets/brand/logo.png')}
             resizeMode="contain"
-            style={{ width: 116, height: 88 }}
-            accessibilityLabel="2L Maps mascot"
+            style={{ width: brandLogo.width, aspectRatio: brandLogo.aspectRatio }}
+            // Decorative: the wordmark directly below says the same word, and a
+            // screen reader that reads both says the name twice.
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
             testID="brand-logo"
           />
-        </View>
-        <Text
-          style={{
-            color: palette.textPrimary,
-            fontSize: 38,
-            lineHeight: 46,
-            fontWeight: '700',
-            marginTop: space.space6,
-          }}
-        >
-          2L Maps
-        </Text>
-        <Text
-          style={{
-            color: palette.accent,
-            fontSize: 17,
-            lineHeight: 24,
-            fontWeight: '700',
-            marginTop: space.space1,
-          }}
-        >
-          Get the fastest itinerary.
-        </Text>
-        <Text
-          style={{
-            color: palette.textSecondary,
-            fontSize: 16,
-            lineHeight: 24,
-            textAlign: 'center',
-            marginTop: space.space5,
-          }}
-        >
-          Plan multiple stops.{'\n'}We automatically find the smartest order.
-        </Text>
-
-        {target !== null && (
+          <Text
+            accessibilityRole="header"
+            style={{
+              color: palette.textPrimary,
+              fontSize: text.display.size,
+              lineHeight: text.display.lineHeight,
+              fontWeight: text.display.weight,
+              letterSpacing: (text.display.tracking / 100) * text.display.size,
+              marginTop: space.space5,
+              textAlign: 'center',
+            }}
+          >
+            2L Maps
+          </Text>
+          {/* `body`, not `title-md`: the tagline is a sentence, and the title
+              voice at 17/600 both crowds the wordmark above it and is wide
+              enough to wrap on a 360 pt Android phone — where it would break
+              after "More", leaving one word on a line of its own. */}
           <Text
             style={{
               color: palette.textSecondary,
-              fontSize: 13,
+              fontSize: text.body.size,
+              lineHeight: text.body.lineHeight,
+              fontWeight: text.body.weight,
+              marginTop: space.space3,
               textAlign: 'center',
-              marginTop: space.space4,
             }}
           >
-            {target.kind === 'route'
-              ? 'Your route will open once you are signed in.'
-              : 'You will continue where you were headed once you are signed in.'}
+            Smart routes. Less time. More freedom.
           </Text>
-        )}
-      </View>
+        </View>
 
-      <View
-        style={{
-          marginTop: space.space7,
-          padding: space.space3,
-          borderRadius: 20,
-          backgroundColor: palette.surface,
-          borderWidth: 1,
-          borderColor: palette.border,
-        }}
-      >
-        <Text
-          style={{
-            color: palette.textSecondary,
-            fontSize: 16,
-            fontWeight: '700',
-            marginBottom: space.space3,
-          }}
-        >
-          Welcome back
-        </Text>
-        {failure !== null && (
-          <Text
-            style={{ color: palette.danger, fontSize: 13, marginBottom: space.space2 }}
-            accessibilityLiveRegion="polite"
-          >
-            {failure === 'unavailable'
-              ? 'Sign-in is not available in this build.'
-              : 'Sign-in did not complete. Check your connection and try again.'}
-          </Text>
-        )}
+        {/* The air. It is what puts the controls in the lower third on a tall
+            screen and collapses first on a short one. */}
+        <View style={{ flexGrow: 1, minHeight: space.space6 }} />
 
-        {/* The controls sit in the lower third, reachable one-handed
-          (CLAUDE.md §7 rule 2). */}
-        {Platform.OS === 'ios' && (
+        <View>
+          {target !== null && (
+            <Text
+              style={{
+                color: palette.textSecondary,
+                fontSize: text.caption.size,
+                lineHeight: text.caption.lineHeight,
+                textAlign: 'center',
+                marginBottom: space.space3,
+              }}
+            >
+              {target.kind === 'route'
+                ? 'Your route will open once you are signed in.'
+                : 'You will continue where you were headed once you are signed in.'}
+            </Text>
+          )}
+
+          {failure !== null && (
+            <Text
+              style={{
+                color: palette.danger,
+                fontSize: text.caption.size,
+                lineHeight: text.caption.lineHeight,
+                textAlign: 'center',
+                marginBottom: space.space3,
+              }}
+              accessibilityLiveRegion="polite"
+            >
+              {failure === 'unavailable'
+                ? 'Sign-in is not available in this build.'
+                : 'Sign-in did not complete. Check your connection and try again.'}
+            </Text>
+          )}
+
+          {Platform.OS === 'ios' && (
+            <SignInButton
+              label="Continue with Apple"
+              onPress={() => {
+                attempt('apple');
+              }}
+              isWorking={isWorking}
+              isPrimary
+              theme={theme}
+              testID="sign-in-apple"
+            />
+          )}
           <SignInButton
-            label="Continue with Apple"
+            label="Continue with Google"
             onPress={() => {
-              attempt('apple');
+              attempt('google');
             }}
             isWorking={isWorking}
-            isPrimary
+            isPrimary={false}
             theme={theme}
+            mark={<GoogleMark size={space.space5} />}
+            testID="sign-in-google"
           />
-        )}
-        <SignInButton
-          label="Continue with Google"
-          onPress={() => {
-            attempt('google');
-          }}
-          isWorking={isWorking}
-          isPrimary={Platform.OS !== 'ios'}
-          theme={theme}
-        />
-      </View>
-      <Text
-        style={{
-          color: palette.textTertiary,
-          fontSize: 14,
-          textAlign: 'center',
-          marginTop: space.space6,
-        }}
-      >
-        Your routes, ordered for less driving.
-      </Text>
+        </View>
+      </ScrollView>
     </View>
   );
 }
 
+/**
+ * One provider, one button.
+ *
+ * The card shape is this system's, not the provider's: `radius-lg` — the radius
+ * of a primary action (docs/07 §8) — a `surface` fill and a soft lift, so the two
+ * buttons read as one row of the same product rather than two vendors' widgets
+ * stacked. The only thing borrowed is the mark itself.
+ *
+ * The lift is not decoration. This control floats over a photograph, and a border
+ * on a photograph is another line in the picture; a shadow is the only thing that
+ * reads as *above* it.
+ */
 function SignInButton({
   label,
   onPress,
   isWorking,
   isPrimary,
   theme,
+  mark,
+  testID,
 }: {
-  label: string;
+  readonly label: string;
   onPress: () => void;
-  isWorking: boolean;
-  isPrimary: boolean;
-  theme: 'light' | 'dark';
+  readonly isWorking: boolean;
+  readonly isPrimary: boolean;
+  readonly theme: ThemeName;
+  readonly mark?: React.ReactNode;
+  readonly testID: string;
 }): React.JSX.Element {
   const palette = colours[theme];
+
   return (
     <Pressable
       onPress={onPress}
       disabled={isWorking}
       accessibilityRole="button"
       accessibilityLabel={label}
+      // Announced rather than only drawn, so a screen reader user knows the
+      // control is busy instead of tapping it again (`CLAUDE.md` §10 rule 7).
       accessibilityState={{ disabled: isWorking, busy: isWorking }}
+      testID={testID}
       style={{
-        minHeight: 54,
-        borderRadius: 16,
-        marginTop: space.space2,
+        minHeight: layout.actionMinHeight,
+        borderRadius: radius.radiusLg,
+        marginTop: space.space3,
+        paddingHorizontal: space.space4,
+        flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: isPrimary ? palette.textPrimary : palette.surfaceRaised,
-        borderWidth: isPrimary ? 0 : 1,
-        borderColor: palette.border,
+        gap: space.space3,
+        backgroundColor: isPrimary ? palette.textPrimary : palette.surface,
         opacity: isWorking ? 0.6 : 1,
+        ...elevPill,
       }}
     >
+      {isWorking ? (
+        <ActivityIndicator
+          color={isPrimary ? palette.bg : palette.textPrimary}
+          accessibilityElementsHidden
+          importantForAccessibility="no"
+        />
+      ) : (
+        mark
+      )}
       <Text
         style={{
           color: isPrimary ? palette.bg : palette.textPrimary,
-          fontSize: 16,
-          fontWeight: '700',
+          fontSize: text.bodyStrong.size,
+          lineHeight: text.bodyStrong.lineHeight,
+          fontWeight: text.bodyStrong.weight,
         }}
       >
-        {label === 'Continue with Google' ? `G   ${label}` : label}
+        {label}
       </Text>
     </Pressable>
   );

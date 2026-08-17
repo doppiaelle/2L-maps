@@ -242,6 +242,59 @@ that place refills the cache and the row returns with its street on it.
 | Offline | Search disabled with a reason; the address book remains searchable locally |
 | At 25 stops | Adding is blocked **before the attempt**, with the limit explained |
 
+### Sign in
+
+The first screen anybody sees and the only one they cannot skip. It has no map, no dock and one
+decision on it.
+
+```
+        ┌────────────────────────────┐
+        │                            │   quiet end of the photograph
+        │           ( logo )         │   baked graduated blur, gone by 55%
+        │                            │
+        │         2L Maps            │   `display`, 44
+        │  Smart routes. Less time.  │   `body`, `text-secondary`
+        │       More freedom.        │
+        │                            │
+        │      ( the interchange,    │   the picture, as photographed
+        │        as photographed )   │
+        │                            │
+        │  ┌──────────────────────┐  │
+        │  │  G  Continue with…   │  │   lower third; `radius-lg`, `elev-pill`
+        │  └──────────────────────┘  │
+        └────────────────────────────┘
+```
+
+**Identity at the top, the decision in the lower third, and nothing in between.** The middle of
+a phone screen is both the part a one-handed grip cannot comfortably reach and the part of this
+picture that has something to look at, so it carries neither.
+
+**Apple and Google only.** No password to lose, no email to verify, and nothing for us to store:
+the only identity this product keeps is the `user_id` the JWT already carries. **Apple is
+offered on iOS only** — Sign in with Apple on Android is a web flow that asks for an Apple ID
+password on a phone the user probably did not buy from Apple, which is worse than the
+alternative sitting next to it. App Review's equivalence requirement applies where Apple's own
+sheet is available, which is the platform where it is shown.
+
+The Google button carries **Google's own mark, drawn as SVG** and never recoloured
+([`07_DESIGN_SYSTEM.md`](07_DESIGN_SYSTEM.md) §6). Everything else about the button is this
+system's: `radius-lg`, a `surface` fill and `elev-pill`, so two providers read as one row of the
+same product rather than two vendors' widgets stacked.
+
+**The photograph is not a texture; it is the reason the labels need a scrim.** Both are
+specified in [`07_DESIGN_SYSTEM.md`](07_DESIGN_SYSTEM.md) §6, and neither is a decoration a
+component may adjust.
+
+| State | Appearance |
+|---|---|
+| Initial | Logo, wordmark, tagline, provider buttons |
+| Working | The pressed button dims, shows a spinner in place of its mark, and announces `busy`. Neither button starts a second attempt |
+| Cancelled | Nothing. The user changed their mind, and an error for it is the app arguing with them |
+| Failed | "Sign-in did not complete. Check your connection and try again." above the buttons, announced politely, with the buttons still live |
+| Unavailable | "Sign-in is not available in this build." — distinct, because "check your connection" is useless advice when the provider was never compiled in |
+| Holding a deep link | A line naming what survives: the route will open once signed in |
+| Dynamic Type at 200% | The composition scrolls rather than truncating; the air between the two blocks collapses first |
+
 ### Import list (modal)
 
 Paste area or file picker. After resolution, two sections: **Added** (count) and **Needs
@@ -410,6 +463,7 @@ achievable at all.
 | 2026-08-06 | Recents and favourites before search results | Reuse is free; search is the dominant cost | Design |
 | 2026-08-06 | List remains visible and unchanged during optimization | Losing the visible order on failure is the worst outcome | Design |
 | 2026-08-06 | Route summary states honestly when saving is zero | An inflated number, once disbelieved, discredits every other number | Design |
+| 2026-08-17 | Sign in rebuilt on a photograph: logo and wordmark at the top, the provider button in the lower third | The screen was a card in the middle of an empty background and said nothing about what the product does. The blur is baked into the asset so the first screen adds no native module | Design |
 
 ## 16. Rationale
 
