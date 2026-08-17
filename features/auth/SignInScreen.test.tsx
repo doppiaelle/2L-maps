@@ -2,8 +2,8 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import Svg from 'react-native-svg';
 
-import SignInScreen from './sign-in';
-import { SessionProvider } from '@/features/auth/session-provider';
+import { SignInScreen } from './SignInScreen';
+import { SessionProvider } from './session-provider';
 import { DeepLinkProvider } from '@/features/navigation/deep-link-provider';
 import type { DeepLinkPort } from '@/features/navigation/use-pending-deep-link';
 import { usePreferencesStore } from '@/features/stores';

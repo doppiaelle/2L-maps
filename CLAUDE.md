@@ -103,12 +103,19 @@ logic is in the wrong place.
 | Constants | `SCREAMING_SNAKE_CASE` | `MAX_STOPS_T1` |
 | Database tables and columns | `snake_case`, plural tables | `places_cache`, `coords_refreshed_at` |
 | Edge Functions | `kebab-case` | `routes-compute` |
-| Test files | mirror the source, `.test.ts` | `tier-selection.test.ts` |
+| Test files | mirror the source, `.test.ts` — **never under `app/`** | `tier-selection.test.ts` |
 
 **Domain vocabulary is fixed by the glossary** in
 [`docs/00_PROJECT_OVERVIEW.md`](docs/00_PROJECT_OVERVIEW.md#8-glossary). A stop is a `Stop`,
 never a `Location`, `Point`, `Destination` or `Address`. Renaming a domain concept requires
 updating the glossary first.
+
+**A test file may not live under `app/`.** Expo Router compiles a `require.context` over that
+whole directory, so every `.tsx` in it is a route and enters Metro's graph — a `.test.tsx` beside
+a screen is a route that imports the testing library, and the release bundle dies on `console`
+and `util` while Jest and `tsc` stay green. This is the layering rule in §1 with teeth: `app/` is
+composition, the screen lives in `features/`, and its test lives beside the screen.
+`lib/navigation/route-files.test.ts` enforces it.
 
 **Booleans read as assertions:** `isOptimized`, `hasEntitlement`, `canChunkHandoff`. Never
 `optimized`, `flag`, `check`.
