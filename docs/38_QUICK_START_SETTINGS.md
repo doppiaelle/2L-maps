@@ -2,10 +2,21 @@
 
 > **Status:** Approved
 > **Owner:** Product owner
-> **Last reviewed:** 2026-08-10
+> **Last reviewed:** 2026-08-18
 > **Related:** [`37_GO_LIVE_RUNBOOK.md`](37_GO_LIVE_RUNBOOK.md) · [`19_SECURITY.md`](19_SECURITY.md)
 
 ---
+
+> ⚠️ **Migration notice — current setup only.** This guide provisions the implemented
+> Google-era application. It must not be used as the HERE target setup. Google location secrets
+> will be removed after cutover; Supabase values remain; Google OAuth remains initially.
+>
+> The replacement sequence is controlled by
+> [`41_HERE_MIGRATION_PROGRAM.md`](41_HERE_MIGRATION_PROGRAM.md). The only product-owner
+> prerequisites currently missing are: create a HERE Base Plan account, register Android and iOS
+> apps, request/accept an acceptable Navigate quote, and make the licensed Flutter SDK package
+> available through a private channel. Until then, do not delete working Google location secrets
+> or claim that HERE navigation is configured.
 
 ## 1. Purpose
 
