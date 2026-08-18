@@ -125,19 +125,21 @@ that HERE exists in the application before its gate passes.
 
 | Program wave | Branch / dependency | Content | Gate | Status |
 |---|---|---|---|---|
-| H0 | `docs/here-migration-program` | Current/target split, architecture decision, risk and gate plan | ADR-0030 and ADR-0031 accepted | 🔵 |
-| H1 | Product-owner prerequisite | HERE account, registered apps, Navigate quote/terms, private SDK delivery | Program Gate A | ⏳ blocked: no HERE account |
-| H2 | New spike PR from latest `main` | Flutter vertical slice + minimal React Native comparator | Program Gate B | ⏳ blocked by H1 |
-| H3+ | One new PR per wave | Neutral data/backend, HERE adapters, Flutter parity, map, navigation, release, Google removal | Program Gates C/D | ⏳ |
+| H0 | `docs/here-migration-program` | Current/target split; Explore/owned-guidance decision; eligibility, risk and gate plan | ADR-0030 and ADR-0031 accepted | 🔵 |
+| H1 | Product-owner prerequisite | HERE Base Plan account, registered apps, permitted-use confirmation, exact caps, private Explore delivery | Program Gate A | ⏳ blocked: no HERE account |
+| H2 | New spike PR from latest `main` | Flutter Explore map + pure-Dart guidance kernel with adversarial trace replay | Program Gate B | ⏳ blocked by H1 |
+| H3+ | One new PR per wave | Neutral data/backend, authorized HERE adapters, Flutter parity, map, essential guidance, release, Google removal | Program Gates C/D | ⏳ |
 
 Approved execution facts:
 
 - Supabase stays; it is not replaced by HERE.
 - Existing Supabase rows are test data and may be reset.
-- Flutter is the expected client after the spike.
+- Flutter is the expected client after the spike; no React Native comparator remains in scope.
+- HERE SDK Explore replaces Navigate; 2L owns a limited online guidance state machine.
 - Android remains first, but iOS is proved during the spike rather than deferred to release.
 - Google OAuth stays initially; Google location services are the migration target.
-- SDK code does not start until credentials and the privately delivered package exist.
+- SDK code does not start until Base Plan use is confirmed, credentials exist, and the privately
+  delivered Explore package is available.
 
 ### What is built, and what is specified but not built — re-audited 2026-08-10
 
@@ -883,7 +885,7 @@ Per wave:
 
 | Phase | Scope | Trigger |
 |---|---|---|
-| HERE H0–H2 | Documentation, commercial onboarding, then measured Flutter/RN spike | ADR-0030 accepted; H2 requires Program Gate A |
+| HERE H0–H2 | Documentation, Base Plan eligibility, then Explore/guidance trace spike | ADR-0030 accepted; H2 requires Program Gate A |
 | Waves 0–1 | Foundation and domain, no external dependency | Historical/current implementation |
 | Wave 2 | Backend, verified by contract | Wave 1 merged |
 | Waves 3–5 | Client through to screens | Wave 2 merged |
@@ -899,6 +901,7 @@ Per wave:
 | 2026-08-07 | Cloud provisioning deferred (I2) | Maps Platform has no sandbox; the first two waves need no upstream call | Architecture |
 | 2026-08-07 | Pinning verified by `expo prebuild`, not by peer ranges | Risk C6 was a config-plugin failure, invisible to dependency resolution | Architecture |
 | 2026-08-18 | HERE migration moved to program waves H0–H9 | Provider, runtime, schema, and navigation changes must have independent gates and PRs | Product owner |
+| 2026-08-18 | H1/H2 pivoted from Navigate quote and RN comparison to Base Plan eligibility and owned-guidance replay | Navigate is removed; the blocking risk is now permitted optimization use and safe GPS route following | Product owner |
 
 ## 15. Rationale
 
