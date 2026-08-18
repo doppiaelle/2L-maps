@@ -12,11 +12,13 @@
 > will be removed after cutover; Supabase values remain; Google OAuth remains initially.
 >
 > The replacement sequence is controlled by
-> [`41_HERE_MIGRATION_PROGRAM.md`](41_HERE_MIGRATION_PROGRAM.md). The only product-owner
-> prerequisites currently missing are: create a HERE Base Plan account, register Android and iOS
-> apps, request/accept an acceptable Navigate quote, and make the licensed Flutter SDK package
-> available through a private channel. Until then, do not delete working Google location secrets
-> or claim that HERE navigation is configured.
+> [`41_HERE_MIGRATION_PROGRAM.md`](41_HERE_MIGRATION_PROGRAM.md). HERE SDK Navigate has been
+> removed from the plan. The missing prerequisites are: create a HERE Base Plan account; register
+> Android and iOS apps; obtain Explore credentials/package; verify exact caps; and obtain written
+> confirmation that single-driver stop ordering, Routing v8 turn-by-turn actions, rerouting,
+> retention, and overlays are permitted through named products under the selected plan. The
+> Explore archive must then reach CI privately. Until Gate A passes, do not delete working Google
+> location secrets or claim that HERE guidance is configured.
 
 ## 1. Purpose
 
