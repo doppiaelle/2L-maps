@@ -394,7 +394,7 @@ program gate in [`41_HERE_MIGRATION_PROGRAM.md`](41_HERE_MIGRATION_PROGRAM.md).
 
 | ID | Risk | Likelihood / impact | Trigger | Mitigation and prepared response | Owner |
 |---|---|---|---|---|---|
-| H1 | Base Plan does not permit the core stop-ordering use case | High / terminal | Restrictions classify 2L as Optimization and no acceptable Tour Planning/other authorization exists | Written named-product confirmation before code; stop or evaluate a legally compatible stack | Product owner |
+| H1 | Base Plan does not permit the core stop-ordering use case | **Fired / terminal** | Official restrictions classify 2L as Optimization; Waypoints Sequence is a separate API and no Base authorization exists | Do not implement WPS; obtain written Base authorization or evaluate a legally compatible non-HERE architecture | Product owner |
 | H2 | Proprietary Explore package cannot reach public-repo CI legally and reproducibly | High / high | License forbids artifact path or CI cannot authenticate privately | Never commit archive; approve private artifact channel, checksum, notice, and pin before spike | Engineering |
 | H3 | Owned guidance advances the wrong maneuver under ambiguous GPS | Medium / terminal | Parallel-road, ramp, tunnel, roundabout, or urban-canyon trace produces confident wrong progress | Confidence state, spatial/temporal/heading hysteresis, adversarial replay corpus, safe fallback | Engineering |
 | H4 | Rerouting loops or scales cost with GPS cadence | Medium / high | Repeated deviations produce repeated API calls or calls occur per location update | Local projection; sustained deviation gate; one request + cooldown; server quota and kill switch | Engineering |
@@ -402,6 +402,8 @@ program gate in [`41_HERE_MIGRATION_PROGRAM.md`](41_HERE_MIGRATION_PROGRAM.md).
 | H6 | Background location, TTS, map, or GPS cadence causes unacceptable battery/thermal behaviour | Medium / high | Spike/device budget exceeded or OS kills guidance | Measured cadence, foreground-service/background-mode design, performance budget, scope reduction | Engineering |
 | H7 | Provider cutover corrupts History or couples product rows to HERE identifiers | Medium / high | Saved route requires provider call, ID churn breaks stop, or wrong route version resumes | Internal UUIDs, immutable snapshots, test DB reset, version checks, rollback window | Engineering |
 | H8 | “Essential guidance” is marketed or relied on as Navigate parity | Medium / terminal | Offline, lane/speed/tunnel/map-matching capability is implied or degraded state stays silent | Explicit exclusions, safety copy, current-leg fallback, controlled road tests, release kill switch | Product owner + engineering |
+| H9 | HERE-derived geocoding data is retained beyond licensed duration | High / high | Coordinate/search fields lack expiry or are restored from History after 30 days without re-hydration | Persist user-owned data separately; expire HERE-derived fields; purge and re-geocode under server quota | Engineering + legal |
+| H10 | Free allowance is mistaken for a provider spend cap | Medium / terminal | Account bills overage or retries continue after application budget | Pre-call server quota, monthly application budget, emergency kill switch; never rely on alerts alone | Product owner + engineering |
 
 ## 7. Architectural decisions
 
@@ -460,7 +462,7 @@ is not mitigated.
 - [ ] C9 naming decision resolved before first store submission.
 - [ ] S4: no unpushed commits at the end of any working session.
 - [ ] No risk has been silently closed without evidence.
-- [ ] H1–H8 reviewed at each HERE program gate.
+- [ ] H1–H10 reviewed at each HERE program gate.
 - [ ] H1–H4 remain green before any production Flutter rewrite.
 - [ ] H4 physical-road evidence exists before navigation release.
 
@@ -472,7 +474,7 @@ is not mitigated.
 | 1.x | C2 monitored monthly; C7 reassessed before 1.3 | Gate D1 passed |
 | 2.0 | C1 reassessed — time windows move every optimization to T2 | Gate D3 |
 | HERE H0–H2 | H1–H4 permitted-use/package/guidance evidence | Program Gates A and B |
-| HERE H3–H9 | H4–H8 reviewed at every cutover gate | Program Gates C and D |
+| HERE H3–H9 | H4–H10 reviewed at every cutover gate | Program Gates C and D |
 | Continuous | S1 reassessed on every Google announcement until location cutover | Event-driven |
 
 ## 13. Decision log
@@ -489,6 +491,7 @@ is not mitigated.
 | 2026-08-06 | S2 and S3 recorded as accepted, not mitigated | No mitigation exists; recording them as managed would be false | Product owner |
 | 2026-08-06 | S4 added after the risk fired | A container reclaim destroyed a full set of committed-but-unpushed documentation | Product owner |
 | 2026-08-18 | H1–H8 revised for Explore + owned guidance | Base Plan eligibility, package delivery, GPS ambiguity, reroute cost, style, battery, data, and scope-honesty replace Navigate quote risks | Product owner |
+| 2026-08-18 | H1 fired; H9–H10 added | WPS is separate/excluded, geocoding retention is limited, and no provider hard cap is established | Product owner |
 
 ## 14. Rationale
 
