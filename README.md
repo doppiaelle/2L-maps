@@ -3,11 +3,11 @@
 **A multi-stop route optimizer for the single mobile professional.**
 
 You have a disordered list of stops and need a usable visiting order in seconds. 2L Maps resolves
-the addresses, optimizes the route, saves the confirmed result, and is evolving into a complete
-in-app navigation product.
+the addresses, optimizes the route, saves the confirmed result, and is evolving toward a branded
+map with focused in-app guidance.
 
-> **The user does not pay for a map. They pay for the order—and for getting through the route
-> safely with less friction.**
+> **The user pays for the order and for getting through it with less friction—not for a generic
+> map feature list.**
 
 ---
 
@@ -26,21 +26,29 @@ Every push to `main` starts `.github/workflows/android-preview.yml`. Download th
 
 ### Approved target, not yet implemented
 
-HERE will replace Google for location search, geocoding, routing, optimization, map rendering, and
-navigation. The target client is Flutter using HERE SDK Navigate after a short measured spike.
-Supabase remains the system of record for authentication, entitlements, quotas, routes, and
-History. Google OAuth may remain initially because authentication is independent of location
-services.
+HERE will replace Google for the online map and location services, subject to a permitted-use and
+cost gate. The target client is Flutter using **HERE SDK Explore**—not the separately contracted
+HERE SDK Navigate. Supabase remains the system of record for authentication, entitlements, quotas,
+routes, and History. Google OAuth may remain initially because authentication is independent of
+location services.
 
-The target experience includes a custom quiet 3D HERE map in the existing 2L colours, complete
-in-app guidance, supported offline features, voice, rerouting, lanes and warnings, plus one minimal
-external-navigation control for the **current leg only**. The existing confirm/open-navigator
-primary flow is removed at cutover, not before.
+2L Maps will build a conservative online guidance kernel from operating-system location updates
+and HERE Routing API v8 polylines, route handles, and `turnByTurnActions`. The first scope is
+position/route progress, current and next maneuver, distance/ETA, visual/TTS prompts, sustained
+deviation rerouting, arrival, restoration, and one minimal external-navigation control for the
+**current leg only**.
 
-Implementation is currently gated by the absence of a HERE account, Navigate quote, credentials,
-and privately delivered SDK package. See
-[`docs/41_HERE_MIGRATION_PROGRAM.md`](docs/41_HERE_MIGRATION_PROGRAM.md) for prerequisites,
-risks, cost gates, data design, spike acceptance, and the pull-request sequence.
+The target does **not** promise offline maps/routing/guidance, HERE Positioning, road-network map
+matching, lanes, junction views, speed/road-sign warnings, tunnel extrapolation, or parity with
+HERE Navigate.
+
+Before implementation, HERE must confirm that the Base Plan permits the actual 2L use cases. Its
+published restrictions identify “Optimization” as excluded except through HERE Tour Planning, so
+free Routing transactions cannot be treated as authorization to reorder stops. Exact reported
+allowances also remain unverified until an account exposes the applicable price table.
+
+See [`docs/41_HERE_MIGRATION_PROGRAM.md`](docs/41_HERE_MIGRATION_PROGRAM.md) for capabilities,
+blockers, risks, cost gates, data design, spike acceptance, and pull-request sequence.
 
 ---
 
@@ -48,12 +56,14 @@ risks, cost gates, data design, spike acceptance, and the pull-request sequence.
 
 | Current | Approved target |
 |---|---|
-| Planner for one professional, one vehicle, 5–25 stops | Planner plus complete in-app navigation |
-| Google server APIs behind Supabase | HERE REST APIs behind the same server controls |
-| Local SVG route preview | Branded HERE vector/3D map |
-| External app drives the route | 2L Maps drives; external app may open the current leg |
+| Planner for one professional, one vehicle, 5–25 stops | Planner plus essential online guidance |
+| Google server APIs behind Supabase | HERE online APIs behind the same server controls, where authorized |
+| Local SVG route preview | Branded HERE SDK Explore map |
+| External app drives the route | 2L guidance kernel drives; external app can open the current leg |
 | Local + Supabase History | Local + Supabase History, provider-neutral |
-| Expo/React Native client | Flutter expected after the Android+iOS spike |
+| Expo/React Native client | Flutter after the Explore/guidance spike |
+| No in-app GPS route following | OS location + pure-Dart conservative route following |
+| No offline map | Still no offline map; Navigate is not in scope |
 
 Fleet dispatch, multiple vehicles, driver management, and a web dashboard remain out of scope.
 
@@ -71,51 +81,51 @@ flowchart TD
   A -->|route or legs| E["External navigator"]
 ```
 
-No Google web-service credential ships in the client. Supabase owns authorization, entitlement,
-rate limiting, quota, caching, upstream calls, and usage recording.
-
 ### Target
 
 ```mermaid
 flowchart TD
-  A["Flutter mobile app"] -->|JWT and app contracts| B["Supabase Edge Functions"]
-  A -->|map, positioning, guidance| C["HERE SDK Navigate"]
-  B -->|search, geocode, route, sequence| D["HERE REST APIs"]
-  B -->|history, quota, entitlements| E["Supabase Postgres"]
-  A -->|current leg only| F["External navigator"]
+  A["Flutter app"] -->|map render/style| B["HERE SDK Explore"]
+  A -->|GPS samples| C["OS location"]
+  A -->|route state| D["2L guidance kernel"]
+  A -->|JWT contracts| E["Supabase"]
+  E -->|search/route/maneuvers/reroute| F["HERE APIs"]
+  E -->|history/quota| G["Postgres"]
+  A -->|current leg| H["External navigator"]
 ```
 
-Provider SDK types never become persisted product contracts. Locations use internal IDs, while
-provider IDs remain replaceable references.
+No server-service credential ships in the client. GPS samples are processed locally; they do not
+generate one upstream request each. Provider SDK/API types never become persisted product
+contracts.
 
 ---
 
 ## Migration decisions
 
-- [ADR-0030](docs/adr/0030-here-platform-and-navigation-target.md) accepts HERE as the target
-  location platform and keeps Supabase as the product backend.
-- [ADR-0031](docs/adr/0031-spike-before-flutter-migration.md) requires a five-day spike and records
-  Flutter as the expected production runtime.
-- Existing Google-era ADRs continue to describe the current implementation until the corresponding
-  cutover lands. They are superseded by implementation PRs, not rewritten retroactively.
+- [ADR-0030](docs/adr/0030-here-platform-and-navigation-target.md) accepts HERE Explore plus
+  app-owned essential guidance, explicitly removing Navigate.
+- [ADR-0031](docs/adr/0031-spike-before-flutter-migration.md) requires a seven-day Android+iOS
+  guidance-kernel spike before the Flutter rewrite.
+- Base Plan eligibility for one-driver stop optimization is a hard gate; HERE Tour Planning is the
+  documented exception that must be evaluated.
+- Existing Google-era ADRs continue to describe the current implementation until their cutovers.
 - Test data may be reset; there is no production-data preservation requirement.
-- Android remains first for delivery, while iOS map/navigation viability is an early spike gate.
+- Android remains first for delivery, while iOS viability is proved during the spike.
+- Google OAuth stays initially; it is not a Google location-service dependency.
 
 ---
 
 ## Documentation
 
-Start with:
-
 | Document | Purpose |
 |---|---|
-| [`docs/41_HERE_MIGRATION_PROGRAM.md`](docs/41_HERE_MIGRATION_PROGRAM.md) | Approved target, blockers, gates, waves, risks |
+| [`docs/41_HERE_MIGRATION_PROGRAM.md`](docs/41_HERE_MIGRATION_PROGRAM.md) | Explore/custom-guidance target, eligibility, gates, waves, risks |
 | [`docs/INDEX.md`](docs/INDEX.md) | Reading paths and area ownership |
 | [`docs/00_PROJECT_OVERVIEW.md`](docs/00_PROJECT_OVERVIEW.md) | Current product and binding glossary |
 | [`CLAUDE.md`](CLAUDE.md) | Development constitution |
-| [`docs/36_IMPLEMENTATION_PLAN.md`](docs/36_IMPLEMENTATION_PLAN.md) | Implemented work and execution order |
-| [`docs/31_COST_MODEL.md`](docs/31_COST_MODEL.md) | Current Google-era cost model; to be replaced after HERE quote |
-| [`docs/38_QUICK_START_SETTINGS.md`](docs/38_QUICK_START_SETTINGS.md) | Current setup; HERE onboarding will replace Google location secrets |
+| [`docs/36_IMPLEMENTATION_PLAN.md`](docs/36_IMPLEMENTATION_PLAN.md) | Implemented work and migration status |
+| [`docs/31_COST_MODEL.md`](docs/31_COST_MODEL.md) | Current Google baseline and HERE verification gate |
+| [`docs/38_QUICK_START_SETTINGS.md`](docs/38_QUICK_START_SETTINGS.md) | Current setup; HERE onboarding replaces location secrets later |
 
 Documentation that names Google describes the implemented system unless it explicitly says
 **Target**. The HERE program controls future changes until each owning document is migrated.
@@ -126,12 +136,14 @@ Documentation that names Google describes the implemented system unless it expli
 
 Read [`CLAUDE.md`](CLAUDE.md) and the document owning the area before writing code.
 
-- Start every change from the latest `main` and deliver it in a new pull request.
-- Do not combine runtime rewrite, provider cutover, schema reset, and navigation into one merge.
-- Do not commit HERE SDK binaries, credentials, quotes, or contracts to this public repository.
-- Keep all provider access behind facades and all server-metered calls behind Supabase quota.
-- Use the CI standalone APK for current Android phone checks.
-- A Flutter/HERE build is not an approved release until both physical-device navigation gates pass.
+- Start every new program wave from the latest `main` and use a new pull request.
+- Do not combine runtime rewrite, provider cutover, schema reset, and guidance into one merge.
+- Do not commit HERE SDK archives, credentials, account pricing, or contracts publicly.
+- Keep provider access behind facades and all metered server calls behind Supabase quota.
+- A GPS sample never directly triggers a paid request.
+- Do not present essential guidance as equivalent to HERE Navigate.
+- Keep current-leg external fallback reachable in ambiguous and degraded states.
+- Use the current CI standalone APK for Android checks until the Flutter delivery wave replaces it.
 
 ---
 
@@ -141,18 +153,25 @@ Read [`CLAUDE.md`](CLAUDE.md) and the document owning the area before writing co
 Supabase · Google Places/Geocoding/Routes/Route Optimization server APIs · RevenueCat · Firebase ·
 Sentry · GitHub Actions
 
-**Approved target:** Flutter · Dart · HERE SDK Navigate · HERE REST APIs · Supabase · RevenueCat ·
-Sentry · GitHub Actions. Exact analytics/crash tooling is revalidated during the Flutter plan.
+**Approved target:** Flutter · Dart · HERE SDK Explore · authorized HERE REST APIs · OS location ·
+2L guidance kernel · Supabase · RevenueCat · Sentry · GitHub Actions. Exact analytics/crash tooling
+is revalidated during the Flutter plan.
 
 ---
 
 ## Attribution, terms, and cost
 
 The current implementation remains subject to Google Maps Platform terms until Google-derived
-location content and services are removed. HERE terms apply only after account onboarding and
-cutover.
+location content and services are removed.
 
-HERE SDK Navigate is not assumed to be included in the public Base Plan price. A written quote,
-usage entitlements, storage rights, offline-map rights, support level, and SDK distribution terms
-are hard gates. Subscription prices and free allowances must be recalculated from that quote plus
-measured SDK/API usage; the current Google cost model cannot be reused as a HERE forecast.
+The HERE Base Plan may provide substantial free allowances, but allowances and allowed use are
+different controls. Before code, the account must confirm:
+
+- the permitted product for stop-order optimization;
+- custom guidance from Routing v8 actions and route-handle rerouting;
+- storage/retention and map-overlay rights;
+- exact map, search, routing, optimization, and rerouting transaction definitions;
+- current free caps, overages, RPS limits, and spending controls.
+
+The owner-supplied working figures of 30,000 map/geocoding transactions and approximately 5,000
+Routing transactions are not code or subscription assumptions until verified in the account.
