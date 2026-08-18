@@ -7,16 +7,17 @@
 
 ---
 
-> ⛔ **HERE pricing gate.** Every numeric model below describes the current Google-era design.
-> None of it forecasts HERE SDK Navigate, HERE REST transactions, offline map delivery, support,
-> or contract minimums. Do not set subscription prices, free allowances, or margin targets for
-> the HERE product from these figures.
+> ⛔ **HERE eligibility and pricing gate.** Every numeric model below describes the current
+> Google-era design. It does not forecast HERE SDK Explore rendering, Search, Routing,
+> Tour Planning/another authorized optimizer, or reroutes. Do not set HERE subscription prices,
+> free allowances, or margins from these figures.
 >
-> The HERE model is written only after a signed/acceptable Navigate quote and measured spike
-> usage identify: fixed monthly commitments, included volume, billable transaction definitions,
-> overages, offline-map/data charges, support, taxes, and worst-case usage. Until then, cost is an
-> open commercial blocker under [`41_HERE_MIGRATION_PROGRAM.md`](41_HERE_MIGRATION_PROGRAM.md)
-> Gate A.
+> HERE SDK Navigate and its quote are no longer in scope. The new model starts only after the
+> account confirms that 2L's stop-ordering use case is permitted through a named product/plan and
+> exposes exact transaction definitions, free caps, overages, RPS limits, retention rights, and
+> spending controls. The owner-supplied 30,000 map/geocode and approximately 5,000 Routing figures
+> are working hypotheses, not constants. GPS updates are local and must never become one Routing
+> transaction each. See [`41_HERE_MIGRATION_PROGRAM.md`](41_HERE_MIGRATION_PROGRAM.md) Gate A.
 
 > ⚠️ **Sourcing note.** `developers.google.com` was unreachable from the environment where this
 > analysis was performed (403 from the egress proxy), so the figures below come from web
@@ -429,7 +430,7 @@ of twenty-five on the dominant operation, and the mitigations here take per-user
 | 2026-08-13 | Sofia narrowed to a 10–25-stop single-driver round and made the target profile | Keeps the sharp delivery pain inside the viable cost envelope | Product owner |
 | 2026-08-13 | Advertising revenue removed from the model | Free is measurable acquisition COGS, not speculative ad revenue | Product owner |
 | 2026-08-06 | Quota values set with 7–13× headroom | Quotas target abuse and defects, not normal use | Architecture |
-| 2026-08-18 | Google model frozen as the current baseline | HERE Navigate price is quote-based for this product and usage must be measured before repricing | Product owner |
+| 2026-08-18 | Google model frozen as the current baseline | HERE permitted use, exact Base Plan caps, optimizer product and guidance transaction rate must be verified/measured before repricing | Product owner |
 
 ## 18. Rationale
 
