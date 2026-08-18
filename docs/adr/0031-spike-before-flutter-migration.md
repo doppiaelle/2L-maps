@@ -1,4 +1,4 @@
-# ADR-0031 — Spike before the Flutter migration
+# ADR-0031 — Guidance-kernel spike before the Flutter migration
 
 **Status:** Accepted
 **Date:** 2026-08-18
@@ -10,80 +10,106 @@
 ## Context
 
 The current client is React Native with Expo. HERE officially supports Android, iOS, and Flutter;
-it does not list React Native as a HERE SDK platform. The Android and iOS SDKs are native products,
-so a React Native client would need project-owned Kotlin and Swift modules plus a JavaScript event
-and lifecycle layer.
+it does not list React Native as a HERE SDK platform. A React Native client would therefore need
+project-owned Kotlin and Swift modules even for HERE SDK Explore.
 
-A Flutter client still means a mobile rewrite in Dart, but it uses HERE's supported Flutter plugin,
-which wraps the native SDKs for both platforms. HERE also publishes a Flutter reference
-application covering a substantial Navigate feature set.
+The earlier version of this decision used a spike to compare a React Native bridge with HERE SDK
+Navigate through Flutter. Navigate has now been removed from the plan. Flutter remains the target
+because it is an official HERE SDK Explore platform and the new guidance engine can be written as
+portable, testable Dart rather than split across JavaScript, Kotlin, and Swift.
 
-Neither option should be chosen only from a support matrix. This product must prove navigation
-event throughput, foreground/background behaviour, audio, restoration, offline maps, CI package
-delivery, styling, performance, and both mobile targets using the exact licensed SDK.
+The new uncertainty is larger than map integration: can a small team build conservative,
+high-quality essential guidance from HERE Routing API v8 maneuvers and operating-system location
+updates without pretending to reproduce HERE Navigate?
 
 ## Decision
 
-Run a timeboxed technical spike before production migration. The expected outcome is Flutter.
+Run a timeboxed technical spike before the production Flutter migration. The spike validates the
+app-owned guidance kernel; it does not compare production runtimes.
 
-The spike builds:
+The spike begins only after:
 
-1. a disposable Flutter vertical slice using the pinned HERE SDK package; and
-2. a deliberately minimal React Native native-module comparator proving only integration cost,
-   lifecycle, event delivery, crash isolation, and build reproducibility.
+- HERE confirms the planned use is allowed under the selected plan, including the optimization
+  path;
+- Explore credentials and the exact Flutter package are available;
+- the package can reach CI through a private channel.
 
-The Flutter slice must demonstrate on Android and iOS:
+The spike builds a disposable Flutter vertical slice with:
 
-- map load and custom style;
-- route rendering;
-- simulated turn-by-turn guidance;
-- voice/maneuver events, rerouting, lanes, and warnings available to the license;
-- positioning and background/foreground transitions;
-- offline map lifecycle;
-- route/session restoration;
-- current-leg external navigator handoff;
-- measured binary size, cold start, first map frame, CPU, memory, battery, and HERE usage.
+1. HERE SDK Explore map load and the first custom 2L style on Android and iOS;
+2. a Supabase fixture/adapter returning polyline, `turnByTurnActions`, route handle, summary, and
+   version metadata;
+3. replayable location traces for clean driving, GPS noise, parallel roads, missed turns,
+   roundabouts, pauses, jumps, and app interruption;
+4. a pure-Dart route projection and along-route progress engine;
+5. maneuver selection and staged visual/TTS announcements;
+6. confidence states that suppress guidance when position is ambiguous;
+7. sustained deviation detection and bounded rerouting;
+8. arrival detection, next-leg transition, restoration, and current-leg external handoff;
+9. foreground/background behaviour on Android and iOS;
+10. measurements for binary size, cold start, first map frame, CPU, memory, battery, GPS cadence,
+    API transactions, and false/late/missed maneuver events.
 
-The spike is capped at five engineering days after its credentials and package prerequisites are
-available. It contains no production schema migration and no attempt to port the whole UI.
+The spike is capped at seven engineering days after prerequisites are available. Five days proved
+map/SDK integration in the old plan; the extra two cover the minimum location-replay and safety
+evidence required by app-owned guidance.
 
-Flutter becomes the production runtime if it passes the two-platform and navigation gates without
-a blocking commercial or technical defect. A React Native bridge may replace it only by amending
-this ADR with measured evidence that the bridge has lower lifecycle and maintenance risk.
+### Passing thresholds
+
+Exact numeric thresholds are set in the spike PR before code so results cannot move the goalposts.
+At minimum, the spike fails if any of these is true:
+
+- a supported target platform cannot render the Explore map reproducibly in CI and on device;
+- guidance advances maneuvers on a nearby parallel road without entering an ambiguous state;
+- brief GPS noise produces reroute loops;
+- a missed turn does not produce either a safe reroute or a visible degraded state;
+- restoration can resume a different route/version silently;
+- the user can lose both in-app guidance and the current-leg external fallback;
+- API use scales with GPS update frequency rather than route/reroute events;
+- the product can only pass by adding a Navigate-exclusive capability.
+
+Flutter becomes the production runtime if this spike passes. If it fails, the response is to
+reduce the guidance promise, retain external navigation, or change provider/license—not to hide
+the failing scenario or grow an unsupported React Native bridge.
 
 ## Consequences
 
-**Positive.** The likely rewrite is validated against the real proprietary package before product
-code and schema depend on it.
+**Positive.** The rewrite is validated against the real Explore package and the real hard part:
+route following under imperfect location input.
 
-**Positive.** The small React Native comparator answers the practical “can we keep the current
-app?” question without turning a proof into an unsupported production platform.
+**Positive.** Pure Dart geometry, state machines, replay fixtures, and thresholds can be tested
+without moving a vehicle, then verified with controlled road tests.
 
-**Negative.** A small amount of spike code is intentionally disposable.
+**Positive.** Removing the React Native comparator keeps the spike focused. Flutter is no longer
+being selected for Navigate; it is selected because HERE supports its Explore plugin and the
+project wants one cross-platform guidance implementation.
 
-**Negative.** The production mobile feature roadmap pauses behind account and license
-prerequisites. Documentation, provider-neutral backend design, and non-SDK prototypes may proceed,
-but Navigate cannot be claimed or shipped.
+**Negative.** The spike code is intentionally disposable except for fixtures, measurements, and
+contracts that are deliberately promoted later.
 
-**Negative.** If Flutter passes, most React Native presentation code is rewritten. Supabase
-contracts, product logic, design tokens, fixtures, copy, and behaviour specifications should be
-ported rather than mechanically translating component code.
+**Negative.** Passing simulated traces is necessary but insufficient. Production still requires
+controlled physical-road testing on both platforms, including poor GPS and background transitions.
+
+**Negative.** Explore does not supply HERE Positioning, map matching, route progress, navigation
+events, or offline maps. All behaviour in those areas is ours and must degrade honestly.
 
 ## Evidence and references
 
 Checked 2026-08-18:
 
 - [HERE SDK examples and supported platforms](https://github.com/heremaps/here-sdk-examples)
-- [HERE SDK for Flutter onboarding](https://docs.here.com/here-sdk/docs/flutter-get-started)
-- [HERE SDK Flutter examples and reference application](https://docs.here.com/here-sdk/docs/flutter-examples)
+- [HERE SDK Flutter licenses](https://docs.here.com/here-sdk/docs/flutter-introduction-editions)
+- [HERE Routing turn-by-turn actions](https://docs.here.com/routing/docs/routing-v8-guidance)
+- [HERE Routing rerouting](https://docs.here.com/routing/docs/routing-v8-adjust-route-after-deviation)
 - [Migration program and gate checklist](../41_HERE_MIGRATION_PROGRAM.md)
 
 ## Alternatives considered
 
 | Alternative | Attraction | Why rejected |
 |---|---|---|
-| Rewrite in Flutter immediately | Matches the published support path | Commits before license, package, platform, and performance evidence |
-| Build a full React Native bridge | Reuses current UI | Makes the project owner of every native navigation boundary without official RN support |
-| Android native first, iOS later | Fastest single-platform SDK proof | Can discover a fatal cross-platform gap after the architecture is fixed |
-| Evaluate only with public examples | No account required | Examples do not prove credentials, licensed features, private package delivery, or this app's lifecycle |
-| Keep Expo until the last wave | Minimizes visible churn | Encourages backend and UI contracts that assume the runtime being replaced |
+| Rewrite in Flutter immediately | Matches HERE's published Explore support path | Commits before license, package, guidance, and platform evidence |
+| Retain a React Native comparator | Answers whether the current UI can survive | No longer tests the principal risk; Explore still has no official RN plugin |
+| Build a full React Native bridge | Reuses current UI | Adds two native integration surfaces around a guidance engine that already needs one shared implementation |
+| Evaluate only with public examples | No account required | Examples do not prove credentials, package delivery, custom guidance, or this app's lifecycle |
+| Test only ideal simulated movement | Fast green result | Misses the exact GPS ambiguity and reroute failure modes that justify the spike |
+| Promise feature parity with Navigate | Stronger marketing | The excluded positioning, map-matching, warners, and offline stack cannot be recreated safely in this scope |
