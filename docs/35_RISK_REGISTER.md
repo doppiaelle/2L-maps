@@ -387,21 +387,21 @@ account termination or a blocked release.*
 ---
 
 
-### HERE migration risks — opened 2026-08-18
+### HERE Explore and guidance risks — revised 2026-08-18
 
 These risks are additive until Google location services are removed. Ratings are reviewed at every
 program gate in [`41_HERE_MIGRATION_PROGRAM.md`](41_HERE_MIGRATION_PROGRAM.md).
 
 | ID | Risk | Likelihood / impact | Trigger | Mitigation and prepared response | Owner |
 |---|---|---|---|---|---|
-| H1 | Navigate quote makes consumer pricing non-viable | Medium / terminal | Fixed commitment or measured COGS exceeds the subscription envelope | Gate A before rewrite; negotiate scope/volume, reduce features, or stop and compare alternatives | Product owner |
-| H2 | Proprietary SDK package cannot be redistributed through current public CI/repository | High / high | Contract forbids the proposed artifact path or CI cannot authenticate privately | Never commit binary; agree a private artifact channel and license evidence before H2 spike | Engineering |
-| H3 | Flutter integration fails Android or iOS lifecycle/navigation requirements | Medium / high | Spike cannot restore sessions, deliver events, or survive background/foreground on either platform | Two-platform spike; stop rather than defer iOS or grow the RN bridge | Engineering |
-| H4 | Full navigation introduces a safety defect | Medium / terminal | Wrong instruction, stale route, silent GPS/audio loss, unsafe interaction, or failed reroute in road tests | Simulation + controlled physical-road matrix, explicit degradation, safety warnings, kill switch, no blocking driving UI | Product owner + engineering |
-| H5 | HERE style matches the mock but loses road/navigation legibility | Medium / high | Maneuvers, hierarchy, warnings, labels, or dark mode fail contrast/device review | Style acceptance prioritizes guidance; maintain restrained fallback scheme and device baselines | Design + engineering |
-| H6 | Offline maps, background positioning, or navigation cause unacceptable storage/battery/thermal use | Medium / high | Spike/device budget exceeded or OS kills background work | Region controls, download policy, telemetry, performance budgets, and feature reduction before release | Engineering |
-| H7 | Provider cutover corrupts History or couples product rows to HERE identifiers | Medium / high | Saved route requires a provider call, ID churn breaks a stop, or mixed route versions resume | Internal UUID schema, immutable route snapshot, test DB reset, contract version checks, rollback window | Engineering |
-| H8 | Big-bang provider + runtime + schema + navigation change becomes unreviewable and irreversible | High / high | One PR spans more than one program wave or Google is removed before HERE observation | One PR per wave from latest main, independent feature flags, shadow test, rollback rehearsal | Engineering |
+| H1 | Base Plan does not permit the core stop-ordering use case | High / terminal | Restrictions classify 2L as Optimization and no acceptable Tour Planning/other authorization exists | Written named-product confirmation before code; stop or evaluate a legally compatible stack | Product owner |
+| H2 | Proprietary Explore package cannot reach public-repo CI legally and reproducibly | High / high | License forbids artifact path or CI cannot authenticate privately | Never commit archive; approve private artifact channel, checksum, notice, and pin before spike | Engineering |
+| H3 | Owned guidance advances the wrong maneuver under ambiguous GPS | Medium / terminal | Parallel-road, ramp, tunnel, roundabout, or urban-canyon trace produces confident wrong progress | Confidence state, spatial/temporal/heading hysteresis, adversarial replay corpus, safe fallback | Engineering |
+| H4 | Rerouting loops or scales cost with GPS cadence | Medium / high | Repeated deviations produce repeated API calls or calls occur per location update | Local projection; sustained deviation gate; one request + cooldown; server quota and kill switch | Engineering |
+| H5 | Explore style matches the mock but loses navigation legibility | Medium / high | Maneuvers, road hierarchy, labels, route, traffic, or dark mode fail device review | Guidance-first style acceptance and restrained fallback scheme | Design + engineering |
+| H6 | Background location, TTS, map, or GPS cadence causes unacceptable battery/thermal behaviour | Medium / high | Spike/device budget exceeded or OS kills guidance | Measured cadence, foreground-service/background-mode design, performance budget, scope reduction | Engineering |
+| H7 | Provider cutover corrupts History or couples product rows to HERE identifiers | Medium / high | Saved route requires provider call, ID churn breaks stop, or wrong route version resumes | Internal UUIDs, immutable snapshots, test DB reset, version checks, rollback window | Engineering |
+| H8 | “Essential guidance” is marketed or relied on as Navigate parity | Medium / terminal | Offline, lane/speed/tunnel/map-matching capability is implied or degraded state stays silent | Explicit exclusions, safety copy, current-leg fallback, controlled road tests, release kill switch | Product owner + engineering |
 
 ## 7. Architectural decisions
 
@@ -461,7 +461,7 @@ is not mitigated.
 - [ ] S4: no unpushed commits at the end of any working session.
 - [ ] No risk has been silently closed without evidence.
 - [ ] H1–H8 reviewed at each HERE program gate.
-- [ ] H1, H2 and H3 remain green before any production Flutter rewrite.
+- [ ] H1–H4 remain green before any production Flutter rewrite.
 - [ ] H4 physical-road evidence exists before navigation release.
 
 ## 12. Roadmap
@@ -471,7 +471,7 @@ is not mitigated.
 | MVP | C9 resolved; C4 purge monitoring live; C12 paywall verified | Before first submission |
 | 1.x | C2 monitored monthly; C7 reassessed before 1.3 | Gate D1 passed |
 | 2.0 | C1 reassessed — time windows move every optimization to T2 | Gate D3 |
-| HERE H0–H2 | H1–H3 commercial/package/runtime evidence | Program Gates A and B |
+| HERE H0–H2 | H1–H4 permitted-use/package/guidance evidence | Program Gates A and B |
 | HERE H3–H9 | H4–H8 reviewed at every cutover gate | Program Gates C and D |
 | Continuous | S1 reassessed on every Google announcement until location cutover | Event-driven |
 
@@ -488,7 +488,7 @@ is not mitigated.
 | 2026-08-06 | C12 raised to high impact | Trial auto-renewal is the leading cause of App Store rejection | Product owner |
 | 2026-08-06 | S2 and S3 recorded as accepted, not mitigated | No mitigation exists; recording them as managed would be false | Product owner |
 | 2026-08-06 | S4 added after the risk fired | A container reclaim destroyed a full set of committed-but-unpushed documentation | Product owner |
-| 2026-08-18 | H1–H8 added for HERE migration | Commercial, proprietary package, runtime rewrite, safety, style, offline performance, data, and big-bang risks begin before implementation | Product owner |
+| 2026-08-18 | H1–H8 revised for Explore + owned guidance | Base Plan eligibility, package delivery, GPS ambiguity, reroute cost, style, battery, data, and scope-honesty replace Navigate quote risks | Product owner |
 
 ## 14. Rationale
 
