@@ -15,8 +15,9 @@ for the glossary, then the document owning the area you are changing
 
 [ADR-0030](docs/adr/0030-here-platform-and-navigation-target.md) and
 [ADR-0031](docs/adr/0031-spike-before-flutter-migration.md) accept HERE SDK Explore, an
-app-owned essential-guidance kernel, and a gated Flutter migration. HERE SDK Navigate is excluded. [`docs/41_HERE_MIGRATION_PROGRAM.md`](docs/41_HERE_MIGRATION_PROGRAM.md) controls its
-order and go/no-go evidence.
+app-owned essential-guidance kernel, and a gated Flutter migration. HERE SDK Navigate is excluded.
+[`docs/41_HERE_MIGRATION_PROGRAM.md`](docs/41_HERE_MIGRATION_PROGRAM.md) controls its order and
+go/no-go evidence.
 
 Until a migration pull request explicitly crosses a gate, the Google/Expo rules below describe the
 implemented application and remain binding. For a scoped migration pull request:
@@ -24,7 +25,8 @@ implemented application and remain binding. For a scoped migration pull request:
 1. the new ADRs override only the provider/runtime-specific rule being replaced;
 2. Supabase authorization, entitlement, quota, History, RLS, validation, error, accessibility,
    safety, testing, and documentation rules remain binding;
-3. server HERE credentials and the proprietary Explore SDK package never enter this public repository;
+3. server HERE credentials and the proprietary Explore SDK package never enter this public
+   repository;
 4. the HERE SDK stays behind a Flutter interface, just as provider SDKs stay behind facades today;
 5. provider-neutral internal IDs replace provider IDs at persisted domain boundaries;
 6. Google location secrets and rollback code are removed only after Program Gate D;
