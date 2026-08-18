@@ -116,7 +116,7 @@ owning your area (see §Areas below) → [`29`](29_DEFINITION_OF_DONE.md).
 | 38 | [Quick Start Settings](38_QUICK_START_SETTINGS.md) | **Instructions, short.** The nine steps from nothing to the app on a phone — everything a first test does not need is left out |
 | 39 | [UI Reimplementation Gap](39_UI_REIMPLEMENTATION_GAP.md) | Historical diagnosis of the incomplete first UI pass |
 | 40 | [UI Implementation Audit](40_UI_IMPLEMENTATION_AUDIT.md) | Current requirement-to-code matrix and Android artifact/device acceptance |
-| 41 | [HERE Migration Program](41_HERE_MIGRATION_PROGRAM.md) | **Approved target.** Commercial gates, Flutter spike, architecture, data reset, risks, costs, and PR waves |
+| 41 | [HERE Explore Migration Program](41_HERE_MIGRATION_PROGRAM.md) | **Approved target.** Base Plan eligibility, Explore map, owned guidance, data reset, risks, costs, and PR waves |
 
 ### Architecture Decision Records
 
@@ -151,8 +151,8 @@ owning your area (see §Areas below) → [`29`](29_DEFINITION_OF_DONE.md).
 | [0028](adr/0028-a-coastline-under-the-route.md) | A bundled public-domain coastline is drawn under the route at national scale, where the invented town would be claiming detail it does not have. **Widens the C3 exposure** and amends `CLAUDE.md` §13 rule 5 and ADR-0012 |
 | [0027](adr/0027-the-drive-happens-elsewhere.md) | Done and Skip removed and J2/J3 withdrawn: the navigation app drives the whole route, so nobody returns between stops. Confirm records the departure and puts the route in History; the next route closes the last. Time saved is withdrawn rather than estimated |
 | [0029](adr/0029-single-driver-wedge-and-subscription-first-freemium.md) | Single last-mile driver, 10–25 stops, fastest unstructured input, saved-route reuse and advertising-free freemium |
-| [0030](adr/0030-here-platform-and-navigation-target.md) | HERE is the target for location APIs, map, and in-app navigation; Supabase remains the product backend |
-| [0031](adr/0031-spike-before-flutter-migration.md) | A five-day Android+iOS spike precedes the expected Flutter rewrite; React Native bridge is a comparator only |
+| [0030](adr/0030-here-platform-and-navigation-target.md) | HERE Explore is the map target; 2L owns limited online guidance; Navigate is excluded; Supabase remains the backend |
+| [0031](adr/0031-spike-before-flutter-migration.md) | A seven-day Android+iOS trace-replay spike must prove the app-owned guidance kernel before Flutter rewrite |
 
 ---
 
