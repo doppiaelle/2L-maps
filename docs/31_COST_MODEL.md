@@ -1,11 +1,22 @@
 # 31 — Cost Model and Unit Economics
 
-> **Status:** Approved — figures require verification before pricing is finalised
+> **Status:** Current Google baseline — invalid for HERE target pricing
 > **Owner:** Architecture
-> **Last reviewed:** 2026-08-06
-> **Related:** [ADR-0003](adr/0003-tiered-optimization-cascade.md) · [`20_SUBSCRIPTIONS.md`](20_SUBSCRIPTIONS.md) · [`33_API_CONTRACTS.md`](33_API_CONTRACTS.md)
+> **Last reviewed:** 2026-08-18
+> **Related:** [ADR-0003](adr/0003-tiered-optimization-cascade.md) · [ADR-0030](adr/0030-here-platform-and-navigation-target.md) · [`41_HERE_MIGRATION_PROGRAM.md`](41_HERE_MIGRATION_PROGRAM.md)
 
 ---
+
+> ⛔ **HERE pricing gate.** Every numeric model below describes the current Google-era design.
+> None of it forecasts HERE SDK Navigate, HERE REST transactions, offline map delivery, support,
+> or contract minimums. Do not set subscription prices, free allowances, or margin targets for
+> the HERE product from these figures.
+>
+> The HERE model is written only after a signed/acceptable Navigate quote and measured spike
+> usage identify: fixed monthly commitments, included volume, billable transaction definitions,
+> overages, offline-map/data charges, support, taxes, and worst-case usage. Until then, cost is an
+> open commercial blocker under [`41_HERE_MIGRATION_PROGRAM.md`](41_HERE_MIGRATION_PROGRAM.md)
+> Gate A.
 
 > ⚠️ **Sourcing note.** `developers.google.com` was unreachable from the environment where this
 > analysis was performed (403 from the egress proxy), so the figures below come from web
@@ -418,6 +429,7 @@ of twenty-five on the dominant operation, and the mitigations here take per-user
 | 2026-08-13 | Sofia narrowed to a 10–25-stop single-driver round and made the target profile | Keeps the sharp delivery pain inside the viable cost envelope | Product owner |
 | 2026-08-13 | Advertising revenue removed from the model | Free is measurable acquisition COGS, not speculative ad revenue | Product owner |
 | 2026-08-06 | Quota values set with 7–13× headroom | Quotas target abuse and defects, not normal use | Architecture |
+| 2026-08-18 | Google model frozen as the current baseline | HERE Navigate price is quote-based for this product and usage must be measured before repricing | Product owner |
 
 ## 18. Rationale
 
