@@ -3,9 +3,10 @@
 The specification set for **2L Maps** — a multi-stop route optimizer for the single mobile
 professional.
 
-**Start here:** [`00_PROJECT_OVERVIEW.md`](00_PROJECT_OVERVIEW.md) for the product thesis,
-architecture and the binding glossary. Then [`../CLAUDE.md`](../CLAUDE.md) before writing any
-code.
+**Start here:** [`00_PROJECT_OVERVIEW.md`](00_PROJECT_OVERVIEW.md) for the implemented product and
+binding glossary. For the approved HERE/Flutter target, read
+[`41_HERE_MIGRATION_PROGRAM.md`](41_HERE_MIGRATION_PROGRAM.md). Then read
+[`../CLAUDE.md`](../CLAUDE.md) before writing any code.
 
 ---
 
@@ -20,7 +21,13 @@ owning your area (see §Areas below) → [`29`](29_DEFINITION_OF_DONE.md).
 [`02`](02_USER_PERSONAS.md) → [`03`](03_USER_JOURNEYS.md) → [`04`](04_FEATURES.md)
 
 **"I want to understand why it is built this way."**
-[`adr/`](adr/) in order. Twelve decisions, each with its rejected alternatives.
+[`adr/`](adr/) in order. Thirty-one decisions, each with its rejected alternatives.
+
+**"I am implementing the HERE migration."**
+[`41`](41_HERE_MIGRATION_PROGRAM.md) →
+[ADR-0030](adr/0030-here-platform-and-navigation-target.md) →
+[ADR-0031](adr/0031-spike-before-flutter-migration.md) →
+[`36`](36_IMPLEMENTATION_PLAN.md) → the current wave's owning document.
 
 **"I am responsible for the money."**
 [`31`](31_COST_MODEL.md) → [`20`](20_SUBSCRIPTIONS.md) →
@@ -109,6 +116,7 @@ owning your area (see §Areas below) → [`29`](29_DEFINITION_OF_DONE.md).
 | 38 | [Quick Start Settings](38_QUICK_START_SETTINGS.md) | **Instructions, short.** The nine steps from nothing to the app on a phone — everything a first test does not need is left out |
 | 39 | [UI Reimplementation Gap](39_UI_REIMPLEMENTATION_GAP.md) | Historical diagnosis of the incomplete first UI pass |
 | 40 | [UI Implementation Audit](40_UI_IMPLEMENTATION_AUDIT.md) | Current requirement-to-code matrix and Android artifact/device acceptance |
+| 41 | [HERE Migration Program](41_HERE_MIGRATION_PROGRAM.md) | **Approved target.** Commercial gates, Flutter spike, architecture, data reset, risks, costs, and PR waves |
 
 ### Architecture Decision Records
 
@@ -143,6 +151,8 @@ owning your area (see §Areas below) → [`29`](29_DEFINITION_OF_DONE.md).
 | [0028](adr/0028-a-coastline-under-the-route.md) | A bundled public-domain coastline is drawn under the route at national scale, where the invented town would be claiming detail it does not have. **Widens the C3 exposure** and amends `CLAUDE.md` §13 rule 5 and ADR-0012 |
 | [0027](adr/0027-the-drive-happens-elsewhere.md) | Done and Skip removed and J2/J3 withdrawn: the navigation app drives the whole route, so nobody returns between stops. Confirm records the departure and puts the route in History; the next route closes the last. Time saved is withdrawn rather than estimated |
 | [0029](adr/0029-single-driver-wedge-and-subscription-first-freemium.md) | Single last-mile driver, 10–25 stops, fastest unstructured input, saved-route reuse and advertising-free freemium |
+| [0030](adr/0030-here-platform-and-navigation-target.md) | HERE is the target for location APIs, map, and in-app navigation; Supabase remains the product backend |
+| [0031](adr/0031-spike-before-flutter-migration.md) | A five-day Android+iOS spike precedes the expected Flutter rewrite; React Native bridge is a comparator only |
 
 ---
 
@@ -152,9 +162,10 @@ When changing code, read the owning document and its ADRs first.
 
 | Area | Owning documents | ADRs |
 |---|---|---|
-| Optimization, tier selection | [`15`](15_ROUTE_OPTIMIZATION.md), [`31`](31_COST_MODEL.md) | 0003 |
-| Map rendering, markers, styles | [`14`](14_GOOGLE_MAPS_INTEGRATION.md), [`09`](09_COMPONENT_LIBRARY.md) | 0005, 0009 |
-| Navigation handoff | [`16`](16_INTERNAL_NAVIGATION.md), [`18`](18_PERMISSIONS.md) | 0004 |
+| HERE migration program | [`41`](41_HERE_MIGRATION_PROGRAM.md), [`36`](36_IMPLEMENTATION_PLAN.md) | 0030, 0031 |
+| Optimization, tier selection | [`15`](15_ROUTE_OPTIMIZATION.md), [`31`](31_COST_MODEL.md) | 0003, 0030 |
+| Map rendering, markers, styles | Current: [`14`](14_GOOGLE_MAPS_INTEGRATION.md), [`09`](09_COMPONENT_LIBRARY.md); target: [`41`](41_HERE_MIGRATION_PROGRAM.md) | 0005, 0009, 0030 |
+| Navigation | Current: [`16`](16_INTERNAL_NAVIGATION.md), [`18`](18_PERMISSIONS.md); target: [`41`](41_HERE_MIGRATION_PROGRAM.md) | 0004, 0030, 0031 |
 | Database, migrations | [`12`](12_DATABASE.md) | 0007 |
 | Edge Functions, upstream calls | [`13`](13_BACKEND.md), [`33`](33_API_CONTRACTS.md) | 0006, 0011 |
 | Billing, paywall, entitlements | [`20`](20_SUBSCRIPTIONS.md), [`26`](26_APP_STORE.md), [`32`](32_LEGAL_COMPLIANCE.md) | 0011, 0029 |
@@ -231,14 +242,13 @@ template, and pushed.
 | 5 — Delivery | `22`, `25`, `26`, `27`, `29`, `README` | ✅ Complete |
 | 6 — Consolidation | Cross-link and consistency audit | ✅ Complete |
 
-**File count.** The approved set is 43 documents: the 33 named in the brief, 8 extensions,
-`36_IMPLEMENTATION_PLAN.md` added when implementation began ([ADR-0013](adr/0013-implementation-execution-model.md)),
-and `37_GO_LIVE_RUNBOOK.md` added when the code was complete against its contracts and nothing
-was yet connected — counting `adr/` as one entry. On disk that is **58 files** — 40 in `docs/`,
-16 in `docs/adr/`, and `CLAUDE.md` and `README.md` at the root — because the single ADR entry
-expands to sixteen records. Both numbers are correct; they count different things.
+**Current file set.** The repository now contains numbered documents `00`–`41`, `INDEX`, the
+numbered-document template, 31 ADRs, `CLAUDE.md`, and `README.md`—77 Markdown files in this
+specification set. The migration program extends the original approved set; it does not rewrite
+the historical consolidation result below.
 
-**Audit results, wave 6.**
+**Historical audit results, wave 6.** The counts in this table describe that completed audit at
+the time it ran, not the current file set.
 
 | Check | Result |
 |---|---|
