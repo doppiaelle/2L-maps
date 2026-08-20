@@ -1,0 +1,135 @@
+name: flutter-here-spike
+
+on:
+  pull_request:
+    paths:
+      - "spike/flutter/**"
+      - ".github/workflows/flutter-spike.yml"
+  workflow_dispatch:
+    inputs:
+      build_ios:
+        description: Build the iOS simulator target on macOS
+        required: true
+        type: boolean
+        default: false
+
+concurrency:
+  group: flutter-here-spike-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android:
+    name: HERE Explore Android bootstrap
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.41.9"
+          channel: stable
+          cache: true
+
+      - name: Verify required inputs
+        env:
+          SDK_ID: ${{ secrets.HERE_SDK_ACCESS_KEY_ID }}
+          SDK_SECRET: ${{ secrets.HERE_SDK_ACCESS_KEY_SECRET }}
+          SDK_URL: ${{ secrets.HERE_SDK_DOWNLOAD_URL }}
+        run: |
+          set -euo pipefail
+          test -n "$SDK_ID"
+          test -n "$SDK_SECRET"
+          test -n "$SDK_URL"
+
+      - name: Prepare HERE SDK
+        working-directory: spike/flutter
+        env:
+          SDK_URL: ${{ secrets.HERE_SDK_DOWNLOAD_URL }}
+          SDK_SHA256: ${{ vars.HERE_SDK_SHA256 }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/here-sdk plugins
+          curl --fail --location --silent --show-error "$SDK_URL" -o /tmp/here-sdk/here.zip
+          test "$(head -c 2 /tmp/here-sdk/here.zip)" = "PK"
+          sha256sum /tmp/here-sdk/here.zip | tee /tmp/here-sdk/sha256.txt
+          actual="$(cut -d' ' -f1 /tmp/here-sdk/sha256.txt)"
+          if [ -n "${SDK_SHA256:-}" ] && [ "$actual" != "$SDK_SHA256" ]; then
+            echo "::error::HERE SDK checksum mismatch"
+            exit 1
+          fi
+          echo "HERE SDK archive SHA-256: $actual" >> "$GITHUB_STEP_SUMMARY"
+          unzip -q /tmp/here-sdk/here.zip -d /tmp/here-sdk/unpacked
+          tarball="$(find /tmp/here-sdk/unpacked -type f -name 'here_sdk-*.release.tar.gz' | head -n 1)"
+          test -n "$tarball"
+          tar -xzf "$tarball" -C plugins
+          extracted="$(find plugins -maxdepth 2 -type f -name pubspec.yaml -print -quit)"
+          test -n "$extracted"
+          plugin_dir="$(dirname "$extracted")"
+          if [ "$plugin_dir" != "plugins/here_sdk" ]; then
+            rm -rf plugins/here_sdk
+            mv "$plugin_dir" plugins/here_sdk
+          fi
+
+      - name: Generate Flutter platform projects
+        working-directory: spike/flutter
+        run: flutter create --platforms=android --org doppiaelle --project-name twol_maps .
+
+      - name: Configure Android SDK levels
+        working-directory: spike/flutter
+        run: |
+          set -euo pipefail
+          sed -i 's/^    compileSdk = .*/    compileSdk = 36/' android/app/build.gradle.kts
+          sed -i 's/^        minSdk = .*/        minSdk = 24/' android/app/build.gradle.kts
+          sed -i 's/^        targetSdk = .*/        targetSdk = 36/' android/app/build.gradle.kts
+
+      - name: Dependencies and tests
+        working-directory: spike/flutter
+        run: |
+          flutter pub get
+          flutter test
+
+      - name: Build Android
+        working-directory: spike/flutter
+        env:
+          SDK_ID: ${{ secrets.HERE_SDK_ACCESS_KEY_ID }}
+          SDK_SECRET: ${{ secrets.HERE_SDK_ACCESS_KEY_SECRET }}
+        run: |
+          set -euo pipefail
+          flutter build apk --debug             --dart-define=HERE_ACCESS_KEY_ID="$SDK_ID"             --dart-define=HERE_ACCESS_KEY_SECRET="$SDK_SECRET"
+
+  ios:
+    name: HERE Explore iOS bootstrap
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_ios }}
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.41.9"
+          channel: stable
+          cache: true
+      - name: Prepare and build
+        working-directory: spike/flutter
+        env:
+          SDK_URL: ${{ secrets.HERE_SDK_DOWNLOAD_URL }}
+          SDK_ID: ${{ secrets.HERE_SDK_ACCESS_KEY_ID }}
+          SDK_SECRET: ${{ secrets.HERE_SDK_ACCESS_KEY_SECRET }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/here-sdk plugins
+          curl --fail --location --silent --show-error "$SDK_URL" -o /tmp/here-sdk/here.zip
+          test "$(head -c 2 /tmp/here-sdk/here.zip)" = "PK"
+          unzip -q /tmp/here-sdk/here.zip -d /tmp/here-sdk/unpacked
+          tarball="$(find /tmp/here-sdk/unpacked -type f -name 'here_sdk-*.release.tar.gz' | head -n 1)"
+          test -n "$tarball"
+          tar -xzf "$tarball" -C plugins
+          extracted="$(find plugins -maxdepth 2 -type f -name pubspec.yaml -print -quit)"
+          test -n "$extracted"
+          plugin_dir="$(dirname "$extracted")"
+          if [ "$plugin_dir" != "plugins/here_sdk" ]; then
+            rm -rf plugins/here_sdk
+            mv "$plugin_dir" plugins/here_sdk
+          fi
+          flutter create --platforms=ios --org doppiaelle --project-name twol_maps .
+          flutter pub get
+          flutter build ios --simulator --no-codesign             --dart-define=HERE_ACCESS_KEY_ID="$SDK_ID"             --dart-define=HERE_ACCESS_KEY_SECRET="$SDK_SECRET"
