@@ -24,12 +24,15 @@ Run a disposable, seven-engineering-day Flutter vertical-slice spike after all p
 
 ### Prerequisites
 
-- an ORS account/key whose dashboard and terms confirm commercial product use, actual
-  `/optimization` daily/minute quota, and request-size limits for one vehicle and 5–25 jobs;
-- a HERE Base Plan account confirming Explore package access, ordered-via Routing v8 eligibility,
+- rotated ORS credentials, the confirmed 500/day Optimization quota, measured minute limit,
+  commercial-use terms, and one-vehicle 5–25-job support;
+- rotated HERE credentials and a Base Plan account confirming ordered-via Routing v8 eligibility,
   response fields, geocoding retention, and billing units;
-- a private CI delivery path for the proprietary, pinned HERE SDK package;
-- server-only test credentials and independent ORS/HERE circuit-breaker budgets.
+- checksum verification and a private CI path for
+  `heresdk-explore-flutter-4.27.2.0.309975.zip`;
+- Flutter 3.41.9/Dart 3.11.5, Android SDK 36/min SDK 24, iOS 15.2 and a pinned working toolchain;
+- server-only ORS/HERE REST credentials, build-injected HERE SDK credentials, and independent
+  circuit-breaker budgets. A committed real `.env` is not an acceptable prerequisite.
 
 ### Spike scope
 
@@ -43,7 +46,9 @@ Run a disposable, seven-engineering-day Flutter vertical-slice spike after all p
    summary, route handle, and `turnByTurnActions`. Measure actual account transactions rather than
    equating one HTTP request with one billed transaction.
 5. Prove that HERE is never called for Matrix, Waypoints Sequence, Tour Planning, or stop ordering.
-6. Render the route with HERE SDK Explore and the first custom 2L style on Android and iOS.
+6. Initialize HERE programmatically with `AuthenticationMode.withKeySecret`, then render the
+   route with Explore 4.27.2 and the first custom 2L style on Android and iOS. Do not place the
+   credentials in AndroidManifest.xml or Info.plist.
 7. Replay traces covering normal travel, GPS noise, parallel roads, missed turns, roundabouts,
    pauses, jumps, app interruption, and stale/changed route versions.
 8. Exercise pure-Dart projection, monotonic progress, confidence/hysteresis, maneuver selection,
@@ -53,6 +58,15 @@ Run a disposable, seven-engineering-day Flutter vertical-slice spike after all p
    calls and transactions, reroute loops, and false/late/missed maneuvers.
 10. Prove circuit breakers, cache/retry policy, visible degraded states, and that GPS frequency does
     not determine upstream-call frequency.
+11. Validate the Mint Clay 3D contract: 45° guidance pitch, available 3D building volumes,
+    desaturated light/charcoal dark schemes, mint route/puck/accuracy halo, reduced POIs, custom stop
+    states, legal attribution, contrast, and degraded-GPS visibility.
+12. Prove 30-day expiry/purge and re-geocoding of HERE-derived coordinates while preserving
+    user-authored textual route data.
+13. Call ORS through `https://api.heigit.org/vroom/v0` and fail any test that reaches the
+    deprecated `api.openrouteservice.org` host.
+14. Treat changing `com.doppiaelle.twolmaps` to `com.twol.maps` as a tested identity migration,
+    including Google OAuth, deep links, signing and store consequences.
 
 ### Passing conditions
 
@@ -62,7 +76,8 @@ Numeric thresholds are committed in the spike PR before implementation. The spik
 - solution-quality measurements exceed the predeclared gap/failure threshold;
 - any input job is lost, duplicated, or silently unassigned;
 - HERE does not authorize ordered-via final routing or actual billing breaks the free-plan budget;
-- a supported platform cannot reproducibly render the styled Explore map;
+- a supported platform cannot reproducibly render the styled Explore map, 3D buildings where
+  covered, or the navigation camera without unsafe occlusion;
 - guidance advances on a nearby parallel road without ambiguity suppression;
 - GPS noise causes reroute loops, or a missed turn produces neither safe reroute nor degradation;
 - restoration silently resumes a different route/version;
@@ -87,6 +102,10 @@ live-traffic-optimal.
 ## Evidence and references
 
 Checked 2026-08-20:
+
+- [HERE Flutter integration and 4.27.2 requirements](https://docs.here.com/here-sdk/docs/flutter-integrate-here-sdk)
+- [HERE UI customization and 3D map capabilities](https://docs.here.com/here-sdk/docs/ios-customization-ui)
+- [ORS host migration to api.heigit.org](https://ask.openrouteservice.org/t/deprecating-api-openrouteservice-org-in-favour-of-api-heigit-org/7912)
 
 - [ORS public-service restrictions](https://openrouteservice.org/restrictions/)
 - [ORS Optimization service](https://openrouteservice.org/services/)
