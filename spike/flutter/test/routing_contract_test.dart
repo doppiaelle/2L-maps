@@ -26,7 +26,7 @@ void main() {
   });
 
   test('HERE request contains ordered route parameters', () {
-    final uri = HereRoutingRequest(route: const OrderedRoute(stops: stops)).uri(apiKey: 'test');
+    final uri = HereRoutingRequest(route: OrderedRoute(stops: stops)).uri(apiKey: 'test');
     expect(uri.host, 'router.hereapi.com');
     expect(uri.queryParameters['origin'], '45.0,9.0');
     expect(uri.queryParameters['destination'], '45.2,9.2');
