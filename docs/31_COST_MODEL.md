@@ -2,22 +2,21 @@
 
 > **Status:** Current Google baseline — invalid for HERE target pricing
 > **Owner:** Architecture
-> **Last reviewed:** 2026-08-18
+> **Last reviewed:** 2026-08-20
 > **Related:** [ADR-0003](adr/0003-tiered-optimization-cascade.md) · [ADR-0030](adr/0030-here-platform-and-navigation-target.md) · [`41_HERE_MIGRATION_PROGRAM.md`](41_HERE_MIGRATION_PROGRAM.md)
 
 ---
 
-> ⛔ **HERE eligibility and pricing gate.** Every numeric model below describes the current
-> Google-era design. It does not forecast HERE SDK Explore rendering, Search, Routing,
-> Tour Planning/another authorized optimizer, or reroutes. Do not set HERE subscription prices,
-> free allowances, or margins from these figures.
+> ⛔ **ORS/HERE account and pricing gate.** Every numeric model below describes the implemented
+> Google-era design. Target stop ordering uses public ORS Optimization/VROOM; HERE supplies
+> Explore, search, the final fixed-order route, and bounded reroutes.
 >
-> HERE SDK Navigate and its quote are no longer in scope. The new model starts only after the
-> account confirms that 2L's stop-ordering use case is permitted through a named product/plan and
-> exposes exact transaction definitions, free caps, overages, RPS limits, retention rights, and
-> spending controls. The owner-supplied 30,000 map/geocode and approximately 5,000 Routing figures
-> are working hypotheses, not constants. GPS updates are local and must never become one Routing
-> transaction each. See [`41_HERE_MIGRATION_PROGRAM.md`](41_HERE_MIGRATION_PROGRAM.md) Gate A.
+> “Zero cost” means only “inside quotas verified in the actual accounts.” Record the ORS
+> `/optimization` daily/minute quota and commercial-use terms; the published 2,000/day Directions
+> allowance is not an Optimization allowance. Record HERE transaction counts for map/search,
+> ordered-via/time-aware Routing and rerouting; one HTTP request is not assumed to equal one billed
+> transaction. GPS updates remain local. See
+> [`41_HERE_MIGRATION_PROGRAM.md`](41_HERE_MIGRATION_PROGRAM.md) Gate A.
 
 > ⚠️ **Sourcing note.** `developers.google.com` was unreachable from the environment where this
 > analysis was performed (403 from the egress proxy), so the figures below come from web
