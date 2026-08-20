@@ -30,6 +30,7 @@ void main() {
     expect(uri.host, 'router.hereapi.com');
     expect(uri.queryParameters['origin'], '45.0,9.0');
     expect(uri.queryParameters['destination'], '45.2,9.2');
+    expect(uri.queryParametersAll['via'], ['45.1,9.1']);
     expect(uri.queryParameters['return'], contains('turnByTurnActions'));
   });
 }
