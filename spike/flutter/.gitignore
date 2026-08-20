@@ -1,0 +1,13 @@
+# Generated Flutter platform/build output
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+android/
+ios/
+linux/
+macos/
+web/
+windows/
+plugins/here_sdk/
