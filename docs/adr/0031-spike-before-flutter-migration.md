@@ -24,9 +24,9 @@ Run a disposable, seven-engineering-day Flutter vertical-slice spike after all p
 
 ### Prerequisites
 
-- rotated ORS credentials, the confirmed 500/day Optimization quota, measured minute limit,
+- ORS credentials stored in protected secrets, the confirmed 500/day Optimization quota, measured minute limit,
   commercial-use terms, and one-vehicle 5–25-job support;
-- rotated HERE credentials and a Base Plan account confirming ordered-via Routing v8 eligibility,
+- HERE credentials stored in protected secrets and a Base Plan account confirming ordered-via Routing v8 eligibility,
   response fields, geocoding retention, and billing units;
 - checksum verification and a private CI path for
   `heresdk-explore-flutter-4.27.2.0.309975.zip`;
@@ -65,8 +65,7 @@ Run a disposable, seven-engineering-day Flutter vertical-slice spike after all p
     user-authored textual route data.
 13. Call ORS through `https://api.heigit.org/vroom/v0` and fail any test that reaches the
     deprecated `api.openrouteservice.org` host.
-14. Treat changing `com.doppiaelle.twolmaps` to `com.twol.maps` as a tested identity migration,
-    including Google OAuth, deep links, signing and store consequences.
+14. Assert that Android `applicationId` and iOS bundle identifier remain `com.doppiaelle.twolmaps`; fail the spike if either drifts.
 
 ### Passing conditions
 
