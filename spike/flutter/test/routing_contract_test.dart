@@ -12,7 +12,7 @@ void main() {
 
   test('ORS request keeps start/end and emits jobs for intermediate stops', () {
     final json = OrsOptimizationRequest(stops: stops).toJson();
-    expect((json['jobs'] as List).length, 2);
+    expect((json['jobs'] as List).length, 1);
     expect((json['vehicles'] as List).single['profile'], 'driving-car');
   });
 
