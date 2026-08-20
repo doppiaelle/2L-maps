@@ -70,7 +70,7 @@ jobs:
           plugin_dir="$(dirname "$extracted")"
           if [ "$plugin_dir" = "plugins" ]; then
             mkdir -p plugins/here_sdk
-            find plugins -mindepth 1 -maxdepth 1 ! -name here_sdk -exec mv {} plugins/here_sdk/ \\;
+            find plugins -mindepth 1 -maxdepth 1 ! -name here_sdk -exec mv {} plugins/here_sdk/ \;
           elif [ "$plugin_dir" != "plugins/here_sdk" ]; then
             rm -rf plugins/here_sdk
             mv "$plugin_dir" plugins/here_sdk
@@ -140,7 +140,7 @@ jobs:
           plugin_dir="$(dirname "$extracted")"
           if [ "$plugin_dir" = "plugins" ]; then
             mkdir -p plugins/here_sdk
-            find plugins -mindepth 1 -maxdepth 1 ! -name here_sdk -exec mv {} plugins/here_sdk/ \\;
+            find plugins -mindepth 1 -maxdepth 1 ! -name here_sdk -exec mv {} plugins/here_sdk/ \;
           elif [ "$plugin_dir" != "plugins/here_sdk" ]; then
             rm -rf plugins/here_sdk
             mv "$plugin_dir" plugins/here_sdk
