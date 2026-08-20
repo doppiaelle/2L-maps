@@ -9,7 +9,7 @@ void main() {
     final adapter = NavigationPositionAdapter(progress);
     const instructions = [NavigationInstruction(action: 'depart', distanceMeters: 10)];
     adapter.onFix(
-      fix: PositionFix(latitude: 45, longitude: 9, accuracyMeters: 4, timestamp: _timestamp),
+      fix: PositionFix(latitude: 45, longitude: 9, accuracyMeters: 4, timestamp: DateTime(2026, 1, 1)),
       distanceFromRouteMeters: 2,
       instructionCompleted: true,
       instructions: instructions,
@@ -17,5 +17,3 @@ void main() {
     expect(progress.instructionIndex, 1);
   });
 }
-
-const _timestamp = DateTime(2026, 1, 1);
