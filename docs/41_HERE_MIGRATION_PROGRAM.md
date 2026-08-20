@@ -1,8 +1,8 @@
-# 41 — HERE Explore Migration Program
+# 41 — HERE Explore + ORS/VROOM Migration Program
 
 > **Status:** Approved target; commercial eligibility and spike gated
 > **Owner:** Product owner
-> **Last reviewed:** 2026-08-18
+> **Last reviewed:** 2026-08-20
 > **Related:** [ADR-0030](adr/0030-here-platform-and-navigation-target.md) ·
 > [ADR-0031](adr/0031-spike-before-flutter-migration.md) ·
 > [Implementation Plan](36_IMPLEMENTATION_PLAN.md)
@@ -11,8 +11,9 @@
 
 ## 1. Purpose
 
-This document controls the replacement of Google location services with HERE SDK Explore and HERE
-online APIs, plus the creation of a deliberately limited 2L guidance engine. It distinguishes the
+This document controls the replacement of Google location services with a disaggregated stack:
+OpenRouteService (ORS)/VROOM for stop ordering, HERE SDK Explore and HERE Routing API v8 for map,
+final route and maneuver data, plus a deliberately limited 2L guidance engine. It distinguishes the
 implemented system from the approved target, names capabilities that are not available without
 HERE SDK Navigate, and orders the migration so that pricing headlines never substitute for
 contract eligibility or measured usage.
@@ -33,7 +34,7 @@ schema, or API payload; those owning documents change in later pull requests aft
 ## 2. Goals
 
 1. Remove Google as the provider of address search, geocoding, route calculation, stop ordering,
-   and map rendering.
+   and map rendering; use ORS/VROOM for stop ordering and HERE for the remaining approved surfaces.
 2. Use HERE SDK Explore for a branded online map on Android and iOS through Flutter.
 3. Build an app-owned, online guidance engine from operating-system location updates and HERE
    Routing API v8 route/maneuver data.
@@ -41,8 +42,8 @@ schema, or API payload; those owning documents change in later pull requests aft
 5. Preserve Supabase as the system of record for authentication, entitlements, quotas, routes,
    favourites, and History.
 6. Replace provider-owned identifiers in domain tables with internal UUIDs.
-7. Make permitted use, transactions, safety, degraded states, and rollback measurable before
-   migration.
+7. Make ORS quota/terms, HERE permitted use/transactions, safety, degraded states, and rollback
+   measurable before migration.
 8. Use disposable test data to reset the Google-shaped schema instead of building a production
    data migration.
 
@@ -80,7 +81,8 @@ The first production scope is:
 | Concern | Owner | Notes |
 |---|---|---|
 | Account, Base Plan acceptance, payment controls | Product owner | Required to obtain credentials/package and verify exact allowance |
-| Optimization-use eligibility | Product owner + legal/commercial confirmation | Base Plan flags Optimization; Tour Planning is the stated exception |
+| ORS optimization eligibility and quota | Product owner + engineering | Public Standard-plan terms/dashboard; 5–25 stops remain below the published 50-route/3-vehicle request-size limits |
+| HERE permitted-use eligibility | Product owner + legal/commercial confirmation | HERE receives an already ordered route; no HERE matrix, sequence, or optimization service |
 | Flutter/Explore integration | Engineering | Map renderer only; no Navigate APIs |
 | Guidance kernel | Engineering | Pure Dart state machine and geometry, replay-tested |
 | Location source | Android/iOS through a Flutter plugin | Must support foreground/background policy explicitly |
@@ -98,8 +100,9 @@ flowchart TD
   A -->|GPS updates| C["OS location"]
   A -->|route state| D["2L guidance kernel"]
   A -->|JWT contracts| E["Supabase Edge Functions"]
-  E -->|search, route, maneuvers, reroute| F["HERE REST APIs"]
-  E -->|history, quota, entitlement| G["Supabase Postgres"]
+  E -->|optimize ordered stops| F["ORS Optimization / VROOM"]
+  E -->|search, final route, maneuvers, reroute| G["HERE REST APIs"]
+  E -->|history, quota, entitlement| I["Supabase Postgres"]
   A -->|current leg only| H["External navigator"]
 ```
 
@@ -110,8 +113,14 @@ Boundary rules:
 - The Explore SDK is responsible for online map rendering, camera, style, markers, and polylines.
 - Operating-system location is the source of device position because HERE Positioning is
   Navigate-only.
-- Search, geocoding, route calculation, turn-by-turn actions, route handles, and reroutes are
-  server-mediated so entitlement, quota, caching, cost, and kill switches remain enforceable.
+- ORS optimization and HERE search/geocoding/routing calls are server-mediated so credentials,
+  entitlement, provider quotas, caching, cost, and circuit breakers remain enforceable.
+- No HERE Matrix Routing, Waypoints Sequence, Tour Planning, or other HERE optimization endpoint is
+  called. ORS returns only the stop order used as ordered vias in one final HERE Routing request.
+- ORS/VROOM is a heuristic VRP solver. The product promises a best-found optimized sequence, never
+  a mathematically proven global optimum.
+- The ORS order uses ORS/OSM travel costs, not HERE live traffic. HERE applies current traffic to
+  the final route and ETA; it does not retroactively make the ORS stop order traffic-optimal.
 - GPS updates never cause upstream calls one-for-one. Projection and progress are local; a HERE
   request occurs on plan, explicit recalculation, or sustained deviation only.
 - A route saved to History is an immutable provider-neutral snapshot and remains readable without
@@ -130,21 +139,39 @@ Boundary rules:
 4. Confirm access to HERE Style Editor.
 5. Read the account-specific pricing, RPS limits, transaction definitions, and restrictions.
 6. Obtain written confirmation for the actual use cases:
-   - one-driver stop-order optimization;
-   - the permitted HERE product for that optimization;
+   - final routing of an externally ordered 5–25-stop sequence;
+   - confirmation that sending ordered vias is ordinary routing and not HERE Optimization;
    - route polylines and `turnByTurnActions` used by app-owned visual/TTS guidance;
    - route-handle rerouting during a live trip;
    - retention of search, coordinate, route, and maneuver data;
    - display of custom or independently computed overlays on the HERE map, if needed.
-7. Record the exact free allowance and overage for map rendering, search/geocoding, Routing,
-   Tour Planning or other approved optimization product, and rerouting.
+7. Record the exact HERE allowance/overage for map rendering, search/geocoding, final Routing and
+   rerouting; record the ORS `/optimization` daily/minute quota shown by the actual account.
 8. Configure a hard spending ceiling/kill switch where the account permits it.
 9. Put the pinned Explore archive in an approved private artifact channel.
 
 **Success:** Gate A is green and engineering knows both what is allowed and what each event bills.  
 **Failure:** stop before provider/runtime rewrite. Free quota without permitted use is not a pass.
 
-### 5.2 Guidance-kernel spike
+### 5.2 Hybrid optimization validation
+
+**Trigger:** ORS and HERE test credentials exist; both terms/quota gates are recorded.
+
+1. Send one vehicle plus 5–25 jobs to the server-side ORS `/optimization` adapter.
+2. Model fixed start and optional fixed return explicitly; reject unassigned jobs.
+3. Extract job IDs from the returned route steps and validate that every requested stop appears
+   exactly once.
+4. Send that ordered sequence as vias in one HERE Routing API v8 request.
+5. Request the supported response fields for polyline, `turnByTurnActions`, summaries and route
+   handle; use time-aware routing defaults unless contract tests require an explicit departure.
+6. Compare ORS order quality and final HERE ETA against fixtures and small exact benchmarks.
+7. Measure the ORS optimization quota headers/dashboard and HERE billed transactions.
+8. Exercise circuit breakers, timeouts, invalid/unassigned jobs, 403/429, and provider outage.
+
+**Success:** the hybrid path is permitted, quota-bounded and meets a declared quality threshold.
+It is not required to prove the mathematical optimum or live-traffic-optimal stop ordering.
+
+### 5.3 Guidance-kernel spike
 
 **Trigger:** Gate A passes.  
 **Timebox:** seven engineering days.
@@ -164,11 +191,11 @@ Boundary rules:
 **Failure:** reduce in-app guidance or retain external driving. Do not imitate missing Navigate
 capabilities until the demo appears green.
 
-### 5.3 Provider and runtime cutover
+### 5.4 Provider and runtime cutover
 
 1. Introduce provider-neutral domain contracts and schema.
 2. Reset the test Supabase project.
-3. Add HERE adapters behind search/routing facades and the approved optimization adapter.
+3. Add separate ORS optimization and HERE search/routing adapters behind provider-neutral facades.
 4. Run contract, quota, billing, and retention tests against controlled non-production calls.
 5. Build Flutter vertical slices: auth → route draft → search → optimize → map → History.
 6. Promote the replay-tested guidance kernel as a separately reviewed slice.
@@ -198,7 +225,8 @@ mark them superseded where the new system actually replaces their decisions.
 
 | # | Condition | Expected behaviour | Specified in |
 |---|---|---|---|
-| 1 | Base Plan does not permit 2L optimization | Stop; price Tour Planning/commercial access or evaluate a legally compatible independent stack | §5.1 |
+| 1 | HERE treats ordered-via final routing as excluded Optimization | Stop HERE integration and obtain written authorization or change routing provider | §5.1 |
+| 1a | ORS public optimization quota/terms do not support the product | Stop public ORS use; evaluate self-hosted VROOM/ORS or another authorized optimizer | §5.2 |
 | 2 | GPS matches two nearby/parallel route segments | Enter ambiguous state; do not advance or speak a maneuver until confidence recovers | guidance spike |
 | 3 | GPS jumps briefly off route | Hysteresis absorbs it; no reroute request | guidance spike |
 | 4 | Sustained deviation | One bounded reroute; cooldown prevents loops; external fallback remains | guidance spike |
@@ -243,7 +271,11 @@ mark them superseded where the new system actually replaces their decisions.
    traffic, warnings, and dark mode outrank decorative similarity.
 9. Pin the Explore SDK version and archive its notices, checksum, source, and license metadata in
    the private delivery channel.
-10. Do not infer allowed use from technical capability or free transaction count.
+10. Do not infer allowed use from technical capability or a free transaction count.
+11. Never describe VROOM output as exact. Store solver/provider/version and objective value so
+    quality regressions are measurable.
+12. Keep ORS and HERE circuit breakers independent; one provider's outage must not create retry
+    traffic against the other.
 
 ## 10. Checklist and go/no-go gates
 
@@ -253,19 +285,25 @@ mark them superseded where the new system actually replaces their decisions.
 - [ ] Android and iOS applications registered.
 - [ ] Explore credentials and Flutter package obtained.
 - [ ] Private package delivery method documented.
-- [ ] 2L stop-order optimization confirmed as permitted through a named HERE product/plan.
+- [ ] HERE confirms final routing of an externally ordered sequence is permitted without a HERE
+      optimization product.
+- [ ] ORS Standard-plan commercial/product use and `/optimization` quota confirmed in the account.
 - [ ] Custom visual/TTS guidance from Routing v8 actions confirmed as permitted.
 - [ ] Retention and map-overlay rights documented.
-- [ ] Exact transaction definitions, free allowances, overages, RPS limits, and taxes recorded.
+- [ ] Exact HERE transaction definitions/free allowances and ORS daily/minute limits recorded.
 - [ ] Worst-case spend bounded with server quotas and a provider/account kill switch.
 - [ ] The owner-supplied 30,000 map/geocode and approximately 5,000 routing figures either
       verified or replaced; they are not embedded as code constants before this box is checked.
 
-### Gate B — guidance spike
+### Gate B — hybrid optimization and guidance spike
 
 - [ ] Exact Flutter and Explore versions pinned.
 - [ ] Android and iOS map first frame proven.
 - [ ] Custom style loads and remains legible in light/dark.
+- [ ] ORS request/response contract proven for one vehicle, fixed start, optional return and 5–25 jobs.
+- [ ] ORS output validated for duplicates, omissions and unassigned jobs.
+- [ ] Hybrid quality benchmark and latency budget recorded; no claim of exact optimum.
+- [ ] HERE final-route request proven to use the ORS order without any HERE matrix/sequence call.
 - [ ] Route/maneuver contract proven from real HERE fixture responses.
 - [ ] Ideal and adversarial trace corpus committed without personal data.
 - [ ] Projection, progress, maneuver timing, ambiguity, deviation, reroute, arrival, and restoration
@@ -299,10 +337,10 @@ mark them superseded where the new system actually replaces their decisions.
 | Wave | Scope | Exit condition |
 |---|---|---|
 | 0 | Documentation and decision pivot | Explore/custom-guidance plan accepted |
-| 1 | Account, permitted use, quotas, private Explore delivery | Gate A |
-| 2 | Flutter Explore + guidance-kernel spike | Gate B |
+| 1 | HERE + ORS accounts, permitted use, quotas, private Explore delivery | Gate A |
+| 2 | ORS/VROOM → HERE final route + Flutter guidance-kernel spike | Gate B |
 | 3 | Neutral schema/contracts and disposable DB reset | Gate C data portion |
-| 4 | HERE search/geocoding/routing and approved optimization adapters | Contract, quota, legal, and cost tests |
+| 4 | ORS optimization plus HERE search/geocoding/final-routing adapters | Contract, quota, legal, and cost tests |
 | 5 | Flutter shell, auth, route planning, History | Current planner parity |
 | 6 | Branded HERE map and visual system | Design/device acceptance |
 | 7 | Essential in-app guidance | Replay and controlled-road matrix |
@@ -322,6 +360,8 @@ Provider, schema, runtime, and guidance changes are not combined into one merge.
 | 2026-08-18 | Base Plan optimization eligibility made a hard gate | Base Plan restrictions identify Optimization as excluded except through Tour Planning | Architecture |
 | 2026-08-18 | Supabase retained; test data may be reset | History, auth, quota, and entitlement remain product concerns | Product owner |
 | 2026-08-18 | Google OAuth retained initially | Location and authentication migrations are independent risks | Product owner |
+| 2026-08-20 | Optimization moved from HERE to ORS/VROOM | HERE Base Plan excludes the use case; disaggregation keeps HERE on map/final-routing surfaces | Product owner |
+| 2026-08-20 | Exact/traffic-optimal claims rejected | VROOM is heuristic and ORS ordering does not consume HERE live traffic | Architecture |
 
 ## 13. Rationale
 
@@ -341,9 +381,12 @@ metrics, clear position marker, and minimal current-leg handoff. HERE Style Edit
 extruded buildings where available, and custom map items provide the mechanisms. License, available
 Explore layers, legibility, and device performance define the final result.
 
-The economic premise is not yet proven. Public pricing allowances describe volume, while Base Plan
-restrictions define allowed use. A route optimizer can be technically under a free transaction
-threshold and still be outside the plan. That is why account/legal confirmation precedes code.
+The economic premise is narrower but still must be measured. ORS removes HERE Matrix and
+Optimization consumption, while the final ordered route should require one HERE request at the HTTP
+level. Billing units, time-aware routing charges, public ORS quota and production eligibility are
+still account facts, not architecture assumptions. ORS orders against its own OSM-based travel-cost
+model; HERE live traffic improves the final geometry and ETA but does not make the order live-
+traffic-optimal.
 
 ## 14. Rejected alternatives
 
@@ -354,7 +397,8 @@ threshold and still be outside the plan. That is why account/legal confirmation 
 | Full homemade Navigate parity | Maximum feature ownership | Unsafe and infeasible without map matching, attributes, offline stack, and mature warners |
 | HERE calls directly from the client | Simple demo | Breaks quota, entitlement, cost control, and server kill switches |
 | Assume 30k/5k allowances settle cost | Fast pricing decision | Exact figures and permitted use must be verified in the account |
-| Use Routing/Waypoint Sequence for optimization without confirmation | Looks technically available | Base Plan restricts Optimization; named product authorization is required |
+| Use any HERE matrix/sequence/optimization endpoint | One provider and live traffic | Base Plan restricts Optimization; the hybrid design removes the use case from HERE |
+| Call ORS output “exact” or “HERE live-traffic optimized” | Stronger promise | VROOM is heuristic and HERE is called only after ordering |
 | Replace Supabase | Fewer vendors in name | HERE does not replace auth, History, entitlement, or relational state |
 | Preserve current test records | Avoid reset | Adds migration complexity for data with no business value |
 | Remove Google OAuth in the same cutover | Complete vendor removal | Expands account/recovery risk without helping location migration |
@@ -371,6 +415,9 @@ threshold and still be outside the plan. That is why account/legal confirmation 
 - [HERE Base Plan pricing entry point](https://www.here.com/get-started/pricing)
 - [HERE Base Plan usage restrictions](https://www.here.com/get-started/pricing/base-plan-restrictions)
 - [HERE excluded-use-case definitions](https://www.here.com/get-started/pricing/rps-limits-excluded-use-cases)
+- [ORS public API restrictions](https://openrouteservice.org/restrictions/)
+- [ORS optimization service](https://openrouteservice.org/services/)
+- [VROOM project](https://github.com/VROOM-Project/vroom)
 
 The public dynamic pricing page did not expose account-specific numeric rows to this review. The
 reported 30,000 map/geocoding and approximately 5,000 routing allowances remain hypotheses until
