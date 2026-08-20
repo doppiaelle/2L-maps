@@ -30,7 +30,7 @@ The approved target is a disaggregated stack: **OpenRouteService/VROOM** orders 
 **HERE SDK Explore** renders the branded map, and **HERE Routing API v8** calculates the final route
 through those already ordered stops. The target client is Flutter; HERE SDK Navigate is excluded.
 The provisioned package is HERE Explore Flutter `4.27.2.0.309975`; ORS reports 500 Optimization
-requests/day. Credentials shared during setup must be rotated before use, and ordered-via billing
+requests/day. Credentials shared during setup may be used for the disposable spike only through protected secret injection; rotation remains required before production. Ordered-via billing
 and retention remain measured gates. Supabase remains the server-side control plane and system of
 record. Google OAuth may remain
 initially because authentication is independent of location services.
@@ -144,7 +144,7 @@ Read [`CLAUDE.md`](CLAUDE.md) and the document owning the area before writing co
 - Start every new program wave from the latest `main` and use a new pull request.
 - Do not combine runtime rewrite, provider cutover, schema reset, and guidance into one merge.
 - Do not commit HERE SDK archives, populated `.env` files, credentials, account pricing, or
-  contracts publicly. Keys exposed in chat are rotated before use.
+  contracts publicly. Keys that crossed chat are accepted only for the disposable spike and rotated before production.
 - Keep provider access behind facades and all metered server calls behind Supabase quota.
 - A GPS sample never directly triggers a paid request.
 - Do not present essential guidance as equivalent to HERE Navigate.
