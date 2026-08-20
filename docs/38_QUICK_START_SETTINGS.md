@@ -11,9 +11,10 @@
 > Google-era application. It must not be used as the HERE target setup. Google location secrets
 > will be removed after cutover; Supabase values remain; Google OAuth remains initially.
 >
-> Credentials pasted into chat on 2026-08-20 are considered exposed. Revoke and recreate the HERE
-> access-key pair, HERE REST API key, and ORS API key before the spike. Never commit a populated
-> `.env`; only `.env.example` may be versioned. Local ignored `.env` files are permitted.
+> The product owner accepts using the newly generated HERE/ORS credentials for the disposable
+> spike although they crossed project chat. Store them only in GitHub/Supabase protected secrets,
+> never print them, and rotate them before production. Never commit a populated `.env`; only
+> `.env.example` may be versioned. Local ignored `.env` files are permitted.
 >
 > The replacement sequence is controlled by
 > [`41_HERE_MIGRATION_PROGRAM.md`](41_HERE_MIGRATION_PROGRAM.md). Before the spike, create an ORS
