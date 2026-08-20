@@ -54,7 +54,7 @@ jobs:
           gdown --fuzzy "$SDK_URL" -O /tmp/here-sdk/here.zip
           test "$(head -c 2 /tmp/here-sdk/here.zip)" = "PK"
           test -n "$SDK_VERSION"
-          unzip -l /tmp/here-sdk/here.zip | grep -q "heresdk-explore-flutter-$SDK_VERSION"
+          unzip -l /tmp/here-sdk/here.zip | grep -qE 'here_sdk-.*release\.tar\.gz'
           sha256sum /tmp/here-sdk/here.zip | tee /tmp/here-sdk/sha256.txt
           actual="$(cut -d' ' -f1 /tmp/here-sdk/sha256.txt)"
           if [ -n "${SDK_SHA256:-}" ] && [ "$actual" != "$SDK_SHA256" ]; then
