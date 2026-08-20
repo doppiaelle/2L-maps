@@ -18,4 +18,4 @@ void main() {
   });
 }
 
-final _timestamp = DateTime(2026, 1, 1);
+const _timestamp = DateTime(2026, 1, 1);
