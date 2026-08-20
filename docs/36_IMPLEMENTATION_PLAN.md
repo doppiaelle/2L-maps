@@ -2,7 +2,7 @@
 
 > **Status:** Approved
 > **Owner:** Architecture
-> **Last reviewed:** 2026-08-18
+> **Last reviewed:** 2026-08-20
 > **Related:** [ADR-0013](adr/0013-implementation-execution-model.md) · [ADR-0030](adr/0030-here-platform-and-navigation-target.md) · [ADR-0031](adr/0031-spike-before-flutter-migration.md) · [`41_HERE_MIGRATION_PROGRAM.md`](41_HERE_MIGRATION_PROGRAM.md)
 
 ---
@@ -125,10 +125,10 @@ that HERE exists in the application before its gate passes.
 
 | Program wave | Branch / dependency | Content | Gate | Status |
 |---|---|---|---|---|
-| H0 | `docs/here-migration-program` | Current/target split; Explore/owned-guidance decision; eligibility, risk and gate plan | ADR-0030 and ADR-0031 accepted | 🔵 |
-| H1 | Product-owner prerequisite | HERE Base Plan account, registered apps, permitted-use confirmation, exact caps, private Explore delivery | Program Gate A | ⛔ blocked: Base docs exclude Optimization; no account/package |
-| H2 | New spike PR from latest `main` | Flutter Explore map + pure-Dart guidance kernel with adversarial trace replay | Program Gate B | ⏳ blocked by H1 |
-| H3+ | One new PR per wave | Neutral data/backend, authorized HERE adapters, Flutter parity, map, essential guidance, release, Google removal | Program Gates C/D | ⏳ |
+| H0 | `docs/here-migration-program` | ORS/VROOM + HERE Explore/final-route decision; risk and gates | ADR-0030 and ADR-0031 accepted | 🔵 |
+| H1 | Product-owner prerequisite | ORS account/quota/terms plus HERE account, apps, ordered-via eligibility/billing, retention and private Explore delivery | Program Gate A | ⛔ blocked: neither account/package exists |
+| H2 | New spike PR from latest `main` | ORS 5/15/25-stop contract and quality tests; one measured HERE final route; styled Explore map; Dart guidance replay | Program Gate B | ⏳ blocked by H1 |
+| H3+ | One new PR per wave | Neutral data/backend, ORS/HERE adapters, Flutter parity, map, essential guidance, release, Google removal | Program Gates C/D | ⏳ |
 
 Approved execution facts:
 
@@ -138,10 +138,10 @@ Approved execution facts:
 - HERE SDK Explore replaces Navigate; 2L owns a limited online guidance state machine.
 - Android remains first, but iOS is proved during the spike rather than deferred to release.
 - Google OAuth stays initially; Google location services are the migration target.
-- SDK code does not start until Base Plan use is confirmed, credentials exist, and the privately
-  delivered Explore package is available.
-- Waypoints Sequence code is explicitly blocked: it is a separate WPS service and is not treated
-  as a free Routing v8 parameter.
+- SDK code does not start until ORS Optimization terms/quota and HERE ordered-via use/billing are
+  confirmed, credentials exist, and the privately delivered Explore package is available.
+- ORS/VROOM owns ordering. HERE Matrix, Waypoints Sequence, Tour Planning, and any HERE ordering
+  logic are blocked. VROOM is heuristic and its order is not HERE-live-traffic-optimal.
 
 ### What is built, and what is specified but not built — re-audited 2026-08-10
 
