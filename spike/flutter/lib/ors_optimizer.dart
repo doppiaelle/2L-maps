@@ -22,7 +22,7 @@ class OrsOptimizationParser {
     if (routes is! List || routes.isEmpty || routes.first is! Map) throw const FormatException('ORS response has no routes');
     final steps = (routes.first as Map)['steps'];
     if (steps is! List) throw const FormatException('ORS response has no ordered steps');
-    final byId = {for (var i = 0; i < stops.length; i++) i + 1: stops[i]};
+    final byId = {for (var i = 1; i < stops.length - 1; i++) i: stops[i]};
     final ordered = <Stop>[stops.first];
     for (final step in steps) {
       if (step is Map && step['type'] == 'job') {
