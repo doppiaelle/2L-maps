@@ -116,7 +116,7 @@ owning your area (see §Areas below) → [`29`](29_DEFINITION_OF_DONE.md).
 | 38 | [Quick Start Settings](38_QUICK_START_SETTINGS.md) | **Instructions, short.** The nine steps from nothing to the app on a phone — everything a first test does not need is left out |
 | 39 | [UI Reimplementation Gap](39_UI_REIMPLEMENTATION_GAP.md) | Historical diagnosis of the incomplete first UI pass |
 | 40 | [UI Implementation Audit](40_UI_IMPLEMENTATION_AUDIT.md) | Current requirement-to-code matrix and Android artifact/device acceptance |
-| 41 | [HERE Explore Migration Program](41_HERE_MIGRATION_PROGRAM.md) | **Approved target.** Base Plan eligibility, Explore map, owned guidance, data reset, risks, costs, and PR waves |
+| 41 | [ORS/VROOM + HERE Explore Migration Program](41_HERE_MIGRATION_PROGRAM.md) | **Approved target.** Base Plan eligibility, Explore map, owned guidance, data reset, risks, costs, and PR waves |
 
 ### Architecture Decision Records
 
