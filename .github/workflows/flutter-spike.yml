@@ -62,7 +62,7 @@ jobs:
             exit 1
           fi
           echo "HERE SDK archive SHA-256: $actual" >> "$GITHUB_STEP_SUMMARY"
-          tarball="$(find /tmp/here-sdk/unpacked -type f -name 'here_sdk-*.release.tar.gz' | head -n 1)"
+          tarball="$(find /tmp/here-sdk/unpacked -type f -name '*.tar.gz' | head -n 1)"
           test -n "$tarball"
           tar -xzf "$tarball" -C plugins
           extracted="$(find plugins -maxdepth 2 -type f -name pubspec.yaml -print -quit)"
@@ -129,7 +129,7 @@ jobs:
           gdown --fuzzy "$SDK_URL" -O /tmp/here-sdk/here.zip
           test "$(head -c 2 /tmp/here-sdk/here.zip)" = "PK"
           unzip -q /tmp/here-sdk/here.zip -d /tmp/here-sdk/unpacked
-          tarball="$(find /tmp/here-sdk/unpacked -type f -name 'here_sdk-*.release.tar.gz' | head -n 1)"
+          tarball="$(find /tmp/here-sdk/unpacked -type f -name '*.tar.gz' | head -n 1)"
           test -n "$tarball"
           tar -xzf "$tarball" -C plugins
           extracted="$(find plugins -maxdepth 2 -type f -name pubspec.yaml -print -quit)"
