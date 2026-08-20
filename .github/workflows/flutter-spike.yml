@@ -78,7 +78,9 @@ jobs:
 
       - name: Generate Flutter platform projects
         working-directory: spike/flutter
-        run: flutter create --platforms=android --org doppiaelle --project-name twolmaps .
+        run: |
+          flutter create --platforms=android --org doppiaelle --project-name twolmaps .
+          rm -f test/widget_test.dart
 
       - name: Configure Android SDK levels
         working-directory: spike/flutter
@@ -146,5 +148,6 @@ jobs:
             mv "$plugin_dir" plugins/here_sdk
           fi
           flutter create --platforms=ios --org doppiaelle --project-name twolmaps .
+          rm -f test/widget_test.dart
           flutter pub get
           flutter build ios --simulator --no-codesign             --dart-define=HERE_ACCESS_KEY_ID="$SDK_ID"             --dart-define=HERE_ACCESS_KEY_SECRET="$SDK_SECRET"
