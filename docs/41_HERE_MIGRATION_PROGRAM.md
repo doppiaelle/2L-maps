@@ -1,6 +1,6 @@
 # 41 — HERE Explore + ORS/VROOM Migration Program
 
-> **Status:** Approved target; accounts provisioned; credential rotation and final account checks gated
+> **Status:** Approved target; accounts provisioned; final account checks and CI secret injection gated
 > **Owner:** Product owner
 > **Last reviewed:** 2026-08-20
 > **Related:** [ADR-0030](adr/0030-here-platform-and-navigation-target.md) ·
@@ -19,9 +19,10 @@ HERE SDK Navigate, and orders the migration so that pricing headlines never subs
 contract eligibility or measured usage.
 
 It records that ORS and HERE accounts now exist and that the downloaded Flutter package is
-`heresdk-explore-flutter-4.27.2.0.309975.zip`. It does not treat credentials pasted into a chat as
-safe operational credentials: affected HERE and ORS keys must be revoked and replaced before use.
-It also does not claim that ordered-via billing, retention, or every allowance has been measured. It does not redefine every current screen,
+`heresdk-explore-flutter-4.27.2.0.309975.zip`. The product owner accepts temporary use of the
+newly generated credentials for the disposable spike despite their having crossed the project chat;
+they are never committed or printed by CI and are rotated before production. Ordered-via billing,
+retention, and every allowance still require measurement. It does not redefine every current screen,
 schema, or API payload; those owning documents change in later pull requests after their gates pass.
 
 ### Status vocabulary
@@ -141,12 +142,13 @@ Boundary rules:
 | ORS auth | `ORS_API_KEY`, Supabase/server only |
 | ORS endpoint | `https://api.heigit.org/vroom/v0` |
 | ORS account limit | 500 Optimization requests per rolling account day, plus measured minute limit |
-| Package identity | desired `com.twol.maps`; migration impact must be proved before replacing current `com.doppiaelle.twolmaps` |
+| Package identity | `com.doppiaelle.twolmaps` on Android and iOS; unchanged |
 | SDK archive | checksum-pinned private CI input; never committed |
 | Local configuration | ignored local `.env` is allowed; committed real `.env` is forbidden |
 
-The APP ID is an identifier, not an authentication secret. All access keys/secrets and API keys
-shared outside the approved secret channel are treated as compromised and rotated. HERE SDK
+The APP ID is an identifier, not an authentication secret. For the disposable spike, the product owner explicitly accepts the residual risk of using the
+newly generated keys shared in project chat. They must still be stored only as GitHub/Supabase
+secrets, masked from logs, and rotated before a production release. HERE SDK
 credentials are necessarily consumed by the client runtime, but public source control still must
 not become their distribution mechanism. ORS and HERE REST keys never enter the mobile bundle.
 
@@ -198,8 +200,8 @@ navigation-session data unless written retention rights explicitly allow longer 
 **Trigger:** this plan is accepted.  
 **Preconditions:** none.
 
-1. Confirm the provisioned HERE Base Plan account and rotate the credentials exposed during setup.
-2. Confirm Android and iOS application registration. Treat the requested `com.twol.maps` identifier as an explicit migration from the implemented `com.doppiaelle.twolmaps`; verify Google OAuth, deep links, signing and store identity before changing it.
+1. Confirm the provisioned HERE Base Plan account and inject its credentials through protected CI/server secret stores.
+2. Confirm Android and iOS application registration. Keep the existing Android package and iOS bundle identifier `com.doppiaelle.twolmaps`; changing it requires a future ADR.
 3. Use the downloaded Explore Flutter package `4.27.2.0.309975`; verify its checksum and license locally, extract its TAR plugin, and deliver it privately to CI.
 4. Confirm access to HERE Style Editor.
 5. Read the account-specific pricing, RPS limits, transaction definitions, and restrictions.
