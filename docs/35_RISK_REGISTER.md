@@ -2,7 +2,7 @@
 
 > **Status:** Live document — reviewed at every phase gate
 > **Owner:** Product owner
-> **Last reviewed:** 2026-08-18
+> **Last reviewed:** 2026-08-20
 > **Related:** [`28_ROADMAP.md`](28_ROADMAP.md) · [`31_COST_MODEL.md`](31_COST_MODEL.md) · [`41_HERE_MIGRATION_PROGRAM.md`](41_HERE_MIGRATION_PROGRAM.md) · [`adr/`](adr/)
 
 ---
@@ -13,7 +13,7 @@ This is the single live register of everything that could damage the project, wi
 trigger that tells us it is happening, and a response prepared in advance.
 
 Google-era risks referenced elsewhere as C1–C19 and strategic risks S1–S4 are defined here.
-HERE-program risks use H1–H8. Other documents cite the identifier; this file holds the
+Hybrid migration risks use H1–H12. Other documents cite the identifier; this file holds the
 definition, so a risk cannot be described two different ways.
 
 ## 2. Goals
@@ -394,7 +394,7 @@ program gate in [`41_HERE_MIGRATION_PROGRAM.md`](41_HERE_MIGRATION_PROGRAM.md).
 
 | ID | Risk | Likelihood / impact | Trigger | Mitigation and prepared response | Owner |
 |---|---|---|---|---|---|
-| H1 | Base Plan does not permit the core stop-ordering use case | **Fired / terminal** | Official restrictions classify 2L as Optimization; Waypoints Sequence is a separate API and no Base authorization exists | Do not implement WPS; obtain written Base authorization or evaluate a legally compatible non-HERE architecture | Product owner |
+| H1 | HERE Base Plan does not permit HERE-powered stop ordering | **Mitigated / terminal** | Any HERE Matrix, WPS, Tour Planning, or other stop-order calculation enters the design | Keep ordering exclusively in ORS/VROOM; HERE receives a fixed order only; re-open if HERE terms classify ordered-via routing as Optimization | Product owner |
 | H2 | Proprietary Explore package cannot reach public-repo CI legally and reproducibly | High / high | License forbids artifact path or CI cannot authenticate privately | Never commit archive; approve private artifact channel, checksum, notice, and pin before spike | Engineering |
 | H3 | Owned guidance advances the wrong maneuver under ambiguous GPS | Medium / terminal | Parallel-road, ramp, tunnel, roundabout, or urban-canyon trace produces confident wrong progress | Confidence state, spatial/temporal/heading hysteresis, adversarial replay corpus, safe fallback | Engineering |
 | H4 | Rerouting loops or scales cost with GPS cadence | Medium / high | Repeated deviations produce repeated API calls or calls occur per location update | Local projection; sustained deviation gate; one request + cooldown; server quota and kill switch | Engineering |
@@ -404,6 +404,8 @@ program gate in [`41_HERE_MIGRATION_PROGRAM.md`](41_HERE_MIGRATION_PROGRAM.md).
 | H8 | “Essential guidance” is marketed or relied on as Navigate parity | Medium / terminal | Offline, lane/speed/tunnel/map-matching capability is implied or degraded state stays silent | Explicit exclusions, safety copy, current-leg fallback, controlled road tests, release kill switch | Product owner + engineering |
 | H9 | HERE-derived geocoding data is retained beyond licensed duration | High / high | Coordinate/search fields lack expiry or are restored from History after 30 days without re-hydration | Persist user-owned data separately; expire HERE-derived fields; purge and re-geocode under server quota | Engineering + legal |
 | H10 | Free allowance is mistaken for a provider spend cap | Medium / terminal | Account bills overage or retries continue after application budget | Pre-call server quota, monthly application budget, emergency kill switch; never rely on alerts alone | Product owner + engineering |
+| H11 | Public ORS quota, terms, or availability cannot support the product | Medium / terminal | Account denies commercial use, 25-stop request, required daily volume, or service availability | Account gate; independent breaker; visible manual-order fallback; evaluate self-hosted VROOM/ORS under a separate decision | Product owner + engineering |
+| H12 | Heuristic ORS order is marketed as exact or HERE-live-traffic-optimal | Medium / high | Exact-fixture gap exceeds threshold or product copy claims exact/live-HERE optimization | Benchmark small exact fixtures; record quality gap; use “best order found”; disclose cross-provider traffic limitation | Product + engineering |
 
 ## 7. Architectural decisions
 
@@ -462,7 +464,7 @@ is not mitigated.
 - [ ] C9 naming decision resolved before first store submission.
 - [ ] S4: no unpushed commits at the end of any working session.
 - [ ] No risk has been silently closed without evidence.
-- [ ] H1–H10 reviewed at each HERE program gate.
+- [ ] H1–H12 reviewed at each HERE program gate.
 - [ ] H1–H4 remain green before any production Flutter rewrite.
 - [ ] H4 physical-road evidence exists before navigation release.
 
@@ -492,6 +494,7 @@ is not mitigated.
 | 2026-08-06 | S4 added after the risk fired | A container reclaim destroyed a full set of committed-but-unpushed documentation | Product owner |
 | 2026-08-18 | H1–H8 revised for Explore + owned guidance | Base Plan eligibility, package delivery, GPS ambiguity, reroute cost, style, battery, data, and scope-honesty replace Navigate quote risks | Product owner |
 | 2026-08-18 | H1 fired; H9–H10 added | WPS is separate/excluded, geocoding retention is limited, and no provider hard cap is established | Product owner |
+| 2026-08-20 | H1 structurally mitigated; H11–H12 added | ORS/VROOM separates Optimization from HERE, while public-service quota/SLA and heuristic/cross-provider quality remain gated | Product owner |
 
 ## 14. Rationale
 
