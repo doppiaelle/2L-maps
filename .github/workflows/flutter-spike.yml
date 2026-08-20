@@ -50,7 +50,8 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p /tmp/here-sdk plugins
-          curl --fail --location --silent --show-error "$SDK_URL" -o /tmp/here-sdk/here.zip
+          python3 -m pip install --disable-pip-version-check --quiet "gdown==5.2.0"
+          gdown --fuzzy "$SDK_URL" -O /tmp/here-sdk/here.zip
           test "$(head -c 2 /tmp/here-sdk/here.zip)" = "PK"
           test -n "$SDK_VERSION"
           unzip -l /tmp/here-sdk/here.zip | grep -q "heresdk-explore-flutter-$SDK_VERSION"
@@ -81,9 +82,12 @@ jobs:
         working-directory: spike/flutter
         run: |
           set -euo pipefail
-          sed -i 's/^    compileSdk = .*/    compileSdk = 36/' android/app/build.gradle.kts
-          sed -i 's/^        minSdk = .*/        minSdk = 24/' android/app/build.gradle.kts
-          sed -i 's/^        targetSdk = .*/        targetSdk = 36/' android/app/build.gradle.kts
+          sed -i 's/compileSdk = flutter.compileSdkVersion/compileSdk = 36/' android/app/build.gradle.kts
+          sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 24/' android/app/build.gradle.kts
+          sed -i 's/targetSdk = flutter.targetSdkVersion/targetSdk = 36/' android/app/build.gradle.kts
+          grep -q 'compileSdk = 36' android/app/build.gradle.kts
+          grep -q 'minSdk = 24' android/app/build.gradle.kts
+          grep -q 'targetSdk = 36' android/app/build.gradle.kts
 
       - name: Dependencies and tests
         working-directory: spike/flutter
@@ -122,7 +126,8 @@ jobs:
           set -euo pipefail
           mkdir -p /tmp/here-sdk plugins
           test -n "$SDK_VERSION"
-          curl --fail --location --silent --show-error "$SDK_URL" -o /tmp/here-sdk/here.zip
+          python3 -m pip install --disable-pip-version-check --quiet "gdown==5.2.0"
+          gdown --fuzzy "$SDK_URL" -O /tmp/here-sdk/here.zip
           test "$(head -c 2 /tmp/here-sdk/here.zip)" = "PK"
           unzip -q /tmp/here-sdk/here.zip -d /tmp/here-sdk/unpacked
           tarball="$(find /tmp/here-sdk/unpacked -type f -name 'here_sdk-*.release.tar.gz' | head -n 1)"
