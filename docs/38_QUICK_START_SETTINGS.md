@@ -2,7 +2,7 @@
 
 > **Status:** Approved
 > **Owner:** Product owner
-> **Last reviewed:** 2026-08-18
+> **Last reviewed:** 2026-08-20
 > **Related:** [`37_GO_LIVE_RUNBOOK.md`](37_GO_LIVE_RUNBOOK.md) · [`19_SECURITY.md`](19_SECURITY.md)
 
 ---
@@ -12,13 +12,13 @@
 > will be removed after cutover; Supabase values remain; Google OAuth remains initially.
 >
 > The replacement sequence is controlled by
-> [`41_HERE_MIGRATION_PROGRAM.md`](41_HERE_MIGRATION_PROGRAM.md). HERE SDK Navigate has been
-> removed from the plan. The missing prerequisites are: create a HERE Base Plan account; register
-> Android and iOS apps; obtain Explore credentials/package; verify exact caps; and obtain written
-> confirmation that single-driver stop ordering, Routing v8 turn-by-turn actions, rerouting,
-> retention, and overlays are permitted through named products under the selected plan. The
-> Explore archive must then reach CI privately. Until Gate A passes, do not delete working Google
-> location secrets or claim that HERE guidance is configured.
+> [`41_HERE_MIGRATION_PROGRAM.md`](41_HERE_MIGRATION_PROGRAM.md). Before the spike, create an ORS
+> account/key and record the actual `/optimization` daily/minute quota, 25-job support, and
+> commercial-use terms. Separately create a HERE Base Plan account, register Android/iOS apps,
+> obtain Explore credentials/package, and confirm ordered-via Routing v8 eligibility/billing,
+> turn-by-turn/reroute use, retention, overlays, and exact quotas. Do not copy the ORS Directions
+> 2,000/day figure onto Optimization. Both API keys stay server-side; the Explore archive reaches
+> CI privately. Until Gate A passes, do not delete working Google location secrets.
 
 ## 1. Purpose
 
