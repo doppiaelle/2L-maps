@@ -2,8 +2,8 @@
 
 > **Status:** Live document — reviewed at every phase gate
 > **Owner:** Product owner
-> **Last reviewed:** 2026-08-06
-> **Related:** [`28_ROADMAP.md`](28_ROADMAP.md) · [`31_COST_MODEL.md`](31_COST_MODEL.md) · [`adr/`](adr/)
+> **Last reviewed:** 2026-08-20
+> **Related:** [`28_ROADMAP.md`](28_ROADMAP.md) · [`31_COST_MODEL.md`](31_COST_MODEL.md) · [`41_HERE_MIGRATION_PROGRAM.md`](41_HERE_MIGRATION_PROGRAM.md) · [`adr/`](adr/)
 
 ---
 
@@ -12,8 +12,9 @@
 This is the single live register of everything that could damage the project, with an owner, a
 trigger that tells us it is happening, and a response prepared in advance.
 
-Risks referenced elsewhere as C1–C16 are defined here. Other documents cite the identifier;
-this file holds the definition, so a risk cannot be described two different ways.
+Google-era risks referenced elsewhere as C1–C19 and strategic risks S1–S4 are defined here.
+Hybrid migration risks use H1–H13. Other documents cite the identifier; this file holds the
+definition, so a risk cannot be described two different ways.
 
 ## 2. Goals
 
@@ -385,6 +386,28 @@ account termination or a blocked release.*
 
 ---
 
+
+### HERE Explore and guidance risks — revised 2026-08-18
+
+These risks are additive until Google location services are removed. Ratings are reviewed at every
+program gate in [`41_HERE_MIGRATION_PROGRAM.md`](41_HERE_MIGRATION_PROGRAM.md).
+
+| ID | Risk | Likelihood / impact | Trigger | Mitigation and prepared response | Owner |
+|---|---|---|---|---|---|
+| H1 | HERE Base Plan does not permit HERE-powered stop ordering | **Mitigated / terminal** | Any HERE Matrix, WPS, Tour Planning, or other stop-order calculation enters the design | Keep ordering exclusively in ORS/VROOM; HERE receives a fixed order only; re-open if HERE terms classify ordered-via routing as Optimization | Product owner |
+| H2 | Proprietary Explore package cannot reach public-repo CI legally and reproducibly | High / high | License forbids artifact path or CI cannot authenticate privately | Never commit archive; approve private artifact channel, checksum, notice, and pin before spike | Engineering |
+| H3 | Owned guidance advances the wrong maneuver under ambiguous GPS | Medium / terminal | Parallel-road, ramp, tunnel, roundabout, or urban-canyon trace produces confident wrong progress | Confidence state, spatial/temporal/heading hysteresis, adversarial replay corpus, safe fallback | Engineering |
+| H4 | Rerouting loops or scales cost with GPS cadence | Medium / high | Repeated deviations produce repeated API calls or calls occur per location update | Local projection; sustained deviation gate; one request + cooldown; server quota and kill switch | Engineering |
+| H5 | Explore style matches the mock but loses navigation legibility | Medium / high | Maneuvers, road hierarchy, labels, route, traffic, or dark mode fail device review | Guidance-first style acceptance and restrained fallback scheme | Design + engineering |
+| H6 | Background location, TTS, map, or GPS cadence causes unacceptable battery/thermal behaviour | Medium / high | Spike/device budget exceeded or OS kills guidance | Measured cadence, foreground-service/background-mode design, performance budget, scope reduction | Engineering |
+| H7 | Provider cutover corrupts History or couples product rows to HERE identifiers | Medium / high | Saved route requires provider call, ID churn breaks stop, or wrong route version resumes | Internal UUIDs, immutable snapshots, test DB reset, version checks, rollback window | Engineering |
+| H8 | “Essential guidance” is marketed or relied on as Navigate parity | Medium / terminal | Offline, lane/speed/tunnel/map-matching capability is implied or degraded state stays silent | Explicit exclusions, safety copy, current-leg fallback, controlled road tests, release kill switch | Product owner + engineering |
+| H9 | HERE-derived geocoding data is retained beyond licensed duration | High / high | Coordinate/search fields lack expiry or are restored from History after 30 days without re-hydration | Persist user-owned data separately; expire HERE-derived fields; purge and re-geocode under server quota | Engineering + legal |
+| H10 | Free allowance is mistaken for a provider spend cap | Medium / terminal | Account bills overage or retries continue after application budget | Pre-call server quota, monthly application budget, emergency kill switch; never rely on alerts alone | Product owner + engineering |
+| H11 | Public ORS quota, terms, or availability cannot support the product | Medium / terminal | Account denies commercial use, 25-stop request, required daily volume, or service availability | Account gate; independent breaker; visible manual-order fallback; evaluate self-hosted VROOM/ORS under a separate decision | Product owner + engineering |
+| H12 | Heuristic ORS order is marketed as exact or HERE-live-traffic-optimal | Medium / high | Exact-fixture gap exceeds threshold or product copy claims exact/live-HERE optimization | Benchmark small exact fixtures; record quality gap; use “best order found”; disclose cross-provider traffic limitation | Product + engineering |
+| H13 | Provider credentials or proprietary SDK are exposed through chat, Git, artifacts, logs, or mobile configuration | **Accepted for spike / terminal for production** | A real key crosses project chat or a populated `.env`/SDK archive enters the public repository | For the spike, store existing keys only in protected secrets and mask logs; rotate before production; private checksum-pinned SDK delivery; secret scanning and artifact inspection | Product owner + engineering |
+
 ## 7. Architectural decisions
 
 Every mitigated risk traces to an ADR. A risk mitigated by intention rather than by structure
@@ -442,6 +465,9 @@ is not mitigated.
 - [ ] C9 naming decision resolved before first store submission.
 - [ ] S4: no unpushed commits at the end of any working session.
 - [ ] No risk has been silently closed without evidence.
+- [ ] H1–H13 reviewed at each HERE program gate.
+- [ ] H1–H4 remain green before any production Flutter rewrite.
+- [ ] H4 physical-road evidence exists before navigation release.
 
 ## 12. Roadmap
 
@@ -450,7 +476,9 @@ is not mitigated.
 | MVP | C9 resolved; C4 purge monitoring live; C12 paywall verified | Before first submission |
 | 1.x | C2 monitored monthly; C7 reassessed before 1.3 | Gate D1 passed |
 | 2.0 | C1 reassessed — time windows move every optimization to T2 | Gate D3 |
-| Continuous | S1 reassessed on every Google announcement | Event-driven |
+| HERE H0–H2 | H1–H4 permitted-use/package/guidance evidence | Program Gates A and B |
+| HERE H3–H9 | H4–H10 reviewed at every cutover gate | Program Gates C and D |
+| Continuous | S1 reassessed on every Google announcement until location cutover | Event-driven |
 
 ## 13. Decision log
 
@@ -465,6 +493,10 @@ is not mitigated.
 | 2026-08-06 | C12 raised to high impact | Trial auto-renewal is the leading cause of App Store rejection | Product owner |
 | 2026-08-06 | S2 and S3 recorded as accepted, not mitigated | No mitigation exists; recording them as managed would be false | Product owner |
 | 2026-08-06 | S4 added after the risk fired | A container reclaim destroyed a full set of committed-but-unpushed documentation | Product owner |
+| 2026-08-18 | H1–H8 revised for Explore + owned guidance | Base Plan eligibility, package delivery, GPS ambiguity, reroute cost, style, battery, data, and scope-honesty replace Navigate quote risks | Product owner |
+| 2026-08-18 | H1 fired; H9–H10 added | WPS is separate/excluded, geocoding retention is limited, and no provider hard cap is established | Product owner |
+| 2026-08-20 | H1 structurally mitigated; H11–H12 added | ORS/VROOM separates Optimization from HERE, while public-service quota/SLA and heuristic/cross-provider quality remain gated | Product owner |
+| 2026-08-20 | H13 added; residual risk accepted for disposable spike | HERE and ORS credentials crossed project chat; owner declined immediate rotation. Protected injection is mandatory and rotation remains a production gate | Product owner |
 
 ## 14. Rationale
 

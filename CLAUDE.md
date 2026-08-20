@@ -11,7 +11,37 @@ for the glossary, then the document owning the area you are changing
 
 ---
 
-## 0. The five rules that must never be broken
+## Migration control — approved target, not current behaviour
+
+[ADR-0030](docs/adr/0030-here-platform-and-navigation-target.md) and
+[ADR-0031](docs/adr/0031-spike-before-flutter-migration.md) accept ORS/VROOM stop ordering,
+HERE SDK Explore plus final ordered-via routing, an app-owned essential-guidance kernel, and a
+gated Flutter migration. HERE optimization services and HERE SDK Navigate are excluded.
+[`docs/41_HERE_MIGRATION_PROGRAM.md`](docs/41_HERE_MIGRATION_PROGRAM.md) controls its order and
+go/no-go evidence.
+
+Until a migration pull request explicitly crosses a gate, the Google/Expo rules below describe the
+implemented application and remain binding. For a scoped migration pull request:
+
+1. the new ADRs override only the provider/runtime-specific rule being replaced;
+2. Supabase authorization, entitlement, quota, History, RLS, validation, error, accessibility,
+   safety, testing, and documentation rules remain binding;
+3. server ORS/HERE credentials and the proprietary Explore SDK package never enter this public
+   repository;
+4. the HERE SDK stays behind a Flutter interface, just as provider SDKs stay behind facades today;
+5. provider-neutral internal IDs replace provider IDs at persisted domain boundaries;
+6. Google location secrets and rollback code are removed only after Program Gate D;
+7. Google OAuth is an authentication dependency and is not removed implicitly;
+8. each program wave starts from latest `main` and uses a separate pull request.
+
+The disposable spike is exempt from production structure only where ADR-0031 says so. It is not
+exempt from ORS Optimization quota/terms, HERE ordered-via permitted-use and billing confirmation,
+credential hygiene, package licensing,
+two-platform trace evidence, or recorded measurements. It may not import a Navigate-only API.
+Flutter production rules are added before the rewrite begins; React Native/TypeScript conventions
+must not be mechanically applied to Dart.
+
+## 0. The five rules that must never be broken — current implementation
 
 These are ordered by how expensive the violation is. Each is elaborated below.
 

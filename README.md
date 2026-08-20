@@ -2,150 +2,176 @@
 
 **A multi-stop route optimizer for the single mobile professional.**
 
-You have twelve addresses to visit today. Google Maps will route them — in the order you typed
-them. It will not work out a better order, and it stops at ten. Waze and Apple Maps take one
-destination at a time. Fleet software solves the problem properly and is priced and shaped for
-dispatchers managing drivers, not for the driver.
+You have a disordered list of stops and need a usable visiting order in seconds. 2L Maps resolves
+the addresses, optimizes the route, saves the confirmed result, and is evolving toward a branded
+map with focused in-app guidance.
 
-> **The user does not pay for a map. They pay for the order.**
-
-Add your stops, tap once, and the app returns the fastest sequence with a real ETA — then hands
-off to Google Maps, Waze or Apple Maps, whichever you already use.
+> **The user pays for the order and for getting through it with less friction—not for a generic
+> map feature list.**
 
 ---
 
-## Status
+## Status: implemented system and approved migration
 
-**The Expo application, Supabase backend, automated tests, CI-built Android APK, and product
-documentation are implemented in this repository.** The current interface follows the approved
-2L Maps mobile direction: minimal black/white surfaces, mint navigation actions, a two-item
-Route/History dock, top-right Settings, inline address autocomplete, and a route-conditioned
-procedural navigation environment.
+### Current on `main`
+
+The Expo/React Native application, Supabase backend, automated tests, CI-built Android APK, and
+product documentation are implemented. Address search, geocoding, routing, and optimization are
+currently proxied to Google from Supabase Edge Functions. The route preview is a local synthetic
+SVG scene rather than a Google map. Driving currently uses external navigator handoff.
 
 Every push to `main` starts `.github/workflows/android-preview.yml`. Download the
-`2l-maps-standalone` artifact from that run, unzip it, and install the contained ARM64 APK on the
-physical Android phone. Final visual/device acceptance is recorded only after that exact artifact
-is checked against [`docs/40_UI_IMPLEMENTATION_AUDIT.md`](docs/40_UI_IMPLEMENTATION_AUDIT.md).
+`2l-maps-standalone` artifact from that run and validate the physical Android build against
+[`docs/40_UI_IMPLEMENTATION_AUDIT.md`](docs/40_UI_IMPLEMENTATION_AUDIT.md).
 
-The documentation in [`docs/`](docs/) describes the implemented product and the remaining release
-work. Start with
-[`docs/00_PROJECT_OVERVIEW.md`](docs/00_PROJECT_OVERVIEW.md), then read
-[`CLAUDE.md`](CLAUDE.md) before writing any code.
+### Approved target, spike prerequisites partially provisioned
+
+The approved target is a disaggregated stack: **OpenRouteService/VROOM** orders 5–25 stops,
+**HERE SDK Explore** renders the branded map, and **HERE Routing API v8** calculates the final route
+through those already ordered stops. The target client is Flutter; HERE SDK Navigate is excluded.
+The provisioned package is HERE Explore Flutter `4.27.2.0.309975`; ORS reports 500 Optimization
+requests/day. Credentials shared during setup may be used for the disposable spike only through protected secret injection; rotation remains required before production. Ordered-via billing
+and retention remain measured gates. Supabase remains the server-side control plane and system of
+record. Google OAuth may remain
+initially because authentication is independent of location services.
+
+2L Maps will build a conservative online guidance kernel from operating-system location updates
+and HERE Routing API v8 polylines, route handles, and `turnByTurnActions`. The first scope is
+position/route progress, current and next maneuver, distance/ETA, visual/TTS prompts, sustained
+deviation rerouting, arrival, restoration, and one minimal external-navigation control for the
+**current leg only**.
+
+The target does **not** promise offline maps/routing/guidance, HERE Positioning, road-network map
+matching, lanes, junction views, speed/road-sign warnings, tunnel extrapolation, or parity with
+HERE Navigate.
+
+HERE is never used to optimize stop order: no Matrix, Waypoints Sequence, or Tour Planning call.
+ORS/VROOM is heuristic and uses its own routing-cost model, so the product does not claim an exact
+optimum or an order optimized against HERE live traffic. HERE traffic affects the final route and
+ETA for the fixed ORS order. “Zero cost” remains conditional on the ORS account's actual
+Optimization quota/terms and the HERE account's ordered-via eligibility and billing.
+
+See [`docs/41_HERE_MIGRATION_PROGRAM.md`](docs/41_HERE_MIGRATION_PROGRAM.md) for capabilities,
+blockers, risks, cost gates, data design, spike acceptance, and pull-request sequence.
 
 ---
 
-## What it is, and what it is not
+## Product boundary
 
-| It is | It is not |
+| Current | Approved target |
 |---|---|
-| A route **planner** — computes the visiting order | A navigation app. No turn-by-turn, no voice |
-| A preview of that order on a quiet map | A competitor to Google Maps on search or traffic data |
-| For one professional with one vehicle, 5–25 stops a day | Fleet software. No dispatchers, no driver management, no web dashboard |
-| Offline for **your own data** — saved routes, address book, last result | An offline map. Tile caching is prohibited by the platform terms |
+| Planner for one professional, one vehicle, 5–25 stops | Planner plus essential online guidance |
+| Google server APIs behind Supabase | ORS Optimization + authorized HERE APIs behind Supabase |
+| Local SVG route preview | Branded HERE SDK Explore map |
+| External app drives the route | 2L guidance kernel drives; external app can open the current leg |
+| Local + Supabase History | Local + Supabase History, provider-neutral |
+| Expo/React Native client | Flutter after the Explore/guidance spike |
+| No in-app GPS route following | OS location + pure-Dart conservative route following |
+| No offline map | Still no offline map; Navigate is not in scope |
 
-Each exclusion is a decision with a recorded reason, not an omission. See
-[`docs/04_FEATURES.md`](docs/04_FEATURES.md) §8.
-
----
-
-## Architecture at a glance
-
-```
-  MOBILE APP  Expo · React Native · TypeScript · Expo Router · NativeWind
-      │       Drawn route preview · RoutingProvider · GeocodingProvider
-      │                NavigationProvider · BillingProvider
-      │       State:   Zustand (client) · React Query (server)
-      │
-      │ HTTPS + JWT
-      ▼
-  SUPABASE    Auth · Postgres + RLS · Realtime · Edge Functions
-      │       Every metered function: JWT → entitlement → rate limit →
-      │       quota → cache → upstream → record
-      │
-      ▼
-  GOOGLE      Routes API · Route Optimization API · Places API (New)
-```
-
-**No Google web-service credential ships in the client.** Calls are proxied because the Route
-Optimization API requires a service account that cannot exist on a device, and because quotas
-enforced in a client are not enforced at all. The preview renderer is local SVG: real route
-geometry and numbered stops over deterministic anonymous scenery generated around the route.
+Fleet dispatch, multiple vehicles, driver management, and a web dashboard remain out of scope.
 
 ---
 
-## Three decisions worth knowing before you read further
+## Architecture
 
-Each of these inverted an assumption in the original brief, and each is documented in full with
-its rejected alternatives.
+### Current
 
-**Optimization uses a cost-aware cascade, not one engine**
-([ADR-0003](docs/adr/0003-tiered-optimization-cascade.md)). The Route Optimization API bills per
-*stop*; `computeRoutes` with `optimizeWaypointOrder` bills per *request*. On a 25-stop route that
-is roughly a 25× difference, so the default path is the cheap one and the expensive engine is
-reserved for problems that genuinely need it. Building the distance matrix yourself and solving
-the TSP locally — the instinctive "cheaper" option — turns out to be the most expensive of all.
+```mermaid
+flowchart TD
+  A["Expo / React Native"] -->|JWT and app contracts| B["Supabase"]
+  A -->|local SVG preview| C["RouteCanvas"]
+  B -->|search, geocode, route, optimize| D["Google location APIs"]
+  A -->|route or legs| E["External navigator"]
+```
 
-**There is no in-app navigation**
-([ADR-0004](docs/adr/0004-external-navigation-handoff.md)). Turn-by-turn requires the Navigation
-SDK, which cannot coexist with the Maps SDK — adopting it would mean rebuilding the entire
-planning map on a Beta pre-1.0 component. Handoff is the delivery mechanism instead, and since no
-external app accepts a full multi-stop route, it is structurally chunked or leg-by-leg.
+### Target
 
-**`place_id` is permanent; coordinates expire in 30 days**
-([ADR-0007](docs/adr/0007-place-id-durable-coordinates-perishable.md)). The platform terms forbid
-caching latitude and longitude beyond 30 consecutive days, which makes the natural schema a
-violation. Coordinates are therefore nullable everywhere and purged on a schedule, while the
-user's own labels and stop order are permanent.
+```mermaid
+flowchart TD
+  A["Flutter app"] -->|map render/style| B["HERE SDK Explore"]
+  A -->|GPS samples| C["OS location"]
+  A -->|route state| D["2L guidance kernel"]
+  A -->|JWT contracts| E["Supabase"]
+  E -->|optimize order| F["ORS / VROOM"]
+  E -->|search/final route/reroute| G["HERE APIs"]
+  E -->|history/quota| I["Postgres"]
+  A -->|current leg| H["External navigator"]
+```
+
+No server-service credential ships in the client. GPS samples are processed locally; they do not
+generate one upstream request each. Provider SDK/API types never become persisted product
+contracts.
+
+---
+
+## Migration decisions
+
+- [ADR-0030](docs/adr/0030-here-platform-and-navigation-target.md) accepts ORS/VROOM ordering,
+  HERE Explore/final routing, and app-owned essential guidance; HERE optimization and Navigate are
+  explicitly excluded.
+- [ADR-0031](docs/adr/0031-spike-before-flutter-migration.md) requires a seven-day Android+iOS
+  hybrid-routing and guidance spike before the Flutter rewrite.
+- ORS Optimization terms/quota and HERE ordered-via routing/billing are hard account gates.
+- Existing Google-era ADRs continue to describe the current implementation until their cutovers.
+- Test data may be reset; there is no production-data preservation requirement.
+- Android remains first for delivery, while iOS viability is proved during the spike.
+- Google OAuth stays initially; it is not a Google location-service dependency.
 
 ---
 
 ## Documentation
 
-[`docs/INDEX.md`](docs/INDEX.md) is the map: reading paths, area ownership, and a traceability
-matrix from every requirement to the document that covers it.
-
-| Start here | For |
+| Document | Purpose |
 |---|---|
-| [`00_PROJECT_OVERVIEW.md`](docs/00_PROJECT_OVERVIEW.md) | The product, the architecture, and the binding glossary |
-| [`CLAUDE.md`](CLAUDE.md) | The rules all development follows — read before writing code |
-| [`docs/adr/`](docs/adr/) | Twelve decisions, each with its rejected alternatives |
-| [`31_COST_MODEL.md`](docs/31_COST_MODEL.md) | What every action costs and whether the price works |
-| [`29_DEFINITION_OF_DONE.md`](docs/29_DEFINITION_OF_DONE.md) | When a change is actually finished |
+| [`docs/41_HERE_MIGRATION_PROGRAM.md`](docs/41_HERE_MIGRATION_PROGRAM.md) | Explore/custom-guidance target, eligibility, gates, waves, risks |
+| [`docs/INDEX.md`](docs/INDEX.md) | Reading paths and area ownership |
+| [`docs/00_PROJECT_OVERVIEW.md`](docs/00_PROJECT_OVERVIEW.md) | Current product and binding glossary |
+| [`CLAUDE.md`](CLAUDE.md) | Development constitution |
+| [`docs/36_IMPLEMENTATION_PLAN.md`](docs/36_IMPLEMENTATION_PLAN.md) | Implemented work and migration status |
+| [`docs/31_COST_MODEL.md`](docs/31_COST_MODEL.md) | Current Google baseline and ORS/HERE verification gates |
+| [`docs/38_QUICK_START_SETTINGS.md`](docs/38_QUICK_START_SETTINGS.md) | Current setup; HERE onboarding replaces location secrets later |
 
-**A note on the numbers.** Google pricing and API limits throughout the documentation were
-gathered from secondary sources because `developers.google.com` was unreachable from the
-authoring environment. They are marked with a confidence level and must be verified against the
-official pages before any pricing decision. See
-[`docs/33_API_CONTRACTS.md`](docs/33_API_CONTRACTS.md) §8.
+Documentation that names Google describes the implemented system unless it explicitly says
+**Target**. The HERE program controls future changes until each owning document is migrated.
 
 ---
 
 ## Working in this repository
 
-**Read before writing code:** [`CLAUDE.md`](CLAUDE.md) §0 — the five rules — then the document
-owning the area you are changing.
+Read [`CLAUDE.md`](CLAUDE.md) and the document owning the area before writing code.
 
-Two practical constraints that catch people out:
-
-- **Use the CI standalone APK for phone checks.** No local Android Studio is assumed; the APK is
-  emitted as a GitHub Actions artifact ([`docs/25_DEPLOYMENT.md`](docs/25_DEPLOYMENT.md)).
-- **Development happens in ephemeral containers.** Push after every meaningful unit of work; a
-  commit that exists only locally is not saved work.
+- Start every new program wave from the latest `main` and use a new pull request.
+- Do not combine runtime rewrite, provider cutover, schema reset, and guidance into one merge.
+- Do not commit HERE SDK archives, populated `.env` files, credentials, account pricing, or
+  contracts publicly. Keys that crossed chat are accepted only for the disposable spike and rotated before production.
+- Keep provider access behind facades and all metered server calls behind Supabase quota.
+- A GPS sample never directly triggers a paid request.
+- Do not present essential guidance as equivalent to HERE Navigate.
+- Keep current-leg external fallback reachable in ambiguous and degraded states.
+- Use the current CI standalone APK for Android checks until the Flutter delivery wave replaces it.
 
 ---
 
 ## Stack
 
-React Native · Expo · TypeScript · Expo Router · React Query · Zustand · NativeWind · Supabase ·
-Google Maps SDK · Google Places API · Google Routes API · Google Route Optimization API ·
-RevenueCat · Firebase Analytics · Crashlytics · Sentry · Fastlane · GitHub Actions
+**Current:** React Native · Expo · TypeScript · Expo Router · React Query · Zustand · NativeWind ·
+Supabase · Google Places/Geocoding/Routes/Route Optimization server APIs · RevenueCat · Firebase ·
+Sentry · GitHub Actions
+
+**Approved target:** Flutter · Dart · ORS Optimization/VROOM · HERE SDK Explore · authorized HERE REST APIs · OS location ·
+2L guidance kernel · Supabase · RevenueCat · Sentry · GitHub Actions. Exact analytics/crash tooling
+is revalidated during the Flutter plan.
 
 ---
 
-## Attribution and terms
+## Attribution, terms, and cost
 
-This product uses the Google Maps Platform and is bound by its Service Specific Terms. Google
-attribution is displayed wherever Google content appears, coordinates are never cached beyond 30
-days, map tiles are never cached or pre-fetched, and Google-derived content is never rendered on
-a non-Google map. Full analysis in
-[`docs/32_LEGAL_COMPLIANCE.md`](docs/32_LEGAL_COMPLIANCE.md).
+The current implementation remains subject to Google Maps Platform terms until Google-derived
+location content and services are removed.
+
+Before code, the ORS account must confirm commercial use and the actual `/optimization`
+daily/minute quota; the documented 2,000/day ORS figure applies to Directions and is not assumed for
+Optimization. The HERE account must confirm Explore access, ordered-via final routing, guidance and
+reroute use, retention/overlay rights, transaction definitions, free caps, RPS, and spending
+controls. One final-route HTTP request is not assumed to equal one billed transaction until measured.

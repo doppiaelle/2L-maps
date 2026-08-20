@@ -2,8 +2,8 @@
 
 > **Status:** Approved
 > **Owner:** Architecture
-> **Last reviewed:** 2026-08-07
-> **Related:** [ADR-0013](adr/0013-implementation-execution-model.md) · [`25_DEPLOYMENT.md`](25_DEPLOYMENT.md) · [`29_DEFINITION_OF_DONE.md`](29_DEFINITION_OF_DONE.md) · [`22_TESTING.md`](22_TESTING.md)
+> **Last reviewed:** 2026-08-20
+> **Related:** [ADR-0013](adr/0013-implementation-execution-model.md) · [ADR-0030](adr/0030-here-platform-and-navigation-target.md) · [ADR-0031](adr/0031-spike-before-flutter-migration.md) · [`41_HERE_MIGRATION_PROGRAM.md`](41_HERE_MIGRATION_PROGRAM.md)
 
 ---
 
@@ -116,6 +116,32 @@ and this document inherits that. No re-statement of any requirement, schema or b
 | 5c | `feat/w5c-data` | Stored-shape fix, query hooks, Plan's data wiring, the screens | §6 W5 | ✅ |
 | 6 | `feat/w6-delivery` | EAS profiles, remaining CI, Maestro flows, store declarations | §6 W6 | ✅ |
 | 7 | `docs/go-live-runbook` | **Go-live runbook** — every external account, key and limit, step by step | §6 W7 | ✅ |
+
+### HERE migration status — opened 2026-08-18
+
+The table above is the completed Google-era implementation history. The approved target is now
+governed by [`41_HERE_MIGRATION_PROGRAM.md`](41_HERE_MIGRATION_PROGRAM.md); no row below implies
+that HERE exists in the application before its gate passes.
+
+| Program wave | Branch / dependency | Content | Gate | Status |
+|---|---|---|---|---|
+| H0 | `docs/here-migration-program` | ORS/VROOM + HERE Explore/final-route decision; risk and gates | ADR-0030 and ADR-0031 accepted | 🔵 |
+| H1 | Product-owner prerequisite | ORS account/quota/terms plus HERE account, apps, ordered-via eligibility/billing, retention and private Explore delivery | Program Gate A | ⛔ blocked: neither account/package exists |
+| H2 | New spike PR from latest `main` | ORS 5/15/25-stop contract and quality tests; one measured HERE final route; styled Explore map; Dart guidance replay | Program Gate B | ⏳ blocked by H1 |
+| H3+ | One new PR per wave | Neutral data/backend, ORS/HERE adapters, Flutter parity, map, essential guidance, release, Google removal | Program Gates C/D | ⏳ |
+
+Approved execution facts:
+
+- Supabase stays; it is not replaced by HERE.
+- Existing Supabase rows are test data and may be reset.
+- Flutter is the expected client after the spike; no React Native comparator remains in scope.
+- HERE SDK Explore replaces Navigate; 2L owns a limited online guidance state machine.
+- Android remains first, but iOS is proved during the spike rather than deferred to release.
+- Google OAuth stays initially; Google location services are the migration target.
+- SDK code does not start until ORS Optimization terms/quota and HERE ordered-via use/billing are
+  confirmed, credentials exist, and the privately delivered Explore package is available.
+- ORS/VROOM owns ordering. HERE Matrix, Waypoints Sequence, Tour Planning, and any HERE ordering
+  logic are blocked. VROOM is heuristic and its order is not HERE-live-traffic-optimal.
 
 ### What is built, and what is specified but not built — re-audited 2026-08-10
 
@@ -861,7 +887,8 @@ Per wave:
 
 | Phase | Scope | Trigger |
 |---|---|---|
-| Waves 0–1 | Foundation and domain, no external dependency | Now |
+| HERE H0–H2 | Documentation, Base Plan eligibility, then Explore/guidance trace spike | ADR-0030 accepted; H2 requires Program Gate A |
+| Waves 0–1 | Foundation and domain, no external dependency | Historical/current implementation |
 | Wave 2 | Backend, verified by contract | Wave 1 merged |
 | Waves 3–5 | Client through to screens | Wave 2 merged |
 | Wave 6 | Delivery pipeline and store preparation | Wave 5 merged |
@@ -875,6 +902,8 @@ Per wave:
 | 2026-08-07 | Squash-merge directly to `main` (I1) | Single contributor, `main` not yet protected | Architecture |
 | 2026-08-07 | Cloud provisioning deferred (I2) | Maps Platform has no sandbox; the first two waves need no upstream call | Architecture |
 | 2026-08-07 | Pinning verified by `expo prebuild`, not by peer ranges | Risk C6 was a config-plugin failure, invisible to dependency resolution | Architecture |
+| 2026-08-18 | HERE migration moved to program waves H0–H9 | Provider, runtime, schema, and navigation changes must have independent gates and PRs | Product owner |
+| 2026-08-18 | H1/H2 pivoted from Navigate quote and RN comparison to Base Plan eligibility and owned-guidance replay | Navigate is removed; the blocking risk is now permitted optimization use and safe GPS route following | Product owner |
 
 ## 15. Rationale
 

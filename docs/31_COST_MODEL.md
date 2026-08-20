@@ -1,11 +1,22 @@
 # 31 — Cost Model and Unit Economics
 
-> **Status:** Approved — figures require verification before pricing is finalised
+> **Status:** Current Google baseline — invalid for HERE target pricing
 > **Owner:** Architecture
-> **Last reviewed:** 2026-08-06
-> **Related:** [ADR-0003](adr/0003-tiered-optimization-cascade.md) · [`20_SUBSCRIPTIONS.md`](20_SUBSCRIPTIONS.md) · [`33_API_CONTRACTS.md`](33_API_CONTRACTS.md)
+> **Last reviewed:** 2026-08-20
+> **Related:** [ADR-0003](adr/0003-tiered-optimization-cascade.md) · [ADR-0030](adr/0030-here-platform-and-navigation-target.md) · [`41_HERE_MIGRATION_PROGRAM.md`](41_HERE_MIGRATION_PROGRAM.md)
 
 ---
+
+> ⛔ **ORS/HERE account and pricing gate.** Every numeric model below describes the implemented
+> Google-era design. Target stop ordering uses public ORS Optimization/VROOM; HERE supplies
+> Explore, search, the final fixed-order route, and bounded reroutes.
+>
+> “Zero cost” means only “inside quotas verified in the actual accounts.” Record the ORS
+> `/optimization` daily/minute quota and commercial-use terms; the published 2,000/day Directions
+> allowance is not an Optimization allowance. Record HERE transaction counts for map/search,
+> ordered-via/time-aware Routing and rerouting; one HTTP request is not assumed to equal one billed
+> transaction. GPS updates remain local. See
+> [`41_HERE_MIGRATION_PROGRAM.md`](41_HERE_MIGRATION_PROGRAM.md) Gate A.
 
 > ⚠️ **Sourcing note.** `developers.google.com` was unreachable from the environment where this
 > analysis was performed (403 from the egress proxy), so the figures below come from web
@@ -418,6 +429,7 @@ of twenty-five on the dominant operation, and the mitigations here take per-user
 | 2026-08-13 | Sofia narrowed to a 10–25-stop single-driver round and made the target profile | Keeps the sharp delivery pain inside the viable cost envelope | Product owner |
 | 2026-08-13 | Advertising revenue removed from the model | Free is measurable acquisition COGS, not speculative ad revenue | Product owner |
 | 2026-08-06 | Quota values set with 7–13× headroom | Quotas target abuse and defects, not normal use | Architecture |
+| 2026-08-18 | Google model frozen as the current baseline | HERE permitted use, exact Base Plan caps, optimizer product and guidance transaction rate must be verified/measured before repricing | Product owner |
 
 ## 18. Rationale
 
