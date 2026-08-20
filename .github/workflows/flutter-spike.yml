@@ -72,7 +72,7 @@ jobs:
 
       - name: Generate Flutter platform projects
         working-directory: spike/flutter
-        run: flutter create --platforms=android --org doppiaelle --project-name twol_maps .
+        run: flutter create --platforms=android --org doppiaelle --project-name twolmaps .
 
       - name: Configure Android SDK levels
         working-directory: spike/flutter
@@ -130,6 +130,6 @@ jobs:
             rm -rf plugins/here_sdk
             mv "$plugin_dir" plugins/here_sdk
           fi
-          flutter create --platforms=ios --org doppiaelle --project-name twol_maps .
+          flutter create --platforms=ios --org doppiaelle --project-name twolmaps .
           flutter pub get
           flutter build ios --simulator --no-codesign             --dart-define=HERE_ACCESS_KEY_ID="$SDK_ID"             --dart-define=HERE_ACCESS_KEY_SECRET="$SDK_SECRET"
