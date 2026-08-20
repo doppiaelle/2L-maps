@@ -1,8 +1,8 @@
-# ADR-0030 — HERE Explore and app-owned guidance target
+# ADR-0030 — ORS/VROOM optimization, HERE Explore, and app-owned guidance
 
-**Status:** Accepted
-**Date:** 2026-08-18
-**Deciders:** Product owner
+**Status:** Accepted  
+**Date:** 2026-08-20  
+**Deciders:** Product owner  
 **Supersedes when implemented:** ADR-0004, ADR-0005, ADR-0007, ADR-0012, ADR-0021,
 ADR-0026, ADR-0027, and ADR-0028 in the location-provider areas they govern
 
@@ -10,134 +10,120 @@ ADR-0026, ADR-0027, and ADR-0028 in the location-provider areas they govern
 
 ## Context
 
-The implemented product plans and saves multi-stop routes, draws a synthetic SVG preview, and
-hands driving to an external navigator. Google still supplies server-side address search,
-geocoding, routing, and waypoint optimization, while Supabase owns authentication, product data,
-quota, and History.
+The implemented Expo application uses Google server APIs for address search, geocoding, routing,
+and stop optimization, draws a synthetic preview, and hands driving to an external navigator.
+The target requires a branded real map, 5–25-stop ordering, and focused in-app guidance without a
+HERE Navigate contract.
 
-The approved product direction requires a real map in the 2L visual language and useful in-app
-guidance. HERE SDK Navigate provides a complete navigation engine, but it requires a separate
-commercial agreement and is not included in the Base Plan. The product owner has rejected that
-dependency for the planned product.
+HERE Base Plan restrictions exclude the Optimization use case except through the named HERE Tour
+Planning product. Using HERE Matrix Routing or Waypoints Sequence and solving or requesting the
+order elsewhere inside HERE would not change the product use case. Those paths are therefore
+forbidden in the approved Base Plan architecture.
 
-HERE Routing API v8 can return a route polyline, route handle, and
-`turnByTurnActions` designed to support visual and verbal guidance. HERE SDK Explore can render
-and style the map but does not include HERE navigation, HERE Positioning, downloadable offline
-maps, offline routing, or offline search.
+OpenRouteService (ORS) exposes an Optimization endpoint backed by the open-source VROOM solver.
+Its published public-service request restriction accommodates this product's 5–25-stop, one-vehicle
+scope. VROOM is heuristic: it returns a high-quality feasible order, not a guaranteed mathematical
+optimum. ORS uses its own OpenStreetMap-derived routing costs; its order is not optimized against
+HERE live traffic.
 
-A second commercial issue is independent of Navigate: HERE's Base Plan restrictions describe
-“Optimization” as an excluded use case, with an exception for HERE Tour Planning. Because ordering
-a driver's stops is the core of 2L Maps, Base Plan eligibility and the correct optimization
-product must be confirmed before the migration can be treated as commercially viable.
-
-The official Waypoints Sequence API documentation does not change that conclusion. It exposes the
-separate `https://wps.hereapi.com/v8/findsequence2` service, returns an ordered waypoint list but
-no route geometry, and then requires a second Routing API v8 request. `traffic:enabled` is part of
-that service's `mode` syntax; it is not a Routing v8 switch that turns stop optimization into an
-ordinary routing request. The public Base Plan material does not establish a zero-cost right to
-use this service for 2L's Optimization use case.
+HERE SDK Explore can render and style the map. HERE Routing API v8 can calculate the final route
+through an already ordered list and return polyline, summary, route handle, and
+`turnByTurnActions`. A traffic-aware final route gives current geometry and ETA, but does not
+retroactively make the ORS stop order optimal for HERE live traffic.
 
 ## Decision
 
-Use HERE SDK **Explore**, not HERE SDK Navigate.
+Adopt a provider-separated architecture:
 
-HERE is the target provider for the online map, address/search services, route geometry,
-turn-by-turn action data, and reroute calculations, subject to the Base Plan eligibility gate.
+1. **ORS/VROOM orders stops.** A Supabase Edge Function sends one vehicle and 5–25 validated jobs,
+   with fixed start and optional fixed return, to ORS Optimization. It validates that every input
+   stop appears exactly once and treats unassigned, duplicate, missing, or unknown stop IDs as a
+   failed optimization.
+2. **HERE supplies location presentation and the final ordered route.** HERE provides search and
+   geocoding, HERE SDK Explore map rendering, and Routing v8 route geometry, summary, route handle,
+   traffic-aware ETA, and `turnByTurnActions` for the ORS order.
+3. **2L owns essential guidance.** A pure-Dart kernel combines provider-neutral route/maneuver
+   contracts with operating-system location updates for route progress, visual/TTS prompts,
+   bounded rerouting, restoration, arrival, and current-leg external handoff.
+4. **Supabase remains the control plane and system of record.** It owns auth, entitlements, quota,
+   provider credentials, request validation, usage accounting, routes, History, and retryable sync.
+   No server credential ships in Flutter.
 
-2L Maps owns a deliberately limited guidance engine in pure Dart. It consumes provider-neutral
-route and maneuver contracts returned by Supabase and combines them with operating-system location
-updates. Its responsibilities are:
+The architecture must not call HERE Matrix Routing, Waypoints Sequence, Tour Planning, or any HERE
+service to calculate stop order. Routing through client-supplied ordered vias is allowed only after
+the HERE account/contract confirms this exact use and its billing unit.
 
-- project the current GPS position onto the active route polyline;
-- track monotonic along-route progress with confidence and hysteresis;
-- select and announce upcoming maneuvers from HERE `turnByTurnActions`;
-- render current position, route progress, maneuver, remaining distance, and ETA;
-- detect sustained route deviation and request a bounded server-side reroute;
-- restore a versioned navigation session after interruption;
-- mark arrival and advance to the next stop;
-- open the installed external navigator for the current leg only.
+The ORS public service is allowed only after the account dashboard/terms confirm commercial product
+use and expose the actual `/optimization` daily/minute quota. The documented 2,000/day allowance
+for ORS Directions must not be copied onto Optimization. Independent server-side circuit breakers
+cap ORS optimization and HERE search/routing/rerouting; a GPS sample never directly triggers an
+upstream request.
 
-The first release is **online essential guidance**, not a replacement for a mature satellite
-navigator. It excludes offline maps/routing/guidance, HERE Positioning, road-network map matching,
-lane assistance, junction views, speed-limit and road-sign warnings, tunnel extrapolation,
-spatial audio, and truck-specific live warners. These are not promised through imitation.
+The product language is “optimized route” or “best order found,” never “exact optimum.” Quality is
+benchmarked against exact solutions for small fixtures and representative real routes before
+release. If ORS quota, terms, availability, or solution quality fail the gate, the fallback is
+manual ordering/external navigation or a self-hosted VROOM/ORS decision—not silent use of HERE
+Optimization.
 
-Supabase remains the product backend and system of record for authentication, profiles,
-entitlements, quotas, favourites, routes, History, provider-neutral locations, usage accounting,
-and retryable sync. Metered HERE REST requests remain behind Edge Functions. The Explore SDK is
-used in the Flutter client for map rendering and style; its types never cross into persisted
-product contracts.
+HERE-derived geocoding fields are perishable. Unless a Permanent Storage Plan or other written
+right is obtained, they expire under HERE's published storage window. Durable user-authored labels,
+route membership, notes, and ordering are stored separately from provider-derived coordinates and
+identifiers; reopening a saved route refreshes expired coordinates before optimization.
 
-Under the approved **Base Plan only / zero commercial upgrade** constraint, the Waypoints
-Sequence API is disabled and no optimization adapter may be implemented on the assumption that it
-is standard Routing. Stop ordering remains a blocking product capability until either:
+The first navigation release is online essential guidance, not HERE Navigate parity. It excludes
+offline maps/routing/guidance, HERE Positioning, road-network map matching, lanes, junction views,
+speed/road-sign warnings, tunnel extrapolation, and truck warners. Ambiguous states suppress unsafe
+prompts and keep the minimal current-leg external-navigation button reachable.
 
-1. HERE provides written Base Plan authorization for this exact single-driver Optimization use
-   case and names the permitted service; or
-2. the product adopts a legally compatible non-HERE optimization/location architecture under a
-   new ADR.
-
-Tour Planning and any paid HERE exception are out of scope by product decision.
-
-Google location services are removed only after a gated HERE cutover. Google OAuth may remain as
-an authentication provider until a separate decision replaces it.
-
-The proprietary Explore package and credentials are not committed to this public repository. CI
-receives the pinned package through an approved private artifact channel.
+Google location services are removed only after the gated cutover. Google OAuth may remain because
+authentication is a separate dependency. Test data may be reset.
 
 ## Consequences
 
-**Positive.** The product can pursue its branded HERE map and essential in-app guidance without a
-Navigate contract or an opaque navigation-SDK price.
+**Positive.** Stop ordering no longer asks HERE to perform or enable an excluded Optimization use
+case, while HERE remains the map and final-route provider.
 
-**Positive.** The app owns guidance UX, thresholds, voice timing, state restoration, analytics,
-and current-leg fallback. These can match the focused single-driver workflow instead of exposing a
-large generic navigation feature set.
+**Positive.** Provider-specific responsibilities are narrow and replaceable. Supabase can enforce
+quota and normalize contracts without rewriting identity, billing, or History.
 
-**Positive.** Keeping Supabase prevents the provider migration from becoming an identity, billing,
-History, and entitlement rewrite. Provider-neutral IDs make future changes less destructive.
+**Positive.** HERE Explore enables the approved branded map, and the owned Dart kernel enables a
+focused navigation experience without a Navigate agreement.
 
-**Negative.** 2L Maps becomes responsible for safety-critical route progress, maneuver timing,
-deviation detection, rerouting policy, background location, voice, restoration, battery, and
-physical-road validation.
+**Negative.** “Zero cost” is conditional on verified public quotas and has no public-service SLA.
+ORS availability, policy, or quota changes can block optimization.
 
-**Negative.** Raw GPS projected onto a route polyline is less robust than road-network map
-matching. Parallel roads, ramps, urban canyons, tunnels, roundabouts, and poor GPS can cause wrong
-progress or wrong maneuver timing. Conservative confidence states and external fallback are
-product requirements, not implementation details.
+**Negative.** The stop order uses ORS costs rather than HERE live traffic. The final HERE route and
+ETA may reveal that another order would now be faster; the product must not claim otherwise.
 
-**Negative.** Guidance is online. Explore does not provide the downloadable offline map/search/
-routing/navigation stack reserved for Navigate.
+**Negative.** VROOM may return a suboptimal solution, and HERE may split ordered vias or time-aware
+routing into more than one billable transaction. Both are measured gates, not assumptions.
 
-**Negative.** Free allowances are not a commercial authorization. The core stop-ordering use case
-may be excluded from Base Plan except through Tour Planning, and exact current quotas must be read
-from the account/contract before pricing.
+**Negative.** 2L owns safety-sensitive progress, maneuver timing, deviation, rerouting, background
+location, voice, restoration, and battery behavior without road-network map matching.
 
 ## Evidence and references
 
-Checked 2026-08-18:
+Checked 2026-08-20:
 
-- [HERE SDK Flutter licenses](https://docs.here.com/here-sdk/docs/flutter-introduction-editions)
-- [HERE SDK Explore map capabilities](https://docs.here.com/here-sdk/docs/flutter-maps)
-- [HERE Routing API v8 turn-by-turn actions](https://docs.here.com/routing/docs/routing-v8-guidance)
-- [HERE Waypoints Sequence API overview](https://docs.here.com/routing/docs/intro-waypoints-sequence)
-- [Optimize waypoints: sequence first, route second](https://docs.here.com/routing/docs/optimizing-waypoints)
-- [HERE SDK Explore/Navigate feature matrix](https://docs.here.com/here-sdk/docs/flutter-introduction-feature-list)
-- [HERE geocoding storage rules](https://docs.here.com/here-kb/docs/permanent-geocoding-overview-licensing-and-usage-rules)
-- [HERE pricing](https://www.here.com/get-started/pricing)
-- [HERE Routing API v8 rerouting with a route handle](https://docs.here.com/routing/docs/routing-v8-adjust-route-after-deviation)
 - [HERE Base Plan restrictions](https://www.here.com/get-started/pricing/base-plan-restrictions)
-- [HERE excluded-use-case definitions](https://www.here.com/get-started/pricing/rps-limits-excluded-use-cases)
+- [HERE Routing API v8 request and response fields](https://docs.here.com/routing/reference/routing-api-v8-calculateroutespost)
+- [HERE traffic-aware routing](https://docs.here.com/routing/docs/routing-v8-traffic-in-routing)
+- [HERE geocoding storage rules](https://docs.here.com/here-kb/docs/permanent-geocoding-overview-licensing-and-usage-rules)
+- [HERE SDK Explore/Navigate feature matrix](https://docs.here.com/here-sdk/docs/flutter-introduction-feature-list)
+- [ORS public-service restrictions](https://openrouteservice.org/restrictions/)
+- [ORS Optimization service](https://openrouteservice.org/services/)
+- [ORS FAQ and documented Directions quota](https://giscience.github.io/openrouteservice/frequently-asked-questions.html)
+- [VROOM solver](https://github.com/VROOM-Project/vroom)
 - [Migration program](../41_HERE_MIGRATION_PROGRAM.md)
 
 ## Alternatives considered
 
-| Alternative | Attraction | Why rejected |
-|---|---|---|
-| HERE SDK Navigate | Complete supported guidance, positioning, warners, offline | Separate commercial agreement and price; removed from the plan |
-| Explore map with external-only navigation | Lowest technical and safety risk | Does not deliver the approved focused in-app guidance experience |
-| Pretend to reproduce every Navigate feature | Marketing parity without the license | Technically unsafe and misleading; many capabilities need map matching and map attributes Explore does not expose |
-| Replace Supabase | Superficially one fewer vendor | HERE does not replace product identity, History, quota, or relational state |
-| Assume Routing allowance permits optimization | Lets development start immediately | Usage allowance and permitted use case are different; Base Plan explicitly flags Optimization |
-| Treat Waypoints Sequence as a Routing v8 parameter | Appears to make 5–25-stop ordering free | It is a separate WPS endpoint, returns order only, and does not remove the Base Plan Optimization restriction |
-| Remove Google OAuth now | Complete Google exit | Couples an independent account migration to the highest-risk location change |
+| Alternative | Why rejected |
+|---|---|
+| HERE Matrix + local TSP | Still implements the excluded HERE Optimization use case; transaction count also scales with matrix dimensions |
+| HERE Waypoints Sequence or Tour Planning | WPS does not remove the restriction; Tour Planning/paid exception is outside the approved plan |
+| Claim VROOM is exact or HERE-traffic-optimal | VROOM is heuristic and ORS does not optimize against HERE live traffic |
+| HERE SDK Navigate | Requires a separate commercial agreement and removes control over the approved cost boundary |
+| Explore with external-only navigation | Does not deliver focused in-app guidance |
+| React Native native bridges | Splits HERE integration and guidance across Dart-equivalent logic, Kotlin, Swift, and JavaScript |
+| Replace Supabase | Does not replace product auth, entitlements, History, quotas, or relational state |
