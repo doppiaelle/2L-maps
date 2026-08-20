@@ -28,3 +28,7 @@ types/database.generated.ts
 # improvement. Its structure is enforced by the 14-section template and the
 # audit in docs/INDEX.md instead.
 *.md
+
+# Disposable Flutter spike is formatted by Flutter tooling.
+spike/flutter/**
+.github/workflows/flutter-spike.yml
