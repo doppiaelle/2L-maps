@@ -8,7 +8,7 @@ import 'spike_config.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  const config = SpikeConfig.fromEnvironment();
+  final config = SpikeConfig.fromEnvironment();
 
   if (!config.isConfigured) {
     runApp(const _ConfigurationMissingApp());
