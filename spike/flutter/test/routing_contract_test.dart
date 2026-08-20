@@ -19,7 +19,7 @@ void main() {
   test('ORS parser rejects omitted stops', () {
     expect(
       () => const OrsOptimizationParser().parse({
-        'routes': [{'steps': [{'type': 'job', 'job': 1}]}],
+        'routes': [{'steps': []}],
       }, stops),
       throwsFormatException,
     );
