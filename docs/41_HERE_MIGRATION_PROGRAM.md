@@ -1,6 +1,6 @@
 # 41 — HERE Explore + ORS/VROOM Migration Program
 
-> **Status:** Approved target; commercial eligibility and spike gated
+> **Status:** Approved target; accounts provisioned; credential rotation and final account checks gated
 > **Owner:** Product owner
 > **Last reviewed:** 2026-08-20
 > **Related:** [ADR-0030](adr/0030-here-platform-and-navigation-target.md) ·
@@ -18,8 +18,10 @@ implemented system from the approved target, names capabilities that are not ava
 HERE SDK Navigate, and orders the migration so that pricing headlines never substitute for
 contract eligibility or measured usage.
 
-It does not claim that HERE is configured, that the Base Plan permits the product's optimization
-use case, or that free allowances have been verified. It does not redefine every current screen,
+It records that ORS and HERE accounts now exist and that the downloaded Flutter package is
+`heresdk-explore-flutter-4.27.2.0.309975.zip`. It does not treat credentials pasted into a chat as
+safe operational credentials: affected HERE and ORS keys must be revoked and replaced before use.
+It also does not claim that ordered-via billing, retention, or every allowance has been measured. It does not redefine every current screen,
 schema, or API payload; those owning documents change in later pull requests after their gates pass.
 
 ### Status vocabulary
@@ -71,7 +73,8 @@ The first production scope is:
   road-sign warnings, tunnel extrapolation, spatial audio, or live truck warners.
 - Calling this engine equivalent to a mature satellite navigator.
 - Storing user History in HERE.
-- Committing the proprietary Explore SDK package to this public repository.
+- Committing the proprietary Explore SDK package, a real `.env`, or credential values to this
+  public repository.
 - Hard-coding the reported 30,000/5,000 allowances before they are verified in the account and
   applicable pricing documents.
 - Fleet dispatch, multiple vehicles, or a web control centre.
@@ -113,8 +116,10 @@ Boundary rules:
 - The Explore SDK is responsible for online map rendering, camera, style, markers, and polylines.
 - Operating-system location is the source of device position because HERE Positioning is
   Navigate-only.
-- ORS optimization and HERE search/geocoding/routing calls are server-mediated so credentials,
-  entitlement, provider quotas, caching, cost, and circuit breakers remain enforceable.
+- ORS optimization and HERE REST search/geocoding/routing calls are server-mediated so
+  credentials, entitlement, provider quotas, caching, cost, and circuit breakers remain
+  enforceable. The HERE SDK itself is initialized in Flutter with Explore access-key credentials
+  injected at build time; they are never committed to the public repository.
 - No HERE Matrix Routing, Waypoints Sequence, Tour Planning, or other HERE optimization endpoint is
   called. ORS returns only the stop order used as ordered vias in one final HERE Routing request.
 - ORS/VROOM is a heuristic VRP solver. The product promises a best-found optimized sequence, never
@@ -126,6 +131,66 @@ Boundary rules:
 - A route saved to History is an immutable provider-neutral snapshot and remains readable without
   a HERE call.
 
+## 4.1 Operational configuration approved for the spike
+
+| Item | Approved value or rule |
+|---|---|
+| HERE SDK | Explore Flutter `4.27.2.0.309975`, private artifact only |
+| HERE SDK auth | `HERE_SDK_ACCESS_KEY_ID` + `HERE_SDK_ACCESS_KEY_SECRET`, build-injected into Flutter initialization |
+| HERE REST auth | `HERE_REST_API_KEY`, Supabase/server only |
+| ORS auth | `ORS_API_KEY`, Supabase/server only |
+| ORS endpoint | `https://api.heigit.org/vroom/v0` |
+| ORS account limit | 500 Optimization requests per rolling account day, plus measured minute limit |
+| Package identity | desired `com.twol.maps`; migration impact must be proved before replacing current `com.doppiaelle.twolmaps` |
+| SDK archive | checksum-pinned private CI input; never committed |
+| Local configuration | ignored local `.env` is allowed; committed real `.env` is forbidden |
+
+The APP ID is an identifier, not an authentication secret. All access keys/secrets and API keys
+shared outside the approved secret channel are treated as compromised and rotated. HERE SDK
+credentials are necessarily consumed by the client runtime, but public source control still must
+not become their distribution mechanism. ORS and HERE REST keys never enter the mobile bundle.
+
+### Mint Clay 3D visual contract
+
+The reference image defines composition and depth, while the existing 2L tokens remain the source
+of brand truth. The spike must prove all of the following on representative dense-city and
+low-detail areas, in both light and dark mode:
+
+- perspective-follow camera with approximately 45° pitch during guidance and a predictable
+  overview transition;
+- visible 3D building volumes where HERE coverage supports them—never synthetic promise of
+  buildings everywhere;
+- clay-like light palette: warm white/light-neutral terrain, slightly separated roads and
+  desaturated building volumes;
+- clay-like dark palette: charcoal terrain/buildings with enough road hierarchy and label
+  contrast for driving;
+- primary route, traveled-route progress, current-position puck and translucent accuracy halo
+  derived from the confirmed mint accent tokens; candidates `#00F5D4` and `#2EC4B6` are
+  contrast-tested rather than both hard-coded;
+- custom stop markers with active/visited/unvisited states and accessible shape differences;
+- reduced generic POI density and labels, while retaining safety-critical road names, maneuver
+  context, attribution, traffic meaning and legal notices;
+- bottom guidance surface, maneuver pill, ETA/distance and minimal current-leg external button
+  placed in Flutter UI above the map rather than baked into map styling;
+- no essential information communicated by mint color alone;
+- screenshots and contrast measurements for daylight, dark mode, route overlap, urban canyon,
+  roundabout, reroute and degraded GPS states.
+
+Use HERE Style Editor output only in a format supported by SDK 4.27.2 and validate it on both
+platforms. A JSON/YAML filename is not assumed until the downloaded package documentation and
+Style Editor export identify the supported artifact.
+
+### Retention implementation contract
+
+Provider-derived HERE search/geocoding coordinates, provider IDs and raw payload fragments receive
+`provider = 'here'`, `provider_fetched_at`, and `provider_expires_at = fetched_at + 30 days`.
+The purge job nulls or deletes those fields after expiry and is idempotent, observable and tested.
+User-authored route name, textual address as entered/confirmed, notes, stop membership and internal
+UUIDs remain durable. Reopening a route with expired coordinates enters a visible “refreshing
+locations” state and re-geocodes before ORS optimization; it never silently navigates stale
+coordinates. Final route polylines, maneuver arrays and route handles are treated as ephemeral
+navigation-session data unless written retention rights explicitly allow longer storage.
+
 ## 5. Flows
 
 ### 5.1 Commercial and account validation
@@ -133,9 +198,9 @@ Boundary rules:
 **Trigger:** this plan is accepted.  
 **Preconditions:** none.
 
-1. Create a HERE Base Plan account.
-2. Register non-production Android and iOS applications.
-3. Obtain Explore credentials and download the Flutter Explore package.
+1. Confirm the provisioned HERE Base Plan account and rotate the credentials exposed during setup.
+2. Confirm Android and iOS application registration. Treat the requested `com.twol.maps` identifier as an explicit migration from the implemented `com.doppiaelle.twolmaps`; verify Google OAuth, deep links, signing and store identity before changing it.
+3. Use the downloaded Explore Flutter package `4.27.2.0.309975`; verify its checksum and license locally, extract its TAR plugin, and deliver it privately to CI.
 4. Confirm access to HERE Style Editor.
 5. Read the account-specific pricing, RPS limits, transaction definitions, and restrictions.
 6. Obtain written confirmation for the actual use cases:
@@ -149,6 +214,14 @@ Boundary rules:
    rerouting; record the ORS `/optimization` daily/minute quota shown by the actual account.
 8. Configure a hard spending ceiling/kill switch where the account permits it.
 9. Put the pinned Explore archive in an approved private artifact channel.
+10. Initialize HERE SDK 4.27.2 programmatically with `SdkContext.init`,
+    `AuthenticationMode.withKeySecret`, and `SDKNativeEngine.makeSharedInstance`; do not put
+    credentials in AndroidManifest.xml or Info.plist. Verify credentials with a real feature
+    engine because initialization alone can succeed with invalid credentials.
+11. Pin the documented compatibility floor for this SDK: Flutter 3.41.9/Dart 3.11.5,
+    Android compile/target SDK 36, min SDK 24, iOS 15.2, and a tested Gradle/AGP/JDK combination.
+12. Call ORS Optimization server-side at `https://api.heigit.org/vroom/v0`; do not retain the
+    deprecated `api.openrouteservice.org/optimization` host.
 
 **Success:** Gate A is green and engineering knows both what is allowed and what each event bills.  
 **Failure:** stop before provider/runtime rewrite. Free quota without permitted use is not a pass.
