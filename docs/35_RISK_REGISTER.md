@@ -13,7 +13,7 @@ This is the single live register of everything that could damage the project, wi
 trigger that tells us it is happening, and a response prepared in advance.
 
 Google-era risks referenced elsewhere as C1–C19 and strategic risks S1–S4 are defined here.
-Hybrid migration risks use H1–H12. Other documents cite the identifier; this file holds the
+Hybrid migration risks use H1–H13. Other documents cite the identifier; this file holds the
 definition, so a risk cannot be described two different ways.
 
 ## 2. Goals
@@ -406,6 +406,7 @@ program gate in [`41_HERE_MIGRATION_PROGRAM.md`](41_HERE_MIGRATION_PROGRAM.md).
 | H10 | Free allowance is mistaken for a provider spend cap | Medium / terminal | Account bills overage or retries continue after application budget | Pre-call server quota, monthly application budget, emergency kill switch; never rely on alerts alone | Product owner + engineering |
 | H11 | Public ORS quota, terms, or availability cannot support the product | Medium / terminal | Account denies commercial use, 25-stop request, required daily volume, or service availability | Account gate; independent breaker; visible manual-order fallback; evaluate self-hosted VROOM/ORS under a separate decision | Product owner + engineering |
 | H12 | Heuristic ORS order is marketed as exact or HERE-live-traffic-optimal | Medium / high | Exact-fixture gap exceeds threshold or product copy claims exact/live-HERE optimization | Benchmark small exact fixtures; record quality gap; use “best order found”; disclose cross-provider traffic limitation | Product + engineering |
+| H13 | Provider credentials or proprietary SDK are exposed through chat, Git, artifacts, logs, or mobile configuration | **Fired / terminal** | A real key is pasted outside the approved secret channel or a populated `.env`/SDK archive enters the public repository | Revoke exposed keys before spike; inject credentials without logging; private checksum-pinned SDK delivery; secret scanning and artifact inspection | Product owner + engineering |
 
 ## 7. Architectural decisions
 
@@ -464,7 +465,7 @@ is not mitigated.
 - [ ] C9 naming decision resolved before first store submission.
 - [ ] S4: no unpushed commits at the end of any working session.
 - [ ] No risk has been silently closed without evidence.
-- [ ] H1–H12 reviewed at each HERE program gate.
+- [ ] H1–H13 reviewed at each HERE program gate.
 - [ ] H1–H4 remain green before any production Flutter rewrite.
 - [ ] H4 physical-road evidence exists before navigation release.
 
@@ -495,6 +496,7 @@ is not mitigated.
 | 2026-08-18 | H1–H8 revised for Explore + owned guidance | Base Plan eligibility, package delivery, GPS ambiguity, reroute cost, style, battery, data, and scope-honesty replace Navigate quote risks | Product owner |
 | 2026-08-18 | H1 fired; H9–H10 added | WPS is separate/excluded, geocoding retention is limited, and no provider hard cap is established | Product owner |
 | 2026-08-20 | H1 structurally mitigated; H11–H12 added | ORS/VROOM separates Optimization from HERE, while public-service quota/SLA and heuristic/cross-provider quality remain gated | Product owner |
+| 2026-08-20 | H13 added and fired | HERE and ORS credentials were pasted into chat; rotation is mandatory before the spike | Product owner |
 
 ## 14. Rationale
 
