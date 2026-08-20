@@ -1,115 +1,107 @@
-# ADR-0031 — Guidance-kernel spike before the Flutter migration
+# ADR-0031 — Hybrid-routing and guidance spike before Flutter migration
 
-**Status:** Accepted
-**Date:** 2026-08-18
-**Deciders:** Product owner
+**Status:** Accepted  
+**Date:** 2026-08-20  
+**Deciders:** Product owner  
 **Related:** ADR-0010, ADR-0013, ADR-0014, ADR-0030
 
 ---
 
 ## Context
 
-The current client is React Native with Expo. HERE officially supports Android, iOS, and Flutter;
-it does not list React Native as a HERE SDK platform. A React Native client would therefore need
-project-owned Kotlin and Swift modules even for HERE SDK Explore.
+HERE officially supports Flutter but not React Native. The target also combines two independent
+online services—ORS/VROOM for ordering and HERE for the final ordered route—with an app-owned
+guidance kernel. The migration must prove provider contracts, quota behavior, solution quality,
+map integration, and route following before replacing the implemented Expo client.
 
-The earlier version of this decision used a spike to compare a React Native bridge with HERE SDK
-Navigate through Flutter. Navigate has now been removed from the plan. Flutter remains the target
-because it is an official HERE SDK Explore platform and the new guidance engine can be written as
-portable, testable Dart rather than split across JavaScript, Kotlin, and Swift.
-
-The new uncertainty is larger than map integration: can a small team build conservative,
-high-quality essential guidance from HERE Routing API v8 maneuvers and operating-system location
-updates without pretending to reproduce HERE Navigate?
+The largest product limitation is intentional: ORS orders against its own travel-cost model and
+VROOM is heuristic. HERE then calculates the final route and live-traffic ETA for that fixed order.
+The spike must measure this seam rather than label it an exact, live-traffic optimum.
 
 ## Decision
 
-Run a timeboxed technical spike before the production Flutter migration. The spike validates the
-app-owned guidance kernel; it does not compare production runtimes.
+Run a disposable, seven-engineering-day Flutter vertical-slice spike after all prerequisites exist.
 
-The spike begins only after:
+### Prerequisites
 
-- HERE confirms the planned use is allowed under the selected plan, including the optimization
-  path;
-- Explore credentials and the exact Flutter package are available;
-- the package can reach CI through a private channel.
+- an ORS account/key whose dashboard and terms confirm commercial product use, actual
+  `/optimization` daily/minute quota, and request-size limits for one vehicle and 5–25 jobs;
+- a HERE Base Plan account confirming Explore package access, ordered-via Routing v8 eligibility,
+  response fields, geocoding retention, and billing units;
+- a private CI delivery path for the proprietary, pinned HERE SDK package;
+- server-only test credentials and independent ORS/HERE circuit-breaker budgets.
 
-The spike builds a disposable Flutter vertical slice with:
+### Spike scope
 
-1. HERE SDK Explore map load and the first custom 2L style on Android and iOS;
-2. a Supabase fixture/adapter returning polyline, `turnByTurnActions`, route handle, summary, and
-   version metadata;
-3. replayable location traces for clean driving, GPS noise, parallel roads, missed turns,
-   roundabouts, pauses, jumps, and app interruption;
-4. a pure-Dart route projection and along-route progress engine;
-5. maneuver selection and staged visual/TTS announcements;
-6. confidence states that suppress guidance when position is ambiguous;
-7. sustained deviation detection and bounded rerouting;
-8. arrival detection, next-leg transition, restoration, and current-leg external handoff;
-9. foreground/background behaviour on Android and iOS;
-10. measurements for binary size, cold start, first map frame, CPU, memory, battery, GPS cadence,
-    API transactions, and false/late/missed maneuver events.
+1. Send one vehicle and 5, 15, and 25 jobs through a Supabase ORS adapter with fixed start and
+   optional fixed return.
+2. Validate stable internal IDs, every job exactly once, and explicit handling of unassigned,
+   duplicate, missing, malformed, timeout, quota, and upstream-error responses.
+3. Benchmark VROOM's best order against exact solutions for small fixtures and representative
+   routes. Record the gap; never make exactness a pass criterion or product claim.
+4. Send the returned order to one HERE Routing v8 HTTP request and request supported polyline,
+   summary, route handle, and `turnByTurnActions`. Measure actual account transactions rather than
+   equating one HTTP request with one billed transaction.
+5. Prove that HERE is never called for Matrix, Waypoints Sequence, Tour Planning, or stop ordering.
+6. Render the route with HERE SDK Explore and the first custom 2L style on Android and iOS.
+7. Replay traces covering normal travel, GPS noise, parallel roads, missed turns, roundabouts,
+   pauses, jumps, app interruption, and stale/changed route versions.
+8. Exercise pure-Dart projection, monotonic progress, confidence/hysteresis, maneuver selection,
+   staged visual/TTS prompts, sustained deviation, bounded rerouting, arrival, next-leg transition,
+   restoration, and current-leg external handoff.
+9. Measure binary size, cold start, first map frame, CPU, memory, battery, GPS cadence, ORS/HERE
+   calls and transactions, reroute loops, and false/late/missed maneuvers.
+10. Prove circuit breakers, cache/retry policy, visible degraded states, and that GPS frequency does
+    not determine upstream-call frequency.
 
-The spike is capped at seven engineering days after prerequisites are available. Five days proved
-map/SDK integration in the old plan; the extra two cover the minimum location-replay and safety
-evidence required by app-owned guidance.
+### Passing conditions
 
-### Passing thresholds
+Numeric thresholds are committed in the spike PR before implementation. The spike fails if:
 
-Exact numeric thresholds are set in the spike PR before code so results cannot move the goalposts.
-At minimum, the spike fails if any of these is true:
+- ORS terms/quota do not support the intended product, or 25-stop requests are not accepted;
+- solution-quality measurements exceed the predeclared gap/failure threshold;
+- any input job is lost, duplicated, or silently unassigned;
+- HERE does not authorize ordered-via final routing or actual billing breaks the free-plan budget;
+- a supported platform cannot reproducibly render the styled Explore map;
+- guidance advances on a nearby parallel road without ambiguity suppression;
+- GPS noise causes reroute loops, or a missed turn produces neither safe reroute nor degradation;
+- restoration silently resumes a different route/version;
+- both in-app guidance and current-leg external fallback can become unavailable;
+- the implementation requires a Navigate-exclusive feature or HERE optimization service.
 
-- a supported target platform cannot render the Explore map reproducibly in CI and on device;
-- guidance advances maneuvers on a nearby parallel road without entering an ambiguous state;
-- brief GPS noise produces reroute loops;
-- a missed turn does not produce either a safe reroute or a visible degraded state;
-- restoration can resume a different route/version silently;
-- the user can lose both in-app guidance and the current-leg external fallback;
-- API use scales with GPS update frequency rather than route/reroute events;
-- the product can only pass by adding a Navigate-exclusive capability.
-
-Flutter becomes the production runtime if this spike passes. If it fails, the response is to
-reduce the guidance promise, retain external navigation, or change provider/license—not to hide
-the failing scenario or grow an unsupported React Native bridge.
+If it passes, Flutter becomes the production runtime. If it fails, reduce the guidance/optimization
+promise, retain manual/external flow, self-host an approved solver stack, or change the commercial
+plan/provider. Do not hide the failed scenario or build an unsupported React Native bridge.
 
 ## Consequences
 
-**Positive.** The rewrite is validated against the real Explore package and the real hard part:
-route following under imperfect location input.
+The spike validates the real cross-provider seam and safety risks before a rewrite. Pure Dart
+geometry/state machines and replay fixtures can be promoted deliberately; the disposable UI and
+provider wiring are not production code.
 
-**Positive.** Pure Dart geometry, state machines, replay fixtures, and thresholds can be tested
-without moving a vehicle, then verified with controlled road tests.
-
-**Positive.** Removing the React Native comparator keeps the spike focused. Flutter is no longer
-being selected for Navigate; it is selected because HERE supports its Explore plugin and the
-project wants one cross-platform guidance implementation.
-
-**Negative.** The spike code is intentionally disposable except for fixtures, measurements, and
-contracts that are deliberately promoted later.
-
-**Negative.** Passing simulated traces is necessary but insufficient. Production still requires
-controlled physical-road testing on both platforms, including poor GPS and background transitions.
-
-**Negative.** Explore does not supply HERE Positioning, map matching, route progress, navigation
-events, or offline maps. All behaviour in those areas is ours and must degrade honestly.
+Passing simulations is necessary but insufficient. Production still requires controlled road tests
+on Android and iOS, quota/availability monitoring, and an honest degraded mode. Public ORS has no
+product SLA, Explore has no HERE Positioning/map matching, and the final order is not HERE
+live-traffic-optimal.
 
 ## Evidence and references
 
-Checked 2026-08-18:
+Checked 2026-08-20:
 
-- [HERE SDK examples and supported platforms](https://github.com/heremaps/here-sdk-examples)
-- [HERE SDK Flutter licenses](https://docs.here.com/here-sdk/docs/flutter-introduction-editions)
-- [HERE Routing turn-by-turn actions](https://docs.here.com/routing/docs/routing-v8-guidance)
-- [HERE Routing rerouting](https://docs.here.com/routing/docs/routing-v8-adjust-route-after-deviation)
-- [Migration program and gate checklist](../41_HERE_MIGRATION_PROGRAM.md)
+- [ORS public-service restrictions](https://openrouteservice.org/restrictions/)
+- [ORS Optimization service](https://openrouteservice.org/services/)
+- [VROOM solver](https://github.com/VROOM-Project/vroom)
+- [HERE SDK examples](https://github.com/heremaps/here-sdk-examples)
+- [HERE SDK Flutter editions](https://docs.here.com/here-sdk/docs/flutter-introduction-editions)
+- [HERE Routing API v8](https://docs.here.com/routing/reference/routing-api-v8-calculateroutespost)
+- [Migration program and gates](../41_HERE_MIGRATION_PROGRAM.md)
 
 ## Alternatives considered
 
-| Alternative | Attraction | Why rejected |
-|---|---|---|
-| Rewrite in Flutter immediately | Matches HERE's published Explore support path | Commits before license, package, guidance, and platform evidence |
-| Retain a React Native comparator | Answers whether the current UI can survive | No longer tests the principal risk; Explore still has no official RN plugin |
-| Build a full React Native bridge | Reuses current UI | Adds two native integration surfaces around a guidance engine that already needs one shared implementation |
-| Evaluate only with public examples | No account required | Examples do not prove credentials, package delivery, custom guidance, or this app's lifecycle |
-| Test only ideal simulated movement | Fast green result | Misses the exact GPS ambiguity and reroute failure modes that justify the spike |
-| Promise feature parity with Navigate | Stronger marketing | The excluded positioning, map-matching, warners, and offline stack cannot be recreated safely in this scope |
+| Alternative | Why rejected |
+|---|---|
+| Rewrite immediately | Commits before quota, contract, billing, provider seam, and guidance evidence |
+| Test only the map | Ignores optimizer correctness, cross-provider mismatch, and safety-critical route following |
+| React Native bridge comparison | HERE has no official RN SDK; it adds two native surfaces without reducing kernel risk |
+| Ideal traces only | Misses ambiguity and reroute failure modes |
+| Exact/live-traffic marketing claim | Unsupported by VROOM's heuristic and ORS/HERE cost-model split |
