@@ -11,14 +11,46 @@
 > Google-era application. It must not be used as the HERE target setup. Google location secrets
 > will be removed after cutover; Supabase values remain; Google OAuth remains initially.
 >
+> Credentials pasted into chat on 2026-08-20 are considered exposed. Revoke and recreate the HERE
+> access-key pair, HERE REST API key, and ORS API key before the spike. Never commit a populated
+> `.env`; only `.env.example` may be versioned. Local ignored `.env` files are permitted.
+>
 > The replacement sequence is controlled by
 > [`41_HERE_MIGRATION_PROGRAM.md`](41_HERE_MIGRATION_PROGRAM.md). Before the spike, create an ORS
-> account/key and record the actual `/optimization` daily/minute quota, 25-job support, and
+> account/key and record the confirmed 500/day Optimization quota, minute limit, 25-job support, and
 > commercial-use terms. Separately create a HERE Base Plan account, register Android/iOS apps,
 > obtain Explore credentials/package, and confirm ordered-via Routing v8 eligibility/billing,
 > turn-by-turn/reroute use, retention, overlays, and exact quotas. Do not copy the ORS Directions
 > 2,000/day figure onto Optimization. Both API keys stay server-side; the Explore archive reaches
-> CI privately. Until Gate A passes, do not delete working Google location secrets.
+> CI privately. The observed archive is `heresdk-explore-flutter-4.27.2.0.309975.zip`, and ORS
+> Optimization uses `https://api.heigit.org/vroom/v0`. HERE SDK credentials are build-injected
+> into programmatic initialization—not AndroidManifest.xml or Info.plist. Until Gate A passes, do
+> not delete working Google location secrets.
+
+### Target variable inventory
+
+| Variable | Destination | Commit value? |
+|---|---|---|
+| `HERE_SDK_ACCESS_KEY_ID` | Flutter build input | No |
+| `HERE_SDK_ACCESS_KEY_SECRET` | Flutter build input | No |
+| `HERE_REST_API_KEY` | Supabase secret | No |
+| `ORS_API_KEY` | Supabase secret | No |
+| `ORS_BASE_URL` | server config; `https://api.heigit.org/vroom/v0` | Yes, non-secret |
+| `SUPABASE_URL` / `SUPABASE_ANON_KEY` | CI build inputs | Keep; anon key is public by design but current workflow uses secrets |
+| `SUPABASE_AUTH_GOOGLE_CLIENT_ID` / `SUPABASE_AUTH_GOOGLE_SECRET` | Supabase Auth provider | Keep until Google login is replaced |
+
+### Google location values to remove after cutover
+
+- `GOOGLE_SERVER_API_KEY` from Supabase Edge Functions/secrets;
+- legacy `MAPS_API_KEY_ANDROID`, `EXPO_PUBLIC_MAPS_API_KEY_ANDROID` and
+  `EXPO_PUBLIC_MAPS_API_KEY_IOS` if still present in GitHub or local environments;
+- `EXPO_PUBLIC_MAP_ID_LIGHT` and `EXPO_PUBLIC_MAP_ID_DARK`;
+- associated Google Places, Geocoding, Routes/Route Optimization and Maps SDK restrictions,
+  quotas and billing configuration.
+
+Do not remove Google OAuth configuration, Supabase deployment credentials, database password,
+Supabase URL/anon key, RevenueCat, Sentry, Firebase or parsing-provider credentials as part of the
+location cutover.
 
 ## 1. Purpose
 
