@@ -46,11 +46,14 @@ jobs:
         env:
           SDK_URL: ${{ secrets.HERE_SDK_DOWNLOAD_URL }}
           SDK_SHA256: ${{ vars.HERE_SDK_SHA256 }}
+          SDK_VERSION: ${{ vars.HERE_SDK_VERSION }}
         run: |
           set -euo pipefail
           mkdir -p /tmp/here-sdk plugins
           curl --fail --location --silent --show-error "$SDK_URL" -o /tmp/here-sdk/here.zip
           test "$(head -c 2 /tmp/here-sdk/here.zip)" = "PK"
+          test -n "$SDK_VERSION"
+          unzip -l /tmp/here-sdk/here.zip | grep -q "heresdk-explore-flutter-$SDK_VERSION"
           sha256sum /tmp/here-sdk/here.zip | tee /tmp/here-sdk/sha256.txt
           actual="$(cut -d' ' -f1 /tmp/here-sdk/sha256.txt)"
           if [ -n "${SDK_SHA256:-}" ] && [ "$actual" != "$SDK_SHA256" ]; then
@@ -114,9 +117,11 @@ jobs:
           SDK_URL: ${{ secrets.HERE_SDK_DOWNLOAD_URL }}
           SDK_ID: ${{ secrets.HERE_SDK_ACCESS_KEY_ID }}
           SDK_SECRET: ${{ secrets.HERE_SDK_ACCESS_KEY_SECRET }}
+          SDK_VERSION: ${{ vars.HERE_SDK_VERSION }}
         run: |
           set -euo pipefail
           mkdir -p /tmp/here-sdk plugins
+          test -n "$SDK_VERSION"
           curl --fail --location --silent --show-error "$SDK_URL" -o /tmp/here-sdk/here.zip
           test "$(head -c 2 /tmp/here-sdk/here.zip)" = "PK"
           unzip -q /tmp/here-sdk/here.zip -d /tmp/here-sdk/unpacked
