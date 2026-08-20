@@ -38,8 +38,8 @@ void main() {
     final here = HereRoutingClient((uri, {required body, required headers}) async {
       fail('network must not be called');
     });
-    expect(
-      () => RouteOrchestrator(ors: client, here: here).buildPlan(
+    await expectLater(
+      RouteOrchestrator(ors: client, here: here).buildPlan(
         stops25,
         orsApiKey: 'ors',
         hereApiKey: 'here',
