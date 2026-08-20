@@ -68,7 +68,10 @@ jobs:
           extracted="$(find plugins -maxdepth 2 -type f -name pubspec.yaml -print -quit)"
           test -n "$extracted"
           plugin_dir="$(dirname "$extracted")"
-          if [ "$plugin_dir" != "plugins/here_sdk" ]; then
+          if [ "$plugin_dir" = "plugins" ]; then
+            mkdir -p plugins/here_sdk
+            find plugins -mindepth 1 -maxdepth 1 ! -name here_sdk -exec mv {} plugins/here_sdk/ \\;
+          elif [ "$plugin_dir" != "plugins/here_sdk" ]; then
             rm -rf plugins/here_sdk
             mv "$plugin_dir" plugins/here_sdk
           fi
@@ -135,7 +138,10 @@ jobs:
           extracted="$(find plugins -maxdepth 2 -type f -name pubspec.yaml -print -quit)"
           test -n "$extracted"
           plugin_dir="$(dirname "$extracted")"
-          if [ "$plugin_dir" != "plugins/here_sdk" ]; then
+          if [ "$plugin_dir" = "plugins" ]; then
+            mkdir -p plugins/here_sdk
+            find plugins -mindepth 1 -maxdepth 1 ! -name here_sdk -exec mv {} plugins/here_sdk/ \\;
+          elif [ "$plugin_dir" != "plugins/here_sdk" ]; then
             rm -rf plugins/here_sdk
             mv "$plugin_dir" plugins/here_sdk
           fi
