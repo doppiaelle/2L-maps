@@ -406,7 +406,7 @@ program gate in [`41_HERE_MIGRATION_PROGRAM.md`](41_HERE_MIGRATION_PROGRAM.md).
 | H10 | Free allowance is mistaken for a provider spend cap | Medium / terminal | Account bills overage or retries continue after application budget | Pre-call server quota, monthly application budget, emergency kill switch; never rely on alerts alone | Product owner + engineering |
 | H11 | Public ORS quota, terms, or availability cannot support the product | Medium / terminal | Account denies commercial use, 25-stop request, required daily volume, or service availability | Account gate; independent breaker; visible manual-order fallback; evaluate self-hosted VROOM/ORS under a separate decision | Product owner + engineering |
 | H12 | Heuristic ORS order is marketed as exact or HERE-live-traffic-optimal | Medium / high | Exact-fixture gap exceeds threshold or product copy claims exact/live-HERE optimization | Benchmark small exact fixtures; record quality gap; use “best order found”; disclose cross-provider traffic limitation | Product + engineering |
-| H13 | Provider credentials or proprietary SDK are exposed through chat, Git, artifacts, logs, or mobile configuration | **Fired / terminal** | A real key is pasted outside the approved secret channel or a populated `.env`/SDK archive enters the public repository | Revoke exposed keys before spike; inject credentials without logging; private checksum-pinned SDK delivery; secret scanning and artifact inspection | Product owner + engineering |
+| H13 | Provider credentials or proprietary SDK are exposed through chat, Git, artifacts, logs, or mobile configuration | **Accepted for spike / terminal for production** | A real key crosses project chat or a populated `.env`/SDK archive enters the public repository | For the spike, store existing keys only in protected secrets and mask logs; rotate before production; private checksum-pinned SDK delivery; secret scanning and artifact inspection | Product owner + engineering |
 
 ## 7. Architectural decisions
 
@@ -496,7 +496,7 @@ is not mitigated.
 | 2026-08-18 | H1–H8 revised for Explore + owned guidance | Base Plan eligibility, package delivery, GPS ambiguity, reroute cost, style, battery, data, and scope-honesty replace Navigate quote risks | Product owner |
 | 2026-08-18 | H1 fired; H9–H10 added | WPS is separate/excluded, geocoding retention is limited, and no provider hard cap is established | Product owner |
 | 2026-08-20 | H1 structurally mitigated; H11–H12 added | ORS/VROOM separates Optimization from HERE, while public-service quota/SLA and heuristic/cross-provider quality remain gated | Product owner |
-| 2026-08-20 | H13 added and fired | HERE and ORS credentials were pasted into chat; rotation is mandatory before the spike | Product owner |
+| 2026-08-20 | H13 added; residual risk accepted for disposable spike | HERE and ORS credentials crossed project chat; owner declined immediate rotation. Protected injection is mandatory and rotation remains a production gate | Product owner |
 
 ## 14. Rationale
 
