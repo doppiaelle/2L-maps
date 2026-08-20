@@ -7,7 +7,7 @@ class OrsOptimizationRequest {
   final String profile;
 
   Map<String, Object?> toJson() => {
-    'jobs': [for (var i = 1; i < stops.length; i++) {'id': i, 'location': [stops[i].longitude, stops[i].latitude]}],
+    'jobs': [for (var i = 1; i < stops.length - 1; i++ {'id': i, 'location': [stops[i].longitude, stops[i].latitude]}],
     'vehicles': [{'id': 1, 'profile': profile, 'start': [stops.first.longitude, stops.first.latitude], 'end': [stops.last.longitude, stops.last.latitude]}],
   };
 
@@ -31,6 +31,7 @@ class OrsOptimizationParser {
         ordered.add(stop);
       }
     }
+    ordered.add(stops.last);
     if (ordered.length != stops.length) throw const FormatException('ORS response omitted a stop');
     return OrderedRoute(stops: ordered);
   }
