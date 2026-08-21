@@ -1,162 +1,91 @@
 name: android-preview
 
-# Builds the Android app for a physical phone (ADR-0014).
-#
-# **Two variants, and the default is the one that works on its own.**
-#
-# - `standalone` (default) — the JavaScript is compiled into the APK. Install it
-#   and it runs. Every change needs a new build, which is this workflow again.
-# - `dev-server` — a development build, which contains no JavaScript and loads it
-#   from a Metro server over the local network. Install it once and every change
-#   arrives by QR code with no rebuild — but it shows a dashboard asking for a
-#   server URL until one is running, and it needs a machine with Node on the same
-#   network.
-#
-# ADR-0014 described only the second, because it assumed a development machine.
-# Without one that variant cannot start at all, which is why it is no longer the
-# default.
-#
-# **Both are signed with the same key.** Expo's template signs the `release`
-# build type with `debug.keystore` too, so the SHA-1 below is correct for either
-# and the Maps key does not need a second fingerprint.
-#
-# Linux runners only, so minutes bill at 1× rather than the 10× macOS rate. This
-# is why the whole approach costs nothing.
-
-# **The signing fingerprint is fixed and knowable in advance.** `assembleDebug`
-# signs with `android/app/debug.keystore`, which Expo's template ships as a fixed
-# file rather than generating per machine — so every build from every runner
-# carries the same SHA-1:
-#
-#     5E:8F:16:06:2E:A3:CD:2C:4A:0D:54:78:76:BA:A6:F3:8C:AB:F6:25
-#
-# That is the value to register against the Maps Android key, and it can be
-# registered before this workflow has ever run. It is the standard Android debug
-# fingerprint and it is not a secret; it is also not a release credential, which
-# is why it may only ever be paired with a key restricted to the Maps SDK
-# (docs/19_SECURITY.md §5).
-
 on:
   workflow_dispatch:
-    inputs:
-      variant:
-        description: Which build
-        required: true
-        type: choice
-        options: [standalone, dev-server]
-        default: standalone
-  push:
-    branches: [main]
-
-concurrency:
-  group: android-preview-${{ github.ref }}
-  cancel-in-progress: true
+  pull_request:
+    paths:
+      - 'spike/flutter/**'
+      - '.github/workflows/android-preview.yml'
 
 jobs:
-  build:
-    name: development build (APK)
+  build-android-preview:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: spike/flutter
+    env:
+      SDK_URL: ${{ secrets.HERE_SDK_DOWNLOAD_URL }}
+      SDK_VERSION: ${{ vars.HERE_SDK_VERSION || vars.HERE_SDK_SDK_VERSION }}
     steps:
       - uses: actions/checkout@v4
-
-      # `inputs.variant` is empty on a push, which falls through to standalone —
-      # the variant that runs without anything else being switched on.
-      - name: Choose the variant
-        id: variant
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.9'
+          channel: stable
+          cache: true
+      - name: Validate SDK inputs
         run: |
-          if [ "${{ inputs.variant }}" = "dev-server" ]; then
-            echo "task=assembleDebug"  >> "$GITHUB_OUTPUT"
-            echo "dir=debug"           >> "$GITHUB_OUTPUT"
-            echo "name=dev-server"     >> "$GITHUB_OUTPUT"
-          else
-            echo "task=assembleRelease" >> "$GITHUB_OUTPUT"
-            echo "dir=release"          >> "$GITHUB_OUTPUT"
-            echo "name=standalone"      >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          test -n "$SDK_URL" || { echo "Missing HERE SDK download URL secret (HERE_SDK_DOWNLOAD_URL)"; exit 1; }
+          test -n "$SDK_VERSION" || { echo "Missing HERE SDK version repository variable (HERE_SDK_VERSION)"; exit 1; }
+      - name: Prepare HERE SDK plugin
+        working-directory: .
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/here-sdk spike/flutter/plugins
+          mkdir -p /tmp/here-sdk spike/flutter/plugins
+          python3 -m pip install --disable-pip-version-check --quiet "gdown==5.2.0"
+          gdown --fuzzy "$SDK_URL" -O /tmp/here-sdk/here.zip
+          test "$(head -c 2 /tmp/here-sdk/here.zip)" = "PK"
+          unzip -q /tmp/here-sdk/here.zip -d /tmp/here-sdk/unpacked
+          tarball="$(find /tmp/here-sdk/unpacked -type f -name '*.tar.gz' | head -n 1)"
+          test -n "$tarball"
+          tar -xzf "$tarball" -C spike/flutter/plugins
+          extracted="$(find spike/flutter/plugins -maxdepth 3 -type f -name pubspec.yaml -print -quit)"
+          test -n "$extracted"
+          plugin_dir="$(dirname "$extracted")"
+          if [ "$plugin_dir" != "spike/flutter/plugins/here_sdk" ]; then
+            rm -rf spike/flutter/plugins/here_sdk
+            mkdir -p spike/flutter/plugins/here_sdk
+            find "$plugin_dir" -mindepth 1 -maxdepth 1 -exec mv {} spike/flutter/plugins/here_sdk/ \;
+            rmdir "$plugin_dir" 2>/dev/null || true
           fi
-          cat "$GITHUB_OUTPUT"
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-
-      # Gradle needs a JDK; the runner image already carries the Android SDK.
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 17
-
-      # Keyed on the lockfile, because that is what decides the dependency set.
-      # `android/` does not exist yet at this point — it is generated by prebuild
-      # below — so keying on a Gradle file would key on nothing.
-      #
-      # Without this every run is a cold run: Gradle re-downloads its own
-      # distribution and every Android dependency before compiling a line.
-      - name: Cache Gradle
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: gradle-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-          restore-keys: gradle-${{ runner.os }}-
-
-      - name: Install
-        run: npm ci
-
-      # The Maps key is restricted by package name AND the SHA-1 of the signing
-      # certificate. CI signs with its own keystore, so that keystore's SHA-1 must
-      # be registered against the key or the map renders grey with no error —
-      # tiles simply never load (docs/25_DEPLOYMENT.md).
-      #
-      # Absent secrets are not a failure: the build still produces an installable
-      # app, it just cannot show a map or reach the backend. That is a useful
-      # artifact while the accounts do not exist yet.
-      - name: Generate native project
-        env:
-          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-          # Unset is a supported state: the map falls back to Google's default
-          # style rather than rendering blank (risk C15). The build does not fail
-          # without them, and the difference is visible rather than reported.
-        run: npx expo prebuild --platform android --no-install --clean
-
-      - name: Build
-        working-directory: android
-        env:
-          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-          # Unset is a supported state: the map falls back to Google's default
-          # style rather than rendering blank (risk C15). The build does not fail
-          # without them, and the difference is visible rather than reported.
-        # **One ABI, not four.** Expo's template defaults to
-        # `armeabi-v7a,arm64-v8a,x86,x86_64`, which compiles every native library
-        # four times — and with the New Architecture that is a great deal of C++.
-        # Every Android phone sold since about 2017 is `arm64-v8a`, and this
-        # artifact exists to be installed on one phone.
-        #
-        # The cost is that the APK will not run on an x86 emulator or a 32-bit
-        # device. Add the others back here if either is ever needed; nothing else
-        # depends on the choice.
-        run: ./gradlew ${{ steps.variant.outputs.task }} --no-daemon -PreactNativeArchitectures=arm64-v8a
-
-      # The SHA-1 is knowable before this workflow ever runs — see the note above
-      # — but it is printed anyway, because "the value is documented" and "the
-      # value the artifact was actually signed with" are two different claims and
-      # only one of them is checkable here.
-      - name: Report the signing SHA-1
-        working-directory: android
-        continue-on-error: true
+      - name: Generate Android project
+        run: flutter create --platforms=android --org com.doppiaelle --project-name twolmaps .
+      - name: Configure Android SDK levels and package
         run: |
-          echo "This APK is signed with the fingerprint below. It must be"
-          echo "registered against the Google Maps Android key, or the map"
-          echo "renders grey with no error message anywhere:"
-          ./gradlew signingReport --no-daemon | grep -A1 'SHA1' | head -20
-
-      - uses: actions/upload-artifact@v4
+          set -euo pipefail
+          git show HEAD:spike/flutter/lib/main.dart > lib/main.dart
+          sed -i 's/^name: .*/name: twol_maps_spike/' pubspec.yaml
+          sed -i 's/package:twolmaps/package:twol_maps_spike/g' test/*.dart
+          rm -f test/widget_test.dart
+          sed -i 's/compileSdk = flutter.compileSdkVersion/compileSdk = 36/' android/app/build.gradle.kts
+          sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 24/' android/app/build.gradle.kts
+          sed -i 's/targetSdk = flutter.targetSdkVersion/targetSdk = 36/' android/app/build.gradle.kts
+          sed -i 's/namespace = "doppiaelle.twolmaps"/namespace = "com.doppiaelle.twolmaps"/' android/app/build.gradle.kts
+          sed -i 's/applicationId = "doppiaelle.twolmaps"/applicationId = "com.doppiaelle.twolmaps"/' android/app/build.gradle.kts
+          grep -q '^name: twol_maps_spike$' pubspec.yaml
+          grep -q 'compileSdk = 36' android/app/build.gradle.kts
+          grep -q 'minSdk = 24' android/app/build.gradle.kts
+          grep -R "com.doppiaelle.twolmaps" android
+      - name: Dependencies and tests
+        run: |
+          flutter pub get
+          flutter test
+      - name: Build installable APK without provider secrets
+        run: |
+          set -euo pipefail
+          flutter build apk --debug
+          test -s build/app/outputs/flutter-apk/app-debug.apk
+      - name: Verify provider REST keys are absent
+        run: |
+          set -euo pipefail
+          apk="build/app/outputs/flutter-apk/app-debug.apk"
+          ! unzip -p "$apk" classes.dex | strings | grep -Eqi 'ORS_API_KEY|HERE_API_KEY|api\.heigit\.org|router\.hereapi\.com'
+      - name: Upload Android preview
+        uses: actions/upload-artifact@v4
         with:
-          name: 2l-maps-${{ steps.variant.outputs.name }}
-          path: android/app/build/outputs/apk/${{ steps.variant.outputs.dir }}/*.apk
-          # Long enough to reinstall after a phone reset without rebuilding.
-          retention-days: 30
+          name: twolmaps-android-preview
+          path: spike/flutter/build/app/outputs/flutter-apk/app-debug.apk
           if-no-files-found: error
+          retention-days: 14
