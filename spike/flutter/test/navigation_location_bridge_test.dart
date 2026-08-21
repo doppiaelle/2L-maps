@@ -101,7 +101,7 @@ void main() {
     await Future<void>.delayed(Duration.zero);
 
     expect(map.follows, 1);
-    expect(speech.calls, ['Parti']);
+    expect(speech.calls, ['Parti in 20 meters']);
 
     bridge.stop();
     tracking.dispose();
