@@ -11,7 +11,7 @@ export SUPABASE_URL='https://...'
 export SUPABASE_ANON_KEY='...'
 export HERE_ACCESS_KEY_ID='...'
 export HERE_ACCESS_KEY_SECRET='...'
-./scripts/build_android_local.sh
+bash scripts/build_android_local.sh
 ```
 
 L'output è `spike/flutter/build/app/outputs/flutter-apk/app-debug.apk`. I valori `dart-define` sono inclusi nel binario dell'app e quindi non sono segreti dopo la distribuzione: usa soltanto credenziali client destinate a essere pubbliche e proteggi le API server-side tramite Supabase/Edge Functions. La CI continua volutamente a produrre una build senza credenziali provider per evitare di pubblicarle nell'artefatto.
