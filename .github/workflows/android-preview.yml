@@ -4,8 +4,8 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
-      - "spike/flutter/**"
-      - ".github/workflows/android-preview.yml"
+      - 'spike/flutter/**'
+      - '.github/workflows/android-preview.yml'
 
 jobs:
   build-android-preview:
@@ -20,7 +20,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: "3.41.9"
+          flutter-version: '3.41.9'
           channel: stable
           cache: true
       - name: Validate SDK inputs
