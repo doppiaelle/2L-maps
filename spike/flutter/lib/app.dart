@@ -71,11 +71,34 @@ class SettingsScreen extends StatelessWidget {
   const SettingsScreen({required this.onTheme, this.onLogout, super.key});
   final ValueChanged<ThemeMode> onTheme;
   final Future<void> Function()? onLogout;
-  @override Widget build(BuildContext context) => _Page(title: 'Impostazioni', subtitle: 'Preferenze dell’app e configurazione.', icon: Icons.settings_outlined, child: Card(child: ListTile(title: const Text('Tema'), trailing: DropdownButton<ThemeMode>(value: ThemeMode.light, items: const [
-    DropdownMenuItem(value: ThemeMode.light, child: Text('Chiaro')), DropdownMenuItem(value: ThemeMode.dark, child: Text('Scuro'))], onChanged: (m) { if (m != null) onTheme(m); })),
-    if (onLogout != null) const Divider(),
-    if (onLogout != null) ListTile(leading: const Icon(Icons.logout), title: const Text('Esci'), onTap: onLogout),
-  )));
+  @override
+  Widget build(BuildContext context) => _Page(
+    title: 'Impostazioni',
+    subtitle: 'Preferenze dell’app e configurazione.',
+    icon: Icons.settings_outlined,
+    child: Card(
+      child: Column(children: [
+        ListTile(
+          title: const Text('Tema'),
+          trailing: DropdownButton<ThemeMode>(
+            value: ThemeMode.light,
+            items: const [
+              DropdownMenuItem(value: ThemeMode.light, child: Text('Chiaro')),
+              DropdownMenuItem(value: ThemeMode.dark, child: Text('Scuro')),
+            ],
+            onChanged: (m) { if (m != null) onTheme(m); },
+          ),
+        ),
+        if (onLogout != null) const Divider(),
+        if (onLogout != null)
+          ListTile(
+            leading: const Icon(Icons.logout),
+            title: const Text('Esci'),
+            onTap: onLogout,
+          ),
+      ]),
+    ),
+  );
 }
 class NavigationScreen extends StatelessWidget {
   const NavigationScreen({super.key});
