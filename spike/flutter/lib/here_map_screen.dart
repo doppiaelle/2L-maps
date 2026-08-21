@@ -54,11 +54,6 @@ class _HereMapScreenState extends State<HereMapScreen> {
       GeoCoordinates(fix.latitude, fix.longitude),
       MapMeasure(MapMeasureKind.distanceInMeters, 450),
     );
-    if (fix.headingDegrees != null) {
-      camera.setOrientationAtTarget(
-        MapCameraOrientation(fix.headingDegrees!, 50),
-      );
-    }
   }
 
   @override
@@ -138,3 +133,4 @@ class _HereMapScreenState extends State<HereMapScreen> {
           ],
         ),
       );
+}
