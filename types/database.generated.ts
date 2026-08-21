@@ -44,7 +44,8 @@ export type Database = {
           id: string
           label: string | null
           last_used_at: string | null
-          place_id: string
+          place_id: string | null
+          saved_place_id: string | null
           use_count: number
           user_id: string
         }
@@ -53,7 +54,8 @@ export type Database = {
           id?: string
           label?: string | null
           last_used_at?: string | null
-          place_id: string
+          place_id?: string | null
+          saved_place_id?: string | null
           use_count?: number
           user_id: string
         }
@@ -62,7 +64,8 @@ export type Database = {
           id?: string
           label?: string | null
           last_used_at?: string | null
-          place_id?: string
+          place_id?: string | null
+          saved_place_id?: string | null
           use_count?: number
           user_id?: string
         }
@@ -73,6 +76,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "places_cache"
             referencedColumns: ["place_id"]
+          },
+          {
+            foreignKeyName: "favourites_saved_place_owner_fkey"
+            columns: ["saved_place_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "saved_places"
+            referencedColumns: ["id", "user_id"]
           },
         ]
       }
@@ -183,6 +193,7 @@ export type Database = {
           optimized_at: string | null
           origin_is_current_location: boolean
           origin_place_id: string | null
+          origin_saved_place_id: string | null
           polyline: string | null
           status: Database["public"]["Enums"]["route_status"]
           total_distance_m: number | null
@@ -204,6 +215,7 @@ export type Database = {
           optimized_at?: string | null
           origin_is_current_location?: boolean
           origin_place_id?: string | null
+          origin_saved_place_id?: string | null
           polyline?: string | null
           status?: Database["public"]["Enums"]["route_status"]
           total_distance_m?: number | null
@@ -225,6 +237,7 @@ export type Database = {
           optimized_at?: string | null
           origin_is_current_location?: boolean
           origin_place_id?: string | null
+          origin_saved_place_id?: string | null
           polyline?: string | null
           status?: Database["public"]["Enums"]["route_status"]
           total_distance_m?: number | null
@@ -240,7 +253,91 @@ export type Database = {
             referencedRelation: "places_cache"
             referencedColumns: ["place_id"]
           },
+          {
+            foreignKeyName: "routes_origin_saved_place_owner_fkey"
+            columns: ["origin_saved_place_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "saved_places"
+            referencedColumns: ["id", "user_id"]
+          },
         ]
+      }
+      saved_place_coordinates: {
+        Row: {
+          created_at: string
+          lat: number | null
+          lng: number | null
+          provider: string
+          provider_expires_at: string | null
+          provider_fetched_at: string | null
+          provider_formatted_address: string | null
+          provider_place_id: string | null
+          provider_raw_payload: Json | null
+          saved_place_id: string
+        }
+        Insert: {
+          created_at?: string
+          lat?: number | null
+          lng?: number | null
+          provider: string
+          provider_expires_at?: string | null
+          provider_fetched_at?: string | null
+          provider_formatted_address?: string | null
+          provider_place_id?: string | null
+          provider_raw_payload?: Json | null
+          saved_place_id: string
+        }
+        Update: {
+          created_at?: string
+          lat?: number | null
+          lng?: number | null
+          provider?: string
+          provider_expires_at?: string | null
+          provider_fetched_at?: string | null
+          provider_formatted_address?: string | null
+          provider_place_id?: string | null
+          provider_raw_payload?: Json | null
+          saved_place_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_place_coordinates_saved_place_id_fkey"
+            columns: ["saved_place_id"]
+            isOneToOne: true
+            referencedRelation: "saved_places"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      saved_places: {
+        Row: {
+          address_text: string
+          created_at: string
+          id: string
+          label: string | null
+          note: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          address_text: string
+          created_at?: string
+          id?: string
+          label?: string | null
+          note?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          address_text?: string
+          created_at?: string
+          id?: string
+          label?: string | null
+          note?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       stops: {
         Row: {
@@ -254,8 +351,9 @@ export type Database = {
           leg_duration_s: number | null
           note: string | null
           optimized_order: number | null
-          place_id: string
+          place_id: string | null
           route_id: string
+          saved_place_id: string | null
           state: Database["public"]["Enums"]["stop_state"]
           updated_at: string
         }
@@ -270,8 +368,9 @@ export type Database = {
           leg_duration_s?: number | null
           note?: string | null
           optimized_order?: number | null
-          place_id: string
+          place_id?: string | null
           route_id: string
+          saved_place_id?: string | null
           state?: Database["public"]["Enums"]["stop_state"]
           updated_at?: string
         }
@@ -286,8 +385,9 @@ export type Database = {
           leg_duration_s?: number | null
           note?: string | null
           optimized_order?: number | null
-          place_id?: string
+          place_id?: string | null
           route_id?: string
+          saved_place_id?: string | null
           state?: Database["public"]["Enums"]["stop_state"]
           updated_at?: string
         }
@@ -304,6 +404,13 @@ export type Database = {
             columns: ["route_id"]
             isOneToOne: false
             referencedRelation: "routes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stops_saved_place_id_fkey"
+            columns: ["saved_place_id"]
+            isOneToOne: false
+            referencedRelation: "saved_places"
             referencedColumns: ["id"]
           },
         ]
