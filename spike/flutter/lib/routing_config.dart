@@ -1,12 +1,17 @@
 class RoutingConfig {
-  const RoutingConfig({required this.orsApiKey, required this.hereApiKey});
-  final String orsApiKey;
-  final String hereApiKey;
+  const RoutingConfig({
+    required this.supabaseUrl,
+    required this.supabaseAnonKey,
+  });
 
-  bool get isConfigured => orsApiKey.isNotEmpty && hereApiKey.isNotEmpty;
+  final String supabaseUrl;
+  final String supabaseAnonKey;
+
+  bool get isConfigured =>
+      supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty;
 
   factory RoutingConfig.fromEnvironment() => const RoutingConfig(
-        orsApiKey: String.fromEnvironment('ORS_API_KEY'),
-        hereApiKey: String.fromEnvironment('HERE_REST_API_KEY'),
+        supabaseUrl: String.fromEnvironment('SUPABASE_URL'),
+        supabaseAnonKey: String.fromEnvironment('SUPABASE_ANON_KEY'),
       );
 }

@@ -8,37 +8,66 @@ class HereRouteParser {
     if (routes is! List || routes.isEmpty || routes.first is! Map) {
       throw const FormatException('HERE response has no routes');
     }
+
     final route = routes.first as Map;
     final sections = route['sections'];
-    if (sections is! List || sections.isEmpty || sections.first is! Map) {
+    if (sections is! List || sections.isEmpty) {
       throw const FormatException('HERE response has no sections');
     }
-    final section = sections.first as Map;
-    final summary = section['summary'];
-    if (summary is! Map) throw const FormatException('HERE response has no summary');
-    final polyline = section['polyline'];
-    if (polyline is! String || polyline.isEmpty) throw const FormatException('HERE response has no polyline');
-    final actions = section['actions'];
+
+    final polylines = <String>[];
     final instructions = <NavigationInstruction>[];
-    if (actions is List) {
-      for (final action in actions) {
-        if (action is Map && action['action'] is String) {
-          instructions.add(NavigationInstruction(
-            action: action['action'] as String,
-            distanceMeters: (action['length'] as num?)?.toDouble() ?? 0,
-            durationSeconds: (action['duration'] as num?)?.toDouble(),
-          ));
+    var distanceMeters = 0.0;
+    var durationSeconds = 0.0;
+
+    for (final value in sections) {
+      if (value is! Map) {
+        throw const FormatException('HERE response has an invalid section');
+      }
+
+      final summary = value['summary'];
+      final polyline = value['polyline'];
+      if (summary is! Map) {
+        throw const FormatException('HERE section has no summary');
+      }
+      if (polyline is! String || polyline.isEmpty) {
+        throw const FormatException('HERE section has no polyline');
+      }
+
+      final distance = summary['length'];
+      final duration = summary['duration'];
+      if (distance is! num || duration is! num) {
+        throw const FormatException('HERE section summary is incomplete');
+      }
+
+      polylines.add(polyline);
+      distanceMeters += distance.toDouble();
+      durationSeconds += duration.toDouble();
+
+      final actions = value['actions'];
+      if (actions is List) {
+        for (final action in actions) {
+          if (action is Map && action['action'] is String) {
+            instructions.add(
+              NavigationInstruction(
+                action: action['action'] as String,
+                distanceMeters: (action['length'] as num?)?.toDouble() ?? 0,
+                durationSeconds: (action['duration'] as num?)?.toDouble(),
+              ),
+            );
+          }
         }
       }
     }
-    final distance = (summary['length'] as num?)?.toDouble();
-    final duration = (summary['duration'] as num?)?.toDouble();
-    if (distance == null || duration == null) throw const FormatException('HERE summary is incomplete');
+
     return HereRouteResult(
-      polyline: polyline,
-      distanceMeters: distance,
-      durationSeconds: duration,
+      polyline: polylines.first,
+      sectionPolylines: polylines,
+      distanceMeters: distanceMeters,
+      durationSeconds: durationSeconds,
       instructions: instructions,
+      routeHandle:
+          route['routeHandle'] is String ? route['routeHandle'] as String : null,
     );
   }
 }

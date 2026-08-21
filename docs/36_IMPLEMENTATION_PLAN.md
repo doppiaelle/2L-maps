@@ -125,10 +125,10 @@ that HERE exists in the application before its gate passes.
 
 | Program wave | Branch / dependency | Content | Gate | Status |
 |---|---|---|---|---|
-| H0 | `docs/here-migration-program` | ORS/VROOM + HERE Explore/final-route decision; risk and gates | ADR-0030 and ADR-0031 accepted | 🔵 |
-| H1 | Product-owner prerequisite | ORS account/quota/terms plus HERE account, apps, ordered-via eligibility/billing, retention and private Explore delivery | Program Gate A | ⛔ blocked: neither account/package exists |
-| H2 | New spike PR from latest `main` | ORS 5/15/25-stop contract and quality tests; one measured HERE final route; styled Explore map; Dart guidance replay | Program Gate B | ⏳ blocked by H1 |
-| H3+ | One new PR per wave | Neutral data/backend, ORS/HERE adapters, Flutter parity, map, essential guidance, release, Google removal | Program Gates C/D | ⏳ |
+| H0 | `docs/here-migration-program` | ORS/VROOM + HERE Explore/final-route decision; risk and gates | ADR-0030 and ADR-0031 accepted | ✅ |
+| H1 | Product-owner prerequisite | HERE/ORS accounts, private Explore archive and protected GitHub/Supabase inputs exist; account-specific legal/billing evidence remains open | Program Gate A | 🟡 partially evidenced |
+| H2 | Merged Flutter spike PRs 15–30 + server-boundary hardening | Android HERE bootstrap, navigation contracts, authenticated hybrid endpoint and 5/15/25-stop provider tests; iOS, physical routing, styling and replay evidence remain open | Program Gate B | 🟡 in progress |
+| H3+ | One new PR per wave | Neutral schema/reset, HERE search, Flutter planner parity, real map renderer, essential guidance, release and Google removal | Program Gates C/D | ⏳ not started |
 
 Approved execution facts:
 
@@ -138,8 +138,8 @@ Approved execution facts:
 - HERE SDK Explore replaces Navigate; 2L owns a limited online guidance state machine.
 - Android remains first, but iOS is proved during the spike rather than deferred to release.
 - Google OAuth stays initially; Google location services are the migration target.
-- SDK code does not start until ORS Optimization terms/quota and HERE ordered-via use/billing are
-  confirmed, credentials exist, and the privately delivered Explore package is available.
+- The existing Android spike and private Explore delivery are technical evidence only; production
+  cutover remains blocked until ORS terms/quota and HERE ordered-via use/billing are confirmed.
 - ORS/VROOM owns ordering. HERE Matrix, Waypoints Sequence, Tour Planning, and any HERE ordering
   logic are blocked. VROOM is heuristic and its order is not HERE-live-traffic-optimal.
 

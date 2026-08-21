@@ -1,6 +1,7 @@
 import { createParseAdapter, type ParseAdapter } from './upstream/parse.ts';
 import { createOpenRouterParseAdapter } from './upstream/parse-openrouter.ts';
 import { createPlacesAdapter } from './upstream/places.ts';
+import { createHybridRoutingAdapter } from './upstream/hybrid-routing.ts';
 import { createRoutesAdapter } from './upstream/routes.ts';
 import { MAX_STOPS } from '../../../types/constants.ts';
 
@@ -48,6 +49,14 @@ export function googleServerKey(): string {
 
 export function routesAdapter(): ReturnType<typeof createRoutesAdapter> {
   return createRoutesAdapter({ apiKey: googleServerKey(), fetchImpl: fetch });
+}
+
+export function hybridRoutingAdapter(): ReturnType<typeof createHybridRoutingAdapter> {
+  return createHybridRoutingAdapter({
+    orsApiKey: requireEnv('ORS_API_KEY'),
+    hereApiKey: requireEnv('HERE_REST_API_KEY'),
+    fetchImpl: fetch,
+  });
 }
 
 export function placesAdapter(): ReturnType<typeof createPlacesAdapter> {

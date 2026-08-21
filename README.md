@@ -24,16 +24,24 @@ Every push to `main` starts `.github/workflows/android-preview.yml`. Download th
 `2l-maps-standalone` artifact from that run and validate the physical Android build against
 [`docs/40_UI_IMPLEMENTATION_AUDIT.md`](docs/40_UI_IMPLEMENTATION_AUDIT.md).
 
-### Approved target, spike prerequisites partially provisioned
+### Approved target and verified migration boundary
 
 The approved target is a disaggregated stack: **OpenRouteService/VROOM** orders 5–25 stops,
 **HERE SDK Explore** renders the branded map, and **HERE Routing API v8** calculates the final route
 through those already ordered stops. The target client is Flutter; HERE SDK Navigate is excluded.
 The provisioned package is HERE Explore Flutter `4.27.2.0.309975`; ORS reports 500 Optimization
-requests/day. Credentials shared during setup may be used for the disposable spike only through protected secret injection; rotation remains required before production. Ordered-via billing
-and retention remain measured gates. Supabase remains the server-side control plane and system of
-record. Google OAuth may remain
-initially because authentication is independent of location services.
+requests/day. Credentials are stored only in GitHub/Supabase protected secrets. Existing valid keys remain
+usable; rotate them only if exposure or compromise warrants it. Ordered-via billing and retention
+remain measured gates. Supabase remains the server-side control plane and system of
+record. Google OAuth may remain initially because authentication is independent of location
+services.
+
+The merged Flutter spike now exposes a separate authenticated Supabase `hybrid-optimize`
+function: ORS computes stop order, one HERE request resolves the ordered geometry, and only a
+provider-neutral response reaches Flutter. This is an integration slice, not the production
+cutover: the Expo application and its existing Google-backed endpoints remain active until the
+provider-neutral schema, Flutter planner parity, physical-device gates, and migration rollout are
+completed.
 
 2L Maps will build a conservative online guidance kernel from operating-system location updates
 and HERE Routing API v8 polylines, route handles, and `turnByTurnActions`. The first scope is
@@ -144,7 +152,8 @@ Read [`CLAUDE.md`](CLAUDE.md) and the document owning the area before writing co
 - Start every new program wave from the latest `main` and use a new pull request.
 - Do not combine runtime rewrite, provider cutover, schema reset, and guidance into one merge.
 - Do not commit HERE SDK archives, populated `.env` files, credentials, account pricing, or
-  contracts publicly. Keys that crossed chat are accepted only for the disposable spike and rotated before production.
+  contracts publicly. Existing valid keys remain protected in GitHub/Supabase; rotate them when
+  exposure, compromise, or an explicit security decision requires it.
 - Keep provider access behind facades and all metered server calls behind Supabase quota.
 - A GPS sample never directly triggers a paid request.
 - Do not present essential guidance as equivalent to HERE Navigate.
