@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:twolmaps/off_route_recovery.dart';
-import 'package:twolmaps/navigation_models.dart';
-import 'package:twolmaps/speech_adapter.dart';
+import 'package:twol_maps_spike/off_route_recovery.dart';
+import 'package:twol_maps_spike/navigation_models.dart';
+import 'package:twol_maps_spike/speech_adapter.dart';
 
 class _Engine implements SpeechEngine {
   final calls = <String>[];
