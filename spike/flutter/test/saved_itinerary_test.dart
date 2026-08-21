@@ -62,7 +62,7 @@ void main() {
     expect((await repo.find('r'))!.isFavorite, isTrue);
     final copy = await repo.duplicate('r');
     expect(copy.id, 'copy');
-    expect((await SavedItineraryRepository(store, userId: 'other').list(), isEmpty);
+    expect((await SavedItineraryRepository(store, userId: 'other').list()), isEmpty);
     expect(() => repo.save(_itinerary(user: 'other')), throwsStateError);
   });
 
