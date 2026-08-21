@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'search_transport.dart';
+import 'route_models.dart';
+import 'route_orchestrator.dart';
+import 'routing_transport.dart';
 
 class PlannerStop {
   PlannerStop({required this.address, this.label = '', this.note = '', this.latitude, this.longitude});
@@ -13,8 +16,9 @@ class PlannerStop {
 }
 
 class PlannerController extends ChangeNotifier {
-  PlannerController({required this.search, this.maxStops = 25});
+  PlannerController({required this.search, this.orchestrator, this.maxStops = 25});
   final SupabaseSearchClient search;
+  final RouteOrchestrator? orchestrator;
   final int maxStops;
   final List<PlannerStop> stops = [];
   PlannerStop? start;
@@ -26,8 +30,34 @@ class PlannerController extends ChangeNotifier {
   List<AddressSuggestion> suggestions = [];
   Timer? _debounce;
   int _requestId = 0;
+  bool optimizing = false;
+  ServerNavigationPlan? plan;
+  String? optimizationError;
+  int _optimizationRequest = 0;
 
   bool get canAddStop => stops.length < maxStops;
+  Future<ServerNavigationPlan?> optimizeRoute(List<Stop> route, {required String accessToken}) async {
+    final service = orchestrator;
+    if (service == null) { optimizationError = 'Ottimizzazione non configurata.'; notifyListeners(); return null; }
+    if (optimizing) return plan;
+    if (route.length < 3 || route.length > maxStops) {
+      optimizationError = 'L’itinerario deve contenere da 3 a $maxStops punti.';
+      notifyListeners(); return null;
+    }
+    final request = ++_optimizationRequest;
+    optimizing = true; optimizationError = null; notifyListeners();
+    try {
+      final result = await service.buildPlan(route, accessToken: accessToken);
+      if (request == _optimizationRequest) plan = result;
+      return result;
+    } catch (error) {
+      if (request == _optimizationRequest) optimizationError = error is StateError ? error.message : 'Impossibile calcolare il percorso.';
+      return null;
+    } finally {
+      if (request == _optimizationRequest) { optimizing = false; notifyListeners(); }
+    }
+  }
+
   void setGps({required bool available, required bool permissionGranted, double? latitude, double? longitude}) {
     gpsAvailable = available; locationPermissionGranted = permissionGranted;
     start ??= PlannerStop(address: available ? 'La mia posizione' : 'Seleziona una partenza', latitude: latitude, longitude: longitude);
