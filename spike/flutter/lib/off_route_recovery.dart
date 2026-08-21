@@ -50,8 +50,13 @@ class OffRouteMonitor {
       );
     }
     final now = _clock();
-    if (_lastRecalculation != null && now.difference(_lastRecalculation!) < cooldown) {
-      return const RecalculationDecision(shouldRecalculate: false, cause: RecoveryCause.cooldown);
+    if (_lastRecalculation != null) {
+      final elapsed = now.difference(_lastRecalculation!);
+      if (elapsed < cooldown) {
+        return const RecalculationDecision(shouldRecalculate: false, cause: RecoveryCause.cooldown);
+      }
+      _lastRecalculation = now;
+      return const RecalculationDecision(shouldRecalculate: true, cause: RecoveryCause.offRoute);
     }
     _consecutive++;
     if (_consecutive < requiredConsecutiveSamples) {
