@@ -28,6 +28,16 @@ class TurnNavigationSnapshot {
       instructionIndex + 1 < instructions.length
           ? instructions[instructionIndex + 1]
           : null;
+
+  Map<String, Object?> toJson() => {
+        'status': status.name,
+        'instructionIndex': instructionIndex,
+        'sectionIndex': sectionIndex,
+        'distanceRemainingMeters': distanceRemainingMeters,
+        'durationRemainingSeconds': durationRemainingSeconds,
+        'eta': eta.toIso8601String(),
+        'arrivedAtStop': arrivedAtStop,
+      };
 }
 
 class TurnNavigationController {
@@ -65,7 +75,9 @@ class TurnNavigationController {
 
   String? get activePolyline {
     final sections = _route?.sectionPolylines ?? const <String>[];
-    return sections.isEmpty ? _route?.polyline : sections[_sectionIndex.clamp(0, sections.length - 1)];
+    if (sections.isEmpty) return _route?.polyline;
+    final index = _sectionIndex.clamp(0, sections.length - 1).toInt();
+    return sections[index];
   }
 
   TurnNavigationSnapshot? get snapshot => _eta == null
