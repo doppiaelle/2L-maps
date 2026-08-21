@@ -183,17 +183,17 @@ class LocationTrackingController extends ChangeNotifier {
   }
 
   void suspend() {
-    if (_suspended) return;
+    if (_suspended || _subscription == null) return;
     _suspended = true;
-    _subscription?.pause();
+    _subscription!.pause();
     _set(LocationTrackingState.suspended,
         'Posizione sospesa finché l’app non torna in primo piano.');
   }
 
   void resume() {
-    if (!_suspended) return;
+    if (!_suspended || _subscription == null) return;
     _suspended = false;
-    _subscription?.resume();
+    _subscription!.resume();
     _set(LocationTrackingState.active,
         _latest == null ? 'Ricerca posizione iniziale…' : null);
   }
