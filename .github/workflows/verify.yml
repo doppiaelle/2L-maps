@@ -37,7 +37,12 @@ jobs:
         run: npm run lint
 
       - name: Format
-        run: npm run format
+        run: |
+          npm run format || {
+            npx prettier --write .
+            git --no-pager diff -- .
+            exit 1
+          }
 
       - name: Test
         run: npm test -- --ci

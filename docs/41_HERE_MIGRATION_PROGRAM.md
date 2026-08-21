@@ -1,6 +1,6 @@
 # 41 — HERE Explore + ORS/VROOM Migration Program
 
-> **Status:** Approved target; protected inputs provisioned; hybrid spike in progress
+> **Status:** Hybrid server routing implemented; additive provider-neutral persistence and HERE retention introduced
 > **Owner:** Product owner
 > **Last reviewed:** 2026-08-20
 > **Related:** [ADR-0030](adr/0030-here-platform-and-navigation-target.md) ·
@@ -187,7 +187,13 @@ Style Editor export identify the supported artifact.
 
 Provider-derived HERE search/geocoding coordinates, provider IDs and raw payload fragments receive
 `provider = 'here'`, `provider_fetched_at`, and `provider_expires_at = fetched_at + 30 days`.
-The purge job nulls or deletes those fields after expiry and is idempotent, observable and tested.
+The additive provider-neutral migration now stores durable user-authored addresses in private
+`saved_places` and isolates HERE-derived material in server-written `saved_place_coordinates`.
+`routes`, `stops`, and `favourites` accept internal UUID references while remaining compatible with
+legacy Google-shaped records. The monitored existing daily purge nulls provider IDs, formatted
+addresses, raw payloads, coordinates, timestamps, route geometry and leg metrics after expiry;
+it also removes expired optimization-cache entries. Owner-bound RLS and real two-user Postgres
+tests prevent cross-user place references or direct client writes to provider data.
 User-authored route name, textual address as entered/confirmed, notes, stop membership and internal
 UUIDs remain durable. Reopening a route with expired coordinates enters a visible “refreshing
 locations” state and re-geocodes before ORS optimization; it never silently navigates stale
