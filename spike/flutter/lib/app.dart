@@ -4,6 +4,7 @@ import 'app_theme.dart';
 import 'here_map_screen.dart';
 import 'auth_screen.dart';
 import 'auth_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class TwolMapsApp extends StatefulWidget {
   const TwolMapsApp({required this.bootstrap, super.key});
@@ -45,6 +46,7 @@ class _AuthGateState extends State<_AuthGate> {
   );
 }
 
+class ConfigurationScreen extends StatelessWidget {
   const ConfigurationScreen({required this.result, super.key});
   final AppBootstrapResult result;
   @override Widget build(BuildContext context) => Scaffold(body: Center(child: Padding(padding: const EdgeInsets.all(32), child: Card(child: Padding(padding: const EdgeInsets.all(28), child: Column(mainAxisSize: MainAxisSize.min, children: [
