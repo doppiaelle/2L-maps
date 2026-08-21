@@ -49,16 +49,16 @@ class OffRouteMonitor {
         cause: RecoveryCause.gpsImprecise,
       );
     }
+    final now = _clock();
+    if (_lastRecalculation != null && now.difference(_lastRecalculation!) < cooldown) {
+      return const RecalculationDecision(shouldRecalculate: false, cause: RecoveryCause.cooldown);
+    }
     _consecutive++;
     if (_consecutive < requiredConsecutiveSamples) {
       return const RecalculationDecision(
         shouldRecalculate: false,
         cause: RecoveryCause.gpsImprecise,
       );
-    }
-    final now = _clock();
-    if (_lastRecalculation != null && now.difference(_lastRecalculation!) < cooldown) {
-      return const RecalculationDecision(shouldRecalculate: false, cause: RecoveryCause.cooldown);
     }
     _lastRecalculation = now;
     _consecutive = 0;
