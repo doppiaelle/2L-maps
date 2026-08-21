@@ -11,6 +11,13 @@ expo-env.d.ts
 /ios
 /android
 
+# generated HERE plugin and copied Flutter brand asset
+/spike/flutter/plugins/
+/spike/flutter/assets/brand/logo.png
+/spike/flutter/build/
+/spike/flutter/.dart_tool/
+/spike/flutter/pubspec.lock
+
 # native artefacts and signing material
 .kotlin/
 *.orig.*
