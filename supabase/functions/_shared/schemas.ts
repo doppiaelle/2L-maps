@@ -172,7 +172,6 @@ export const hereRefreshRequestSchema = z.object({
   savedPlaceIds: z.array(z.string().uuid()).min(1).max(MAX_STOPS),
 });
 
-
 /**
  * `/place-details` — the re-hydration path.
  *
