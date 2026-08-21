@@ -20,7 +20,7 @@ void main() {
   test('onboarding and authentication lead to planner', () {
     final coordinator = ExperienceCoordinator();
     expect(coordinator.state.phase, ExperiencePhase.onboarding);
-    coordinator.completeOnboarding(false);
+    coordinator.completeOnboarding(authenticated: false);
     expect(coordinator.state.phase, ExperiencePhase.unauthenticated);
     coordinator.signedIn();
     expect(coordinator.state.phase, ExperiencePhase.planner);
@@ -44,14 +44,13 @@ void main() {
   test('route lifecycle reaches navigation and completion', () {
     final coordinator = ExperienceCoordinator();
     coordinator.signedIn();
-    final itinerary = _itinerary(2);
-    coordinator.beginOptimization(itinerary);
+    coordinator.beginOptimization(_itinerary(2));
 
     const route = HereRouteResult(
       polyline: 'encoded',
       distanceMeters: 1250,
       durationSeconds: 3660,
-      instructions: <TurnAction>[],
+      instructions: <NavigationInstruction>[],
     );
     coordinator.routeReady(route);
     expect(coordinator.state.phase, ExperiencePhase.routeReady);
