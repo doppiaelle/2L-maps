@@ -16,6 +16,8 @@ jobs:
     env:
       SDK_URL: ${{ secrets.HERE_SDK_DOWNLOAD_URL }}
       SDK_VERSION: ${{ vars.HERE_SDK_VERSION || vars.HERE_SDK_SDK_VERSION }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -23,11 +25,13 @@ jobs:
           flutter-version: '3.41.9'
           channel: stable
           cache: true
-      - name: Validate SDK inputs
+      - name: Validate SDK and runtime inputs
         run: |
           set -euo pipefail
           test -n "$SDK_URL" || { echo "Missing HERE SDK download URL secret (HERE_SDK_DOWNLOAD_URL)"; exit 1; }
           test -n "$SDK_VERSION" || { echo "Missing HERE SDK version repository variable (HERE_SDK_VERSION)"; exit 1; }
+          test -n "$SUPABASE_URL" || { echo "Missing Supabase URL secret (SUPABASE_URL)"; exit 1; }
+          test -n "$SUPABASE_ANON_KEY" || { echo "Missing Supabase publishable/anon key secret (SUPABASE_ANON_KEY)"; exit 1; }
       - name: Prepare HERE SDK plugin
         working-directory: .
         run: |
@@ -72,10 +76,12 @@ jobs:
         run: |
           flutter pub get
           flutter test
-      - name: Build installable APK without provider secrets
+      - name: Build installable APK with public runtime config
         run: |
           set -euo pipefail
-          flutter build apk --debug
+          flutter build apk --debug \
+            --dart-define=SUPABASE_URL="$SUPABASE_URL" \
+            --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"
           test -s build/app/outputs/flutter-apk/app-debug.apk
       - name: Verify provider REST keys are absent
         run: |
