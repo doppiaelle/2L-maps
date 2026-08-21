@@ -19,10 +19,10 @@ class _TwolMapsAppState extends State<TwolMapsApp> {
   @override void dispose() { if (widget.bootstrap.status == BootstrapStatus.ready) disposeBootstrap(); super.dispose(); }
 }
 class _Shell extends StatelessWidget {
-  const _Shell({required this.index, required this.onIndex, required this.onTheme});
-  final int index; final ValueChanged<int> onIndex; final ValueChanged<ThemeMode> onTheme;
+  const _Shell({required this.index, required this.onIndex, required this.onTheme, this.onLogout});
+  final int index; final ValueChanged<int> onIndex; final ValueChanged<ThemeMode> onTheme; final Future<void> Function()? onLogout;
   @override Widget build(BuildContext context) {
-    final pages = [const PlannerScreen(), const HistoryScreen(), SettingsScreen(onTheme: onTheme), const NavigationScreen()];
+    final pages = [const PlannerScreen(), const HistoryScreen(), SettingsScreen(onTheme: onTheme, onLogout: onLogout), const NavigationScreen()];
     return Scaffold(body: IndexedStack(index: index, children: pages), bottomNavigationBar: NavigationBar(selectedIndex: index, onDestinationSelected: onIndex, destinations: const [
       NavigationDestination(icon: Icon(Icons.route), label: 'Planner'), NavigationDestination(icon: Icon(Icons.history), label: 'Storico'),
       NavigationDestination(icon: Icon(Icons.settings_outlined), label: 'Impostazioni'), NavigationDestination(icon: Icon(Icons.navigation_outlined), label: 'Navigazione'),
@@ -42,7 +42,7 @@ class _AuthGateState extends State<_AuthGate> {
     initialData: AuthState(AuthChangeEvent.initialSession, auth.session),
     builder: (context, snapshot) => snapshot.data?.session == null
       ? AuthScreen(auth: auth)
-      : _Shell(index: 0, onIndex: (_) {}, onTheme: widget.onTheme),
+      : _Shell(index: 0, onIndex: (_) {}, onTheme: widget.onTheme, onLogout: auth.signOut),
   );
 }
 
@@ -68,10 +68,14 @@ class HistoryScreen extends StatelessWidget {
   @override Widget build(BuildContext context) => const _Page(title: 'I tuoi itinerari', subtitle: 'Gli itinerari salvati appariranno qui.', icon: Icons.history, child: Card(child: Padding(padding: EdgeInsets.all(40), child: Text('Nessun itinerario salvato'))));
 }
 class SettingsScreen extends StatelessWidget {
-  const SettingsScreen({required this.onTheme, super.key});
+  const SettingsScreen({required this.onTheme, this.onLogout, super.key});
   final ValueChanged<ThemeMode> onTheme;
+  final Future<void> Function()? onLogout;
   @override Widget build(BuildContext context) => _Page(title: 'Impostazioni', subtitle: 'Preferenze dell’app e configurazione.', icon: Icons.settings_outlined, child: Card(child: ListTile(title: const Text('Tema'), trailing: DropdownButton<ThemeMode>(value: ThemeMode.light, items: const [
-    DropdownMenuItem(value: ThemeMode.light, child: Text('Chiaro')), DropdownMenuItem(value: ThemeMode.dark, child: Text('Scuro'))], onChanged: (m) { if (m != null) onTheme(m); }))));
+    DropdownMenuItem(value: ThemeMode.light, child: Text('Chiaro')), DropdownMenuItem(value: ThemeMode.dark, child: Text('Scuro'))], onChanged: (m) { if (m != null) onTheme(m); })),
+    if (onLogout != null) const Divider(),
+    if (onLogout != null) ListTile(leading: const Icon(Icons.logout), title: const Text('Esci'), onTap: onLogout),
+  )));
 }
 class NavigationScreen extends StatelessWidget {
   const NavigationScreen({super.key});
