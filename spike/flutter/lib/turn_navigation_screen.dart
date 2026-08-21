@@ -35,8 +35,8 @@ class _TurnNavigationScreenState extends State<TurnNavigationScreen> {
   }
 
   String _distance(double meters) => meters >= 1000
-      ? '\${(meters / 1000).toStringAsFixed(1)} km'
-      : '\${meters.round()} m';
+      ? '${(meters / 1000).toStringAsFixed(1)} km'
+      : '${meters.round()} m';
 
   @override
   Widget build(BuildContext context) {
@@ -51,7 +51,7 @@ class _TurnNavigationScreenState extends State<TurnNavigationScreen> {
           followPosition: active,
           userPosition: widget.userPosition,
           routeSummary: active
-              ? '\${_distance(controller.distanceRemainingMeters)} rimanenti'
+              ? '${_distance(controller.distanceRemainingMeters)} rimanenti'
               : null,
         ),
         if (active)
@@ -70,9 +70,9 @@ class _TurnNavigationScreenState extends State<TurnNavigationScreen> {
                         style: Theme.of(context).textTheme.headlineSmall),
                     Text(current == null
                         ? 'Arrivo'
-                        : '\${_distance(current.distanceMeters)} alla prossima manovra'),
+                        : '${_distance(current.distanceMeters)} alla prossima manovra'),
                     if (next != null)
-                      Text('Dopo: \${next.action}',
+                      Text('Dopo: ${next.action}',
                           style: Theme.of(context).textTheme.bodySmall),
                     const SizedBox(height: 10),
                     Row(
