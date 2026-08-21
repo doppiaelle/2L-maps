@@ -1,4 +1,4 @@
-name: flutter-here-spike
+name: flutter-app-foundation
 
 on:
   pull_request:
@@ -14,12 +14,12 @@ on:
         default: false
 
 concurrency:
-  group: flutter-here-spike-${{ github.ref }}
+  group: flutter-app-foundation-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   android:
-    name: HERE Explore Android bootstrap
+    name: Flutter app Android build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -121,7 +121,7 @@ jobs:
           ! grep -R -n "String.fromEnvironment(\x27HERE_REST_API_KEY\x27)" lib
 
   ios:
-    name: HERE Explore iOS bootstrap
+    name: Flutter app iOS build
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_ios }}
     runs-on: macos-latest
     steps:
