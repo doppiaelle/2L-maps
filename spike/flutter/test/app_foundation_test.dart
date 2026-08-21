@@ -39,7 +39,11 @@ void main() {
       ),
     );
 
-    final client = SupabaseClient('https://example.supabase.co', 'anon');
+    final client = SupabaseClient(
+      'https://example.supabase.co',
+      'anon',
+      authOptions: const GoTrueClientOptions(autoRefreshToken: false),
+    );
     await tester.pumpWidget(MaterialApp(home: AuthScreen(auth: AuthSessionController(client: client))));
     await tester.pumpAndSettle();
     expect(find.text('Accedi a 2L Maps'), findsOneWidget);
