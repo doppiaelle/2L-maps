@@ -61,11 +61,20 @@ with required (kind, object, detail, needed_by) as (
     ('table',    'places_cache',      '',                    '/places-autocomplete'),
     ('column',   'places_cache',      'coords_refreshed_at', '/place-details'),
     ('table',    'favourites',        '',                    'the address book'),
+    -- Provider-neutral user content and server-written expiring HERE material.
+    ('table',    'saved_places',      '',                    'provider-neutral History'),
+    ('table',    'saved_place_coordinates', '',              'HERE coordinate retention'),
+    ('column',   'saved_places',      'address_text',        'durable user-authored addresses'),
+    ('column',   'saved_place_coordinates', 'provider_expires_at', '30-day HERE retention'),
+    ('column',   'routes',            'origin_saved_place_id', 'provider-neutral route origin'),
+    ('column',   'stops',             'saved_place_id',      'provider-neutral itinerary stops'),
     ('function', 'record_place_use',  '',                    'the address book'),
     -- The phone uses PostgREST as `authenticated`, and Postgres checks table
     -- privileges before RLS policies. If these grants are missing, a perfectly
     -- valid owner policy still fails with "permission denied for table routes".
     ('privilege', 'routes',              'select,insert,update,delete', 'History sync'),
+    ('privilege', 'saved_places',        'select,insert,update,delete', 'provider-neutral address book'),
+    ('privilege', 'saved_place_coordinates', 'select',                'private HERE location refresh'),
     ('privilege', 'stops',               'select,insert,update,delete', 'History sync'),
     ('privilege', 'favourites',          'select,insert,update,delete', 'the address book'),
     ('privilege', 'places_cache',        'select',                      'history addresses and suggestions'),

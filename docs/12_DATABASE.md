@@ -1,5 +1,18 @@
 # 12 — Database
 
+> **Migration update — provider-neutral HERE persistence:** The forward-only migration
+> `20260821100000_provider_neutral_saved_places.sql` adds private `saved_places` and
+> server-written `saved_place_coordinates` without breaking the active Expo/Google schema.
+> User-authored `address_text`, labels, notes and internal UUIDs are permanent. HERE place
+> identifiers, formatted addresses, raw payloads and coordinates are perishable and carry
+> `provider_fetched_at` plus `provider_expires_at <= fetched_at + 30 days`.
+> Existing `routes`, `stops` and `favourites` accept either one legacy Google place ID or
+> one owned internal saved-place UUID. RLS isolates each user's private address book, and
+> only server-side code may write provider coordinates. The existing monitored daily purge
+> clears expired legacy/HERE values, route geometry, leg metrics and optimization-cache rows.
+> The remaining sections describe the legacy shape until the final migration cutover.
+
+
 > **Status:** Approved
 > **Owner:** Architecture
 > **Last reviewed:** 2026-08-06

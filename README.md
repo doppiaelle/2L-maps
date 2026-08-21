@@ -38,10 +38,12 @@ services.
 
 The merged Flutter spike now exposes a separate authenticated Supabase `hybrid-optimize`
 function: ORS computes stop order, one HERE request resolves the ordered geometry, and only a
-provider-neutral response reaches Flutter. This is an integration slice, not the production
-cutover: the Expo application and its existing Google-backed endpoints remain active until the
-provider-neutral schema, Flutter planner parity, physical-device gates, and migration rollout are
-completed.
+provider-neutral response reaches Flutter. Supabase now also exposes an additive, private
+provider-neutral persistence boundary: user-authored addresses use internal UUIDs, HERE-derived
+coordinates and provider identifiers expire within 30 days, and the daily monitored purge also
+removes expired route geometry. Legacy Expo/Google routes remain readable during migration.
+This is still not the production cutover: HERE search, Flutter planner parity, physical-device
+gates, generated live database types, and migration rollout remain separate milestones.
 
 2L Maps will build a conservative online guidance kernel from operating-system location updates
 and HERE Routing API v8 polylines, route handles, and `turnByTurnActions`. The first scope is
