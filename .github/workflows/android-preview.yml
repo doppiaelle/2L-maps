@@ -14,7 +14,7 @@ jobs:
       run:
         working-directory: spike/flutter
     env:
-      SDK_URL: ${{ secrets.HERE_SDK_URL || secrets.HERE_SDK_DOWNLOAD_URL }}
+      SDK_URL: ${{ secrets.HERE_SDK_DOWNLOAD_URL }}
       SDK_VERSION: ${{ vars.HERE_SDK_VERSION || vars.HERE_SDK_SDK_VERSION }}
     steps:
       - uses: actions/checkout@v4
