@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'app_bootstrap.dart';
 import 'app_theme.dart';
 import 'here_map_screen.dart';
+import 'auth_screen.dart';
+import 'auth_service.dart';
 
 class TwolMapsApp extends StatefulWidget {
   const TwolMapsApp({required this.bootstrap, super.key});
@@ -12,7 +14,7 @@ class _TwolMapsAppState extends State<TwolMapsApp> {
   ThemeMode mode = ThemeMode.light;
   int index = 0;
   @override Widget build(BuildContext context) => MaterialApp(title: '2L Maps', theme: AppTheme.light(), darkTheme: AppTheme.dark(), themeMode: mode,
-    home: widget.bootstrap.status == BootstrapStatus.ready ? _Shell(index: index, onIndex: (i) => setState(() => index = i), onTheme: (m) => setState(() => mode = m)) : ConfigurationScreen(result: widget.bootstrap));
+    home: widget.bootstrap.status == BootstrapStatus.ready ? _AuthGate(onTheme: (m) => setState(() => mode = m)) : ConfigurationScreen(result: widget.bootstrap));
   @override void dispose() { if (widget.bootstrap.status == BootstrapStatus.ready) disposeBootstrap(); super.dispose(); }
 }
 class _Shell extends StatelessWidget {
@@ -26,7 +28,23 @@ class _Shell extends StatelessWidget {
     ]));
   }
 }
-class ConfigurationScreen extends StatelessWidget {
+class _AuthGate extends StatefulWidget {
+  const _AuthGate({required this.onTheme});
+  final ValueChanged<ThemeMode> onTheme;
+  @override State<_AuthGate> createState() => _AuthGateState();
+}
+class _AuthGateState extends State<_AuthGate> {
+  late final AuthSessionController auth;
+  @override void initState() { super.initState(); auth = AuthSessionController(); }
+  @override Widget build(BuildContext context) => StreamBuilder<AuthState>(
+    stream: auth.authStateChanges,
+    initialData: AuthState(AuthChangeEvent.initialSession, auth.session),
+    builder: (context, snapshot) => snapshot.data?.session == null
+      ? AuthScreen(auth: auth)
+      : _Shell(index: 0, onIndex: (_) {}, onTheme: widget.onTheme),
+  );
+}
+
   const ConfigurationScreen({required this.result, super.key});
   final AppBootstrapResult result;
   @override Widget build(BuildContext context) => Scaffold(body: Center(child: Padding(padding: const EdgeInsets.all(32), child: Card(child: Padding(padding: const EdgeInsets.all(28), child: Column(mainAxisSize: MainAxisSize.min, children: [
