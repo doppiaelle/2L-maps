@@ -29,32 +29,30 @@ class _AuthScreenState extends State<AuthScreen> {
     catch (_) { if (mounted) setState(() => error = 'Accesso Google non disponibile.'); }
     finally { if (mounted) setState(() => busy = false); }
   }
-  @override Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(child: SingleChildScrollView(
-        padding: const EdgeInsets.all(28),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 440),
-          child: Card(child: Padding(
-            padding: const EdgeInsets.all(28),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              Icon(Icons.route, size: 52, color: Theme.of(context).colorScheme.primary),
-              const SizedBox(height: 16),
-              Text(register ? 'Crea il tuo account' : 'Accedi a 2L Maps', style: Theme.of(context).textTheme.headlineSmall),
-              const SizedBox(height: 20),
-              TextField(controller: email, keyboardType: TextInputType.emailAddress, decoration: const InputDecoration(labelText: 'Email')),
-              const SizedBox(height: 12),
-              TextField(controller: password, obscureText: true, decoration: const InputDecoration(labelText: 'Password')),
-              if (error != null) ...[const SizedBox(height: 12), Text(error!, style: const TextStyle(color: Colors.red))],
-              const SizedBox(height: 20),
-              FilledButton(onPressed: busy ? null : submit, child: Text(register ? 'Registrati' : 'Accedi')),
-              const SizedBox(height: 8),
-              OutlinedButton.icon(onPressed: busy ? null : google, icon: const Icon(Icons.login), label: const Text('Continua con Google')),
-              TextButton(onPressed: busy ? null : () => setState(() { register = !register; error = null; }), child: Text(register ? 'Hai già un account? Accedi' : 'Crea un account')),
-            ]),
-          )),
-        ),
-      )),
-    );
-  }
+  @override Widget build(BuildContext context) => Scaffold(
+    body: Center(child: SingleChildScrollView(
+      padding: const EdgeInsets.all(28),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 440),
+        child: Card(child: Padding(
+          padding: const EdgeInsets.all(28),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Image.asset('../../assets/brand/logo.png', height: 84, fit: BoxFit.contain),
+            const SizedBox(height: 16),
+            Text(register ? 'Crea il tuo account' : 'Accedi a 2L Maps', style: Theme.of(context).textTheme.headlineSmall),
+            const SizedBox(height: 20),
+            TextField(controller: email, keyboardType: TextInputType.emailAddress, decoration: const InputDecoration(labelText: 'Email')),
+            const SizedBox(height: 12),
+            TextField(controller: password, obscureText: true, decoration: const InputDecoration(labelText: 'Password')),
+            if (error != null) ...[const SizedBox(height: 12), Text(error!, style: const TextStyle(color: Colors.red))],
+            const SizedBox(height: 20),
+            FilledButton(onPressed: busy ? null : submit, child: Text(register ? 'Registrati' : 'Accedi')),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(onPressed: busy ? null : google, icon: const Icon(Icons.login), label: const Text('Continua con Google')),
+            TextButton(onPressed: busy ? null : () => setState(() { register = !register; error = null; }), child: Text(register ? 'Hai già un account? Accedi' : 'Crea un account')),
+          ]),
+        )),
+      ),
+    )),
+  );
 }
