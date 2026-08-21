@@ -66,7 +66,7 @@ void main() {
     expect(() => repo.save(_itinerary(user: 'other')), throwsStateError);
   });
 
-  test('reopen refreshes expired coordinates and always reoptimizes', () async {
+  test('reopen refreshes missing coordinates and always reoptimizes', () async {
     var refreshes = 0;
     var optimizations = 0;
     final reopener = SavedItineraryReopener(
@@ -78,7 +78,7 @@ void main() {
       now: DateTime.utc(2026, 1, 1),
     );
     expect(result.route.distanceMeters, 42);
-    expect(refreshes, 0);
+    expect(refreshes, 1);
     expect(optimizations, 1);
   });
 }
