@@ -33,5 +33,5 @@ class MapPresentation {
 
 List<MapMarker> numberedMarkers(List<MapMarker> markers) => [
   for (var i = 0; i < markers.length; i++)
-    MapMarker(id: '\${i + 1}:\${markers[i].id}', latitude: markers[i].latitude, longitude: markers[i].longitude, color: markers[i].color),
+    MapMarker(id: '${i + 1}:${markers[i].id}', latitude: markers[i].latitude, longitude: markers[i].longitude, color: markers[i].color),
 ];
