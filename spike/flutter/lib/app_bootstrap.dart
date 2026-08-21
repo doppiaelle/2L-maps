@@ -19,4 +19,7 @@ Future<AppBootstrapResult> bootstrapApp() async {
   if (!config.isConfigured) return AppBootstrapResult(status: BootstrapStatus.missingConfiguration, config: config, message: 'Configura Supabase e HERE tramite dart-define.');
   try { await Supabase.initialize(url: config.supabaseUrl, anonKey: config.supabaseAnonKey); SdkContext.init(IsolateOrigin.main); final auth=AuthenticationMode.withKeySecret(config.hereAccessKeyId, config.hereAccessKeySecret); await SDKNativeEngine.makeSharedInstance(SDKOptions.withAuthenticationMode(auth)); return AppBootstrapResult(status: BootstrapStatus.ready, config: config); } on InstantiationException catch (e) { return AppBootstrapResult(status: BootstrapStatus.failed, config: config, message: 'Impossibile inizializzare HERE: $e'); } catch (e) { return AppBootstrapResult(status: BootstrapStatus.failed, config: config, message: 'Impossibile inizializzare i servizi: $e'); }
 }
-void disposeBootstrap(){SDKNativeEngine.sharedInstance?.dispose(); SdkContext.release();}
+void disposeBootstrap() {
+  try { SDKNativeEngine.sharedInstance?.dispose(); } catch (_) {}
+  try { SdkContext.release(); } catch (_) {}
+}
