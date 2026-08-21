@@ -1,4 +1,8 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../lib/auth_screen.dart';
+import '../lib/auth_service.dart';
 
 import '../lib/app.dart';
 import '../lib/app_bootstrap.dart';
@@ -35,10 +39,14 @@ void main() {
       ),
     );
 
-    await tester.pumpWidget(TwolMapsApp(bootstrap: result));
-    expect(find.text('Planner'), findsOneWidget);
-    expect(find.text('Storico'), findsOneWidget);
-    expect(find.text('Impostazioni'), findsOneWidget);
-    expect(find.text('Navigazione'), findsOneWidget);
+    final client = SupabaseClient(
+      'https://example.supabase.co',
+      'anon'
+    );
+    await tester.pumpWidget(MaterialApp(home: AuthScreen(auth: AuthSessionController(client: client))));
+    await tester.pumpAndSettle();
+    expect(find.text('Accedi a 2L Maps'), findsOneWidget);
+    expect(find.text('Continua con Google'), findsOneWidget);
+    client.auth.stopAutoRefresh();
   });
 }
