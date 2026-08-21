@@ -22,9 +22,10 @@ void main() {
   test('session ignores positions before start and composes subsystems', () async {
     final map = FakeMap();
     final speech = FakeSpeech();
+    final progress = NavigationProgress();
     final session = NavigationSession(
-      progress: NavigationProgress(),
-      positionAdapter: NavigationPositionAdapter(NavigationProgress()),
+      progress: progress,
+      positionAdapter: NavigationPositionAdapter(progress),
       mapPresenter: MapPresenter(map),
       announcer: NavigationAnnouncer(speech),
     );
