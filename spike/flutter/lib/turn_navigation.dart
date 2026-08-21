@@ -142,6 +142,29 @@ class TurnNavigationController {
     }
   }
 
+  static TurnNavigationController restore(
+    HereRouteResult route,
+    Map<String, Object?> data, {
+    DateTime Function()? clock,
+  }) {
+    final controller = TurnNavigationController(clock: clock);
+    controller.start(route);
+    controller._status = TurnNavigationStatus.values.firstWhere(
+      (value) => value.name == data['status'],
+      orElse: () => TurnNavigationStatus.paused,
+    );
+    controller._instructionIndex = (data['instructionIndex'] as num?)?.toInt() ?? 0;
+    controller._sectionIndex = (data['sectionIndex'] as num?)?.toInt() ?? 0;
+    controller._distanceRemainingMeters =
+        (data['distanceRemainingMeters'] as num?)?.toDouble() ?? route.distanceMeters;
+    controller._durationRemainingSeconds =
+        (data['durationRemainingSeconds'] as num?)?.toDouble() ?? route.durationSeconds;
+    final eta = data['eta'];
+    controller._eta = eta is String ? DateTime.tryParse(eta) : controller._eta;
+    controller._arrivedAtStop = data['arrivedAtStop'] == true;
+    return controller;
+  }
+
   Map<String, Object?> toJson() => {
         'status': _status.name,
         'instructionIndex': _instructionIndex,
