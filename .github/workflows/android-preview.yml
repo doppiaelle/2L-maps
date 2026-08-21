@@ -26,7 +26,7 @@ jobs:
       - name: Validate SDK inputs
         run: |
           set -euo pipefail
-          test -n "$SDK_URL" || { echo "Missing HERE SDK download URL secret (HERE_SDK_URL or HERE_SDK_DOWNLOAD_URL)"; exit 1; }
+          test -n "$SDK_URL" || { echo "Missing HERE SDK download URL secret (HERE_SDK_DOWNLOAD_URL)"; exit 1; }
           test -n "$SDK_VERSION" || { echo "Missing HERE SDK version repository variable (HERE_SDK_VERSION)"; exit 1; }
       - name: Prepare HERE SDK plugin
         working-directory: .
@@ -54,11 +54,14 @@ jobs:
         run: flutter create --platforms=android --org com.doppiaelle --project-name twolmaps .
       - name: Configure Android SDK levels and package
         run: |
+          set -euo pipefail
+          sed -i 's/^name: .*/name: twolmaps/' pubspec.yaml
           sed -i 's/compileSdk = flutter.compileSdkVersion/compileSdk = 36/' android/app/build.gradle.kts
           sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 24/' android/app/build.gradle.kts
           sed -i 's/targetSdk = flutter.targetSdkVersion/targetSdk = 36/' android/app/build.gradle.kts
           sed -i 's/namespace = "doppiaelle.twolmaps"/namespace = "com.doppiaelle.twolmaps"/' android/app/build.gradle.kts
           sed -i 's/applicationId = "doppiaelle.twolmaps"/applicationId = "com.doppiaelle.twolmaps"/' android/app/build.gradle.kts
+          grep -q '^name: twolmaps$' pubspec.yaml
           grep -q 'compileSdk = 36' android/app/build.gradle.kts
           grep -q 'minSdk = 24' android/app/build.gradle.kts
           grep -R "com.doppiaelle.twolmaps" android
