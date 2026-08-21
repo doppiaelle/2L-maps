@@ -2,11 +2,13 @@ import 'navigation_models.dart';
 import 'navigation_progress.dart';
 
 class PositionFix {
-  const PositionFix({required this.latitude, required this.longitude, required this.accuracyMeters, required this.timestamp});
+  const PositionFix({required this.latitude, required this.longitude, required this.accuracyMeters, required this.timestamp, this.headingDegrees, this.speedMetersPerSecond});
   final double latitude;
   final double longitude;
   final double accuracyMeters;
   final DateTime timestamp;
+  final double? headingDegrees;
+  final double? speedMetersPerSecond;
 }
 
 abstract interface class PositionSource {
