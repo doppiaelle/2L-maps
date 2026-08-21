@@ -80,7 +80,18 @@ jobs:
         working-directory: spike/flutter
         run: |
           flutter create --platforms=android --org com.doppiaelle --project-name twolmaps .
-          sed -i '/<manifest /a\\    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />' android/app/src/main/AndroidManifest.xml
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('android/app/src/main/AndroidManifest.xml')
+          manifest = path.read_text()
+          permissions = (
+              '    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\\n'
+              '    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\\n'
+          )
+          if 'android.permission.ACCESS_FINE_LOCATION' not in manifest:
+              manifest = manifest.replace('</manifest>', permissions + '</manifest>')
+              path.write_text(manifest)
+          PY
           grep -q 'android.permission.ACCESS_FINE_LOCATION' android/app/src/main/AndroidManifest.xml
           grep -Eq 'applicationId[[:space:]]*=[[:space:]]*"com.doppiaelle.twolmaps"' android/app/build.gradle.kts
           rm -f test/widget_test.dart
