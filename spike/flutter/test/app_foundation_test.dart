@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../lib/app.dart';
 import '../lib/app_bootstrap.dart';
@@ -35,10 +36,9 @@ void main() {
       ),
     );
 
+    await Supabase.initialize(url: 'https://example.supabase.co', anonKey: 'anon');
     await tester.pumpWidget(TwolMapsApp(bootstrap: result));
-    expect(find.text('Planner'), findsOneWidget);
-    expect(find.text('Storico'), findsOneWidget);
-    expect(find.text('Impostazioni'), findsOneWidget);
-    expect(find.text('Navigazione'), findsOneWidget);
+    expect(find.text('Accedi a 2L Maps'), findsOneWidget);
+    expect(find.text('Continua con Google'), findsOneWidget);
   });
 }
