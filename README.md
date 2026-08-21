@@ -41,9 +41,11 @@ function: ORS computes stop order, one HERE request resolves the ordered geometr
 provider-neutral response reaches Flutter. Supabase now also exposes an additive, private
 provider-neutral persistence boundary: user-authored addresses use internal UUIDs, HERE-derived
 coordinates and provider identifiers expire within 30 days, and the daily monitored purge also
-removes expired route geometry. Legacy Expo/Google routes remain readable during migration.
-This is still not the production cutover: HERE search, Flutter planner parity, physical-device
-gates, generated live database types, and migration rollout remain separate milestones.
+removes expired route geometry. Authenticated `here-search`, `here-geocode`, and
+`here-place-details` functions now perform HERE address search, private saved-place geocoding,
+and expired-coordinate refresh entirely server-side. Legacy Expo/Google routes remain readable
+during migration. This is still not the production cutover: Flutter planner parity,
+physical-device gates, and rollout remain separate milestones.
 
 2L Maps will build a conservative online guidance kernel from operating-system location updates
 and HERE Routing API v8 polylines, route handles, and `turnByTurnActions`. The first scope is

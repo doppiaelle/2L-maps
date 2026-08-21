@@ -149,6 +149,29 @@ export const geocodeRequestSchema = z.object({
 
 export type GeocodeRequest = z.infer<typeof geocodeRequestSchema>;
 
+/** HERE requests are private, provider-neutral and never require Google session tokens. */
+export const hereSearchRequestSchema = z.object({
+  input: z.string().trim().min(1).max(200),
+  locale: z.string().min(2).max(35).nullable().optional(),
+  bias: z
+    .object({
+      lat: z.number().min(-90).max(90),
+      lng: z.number().min(-180).max(180),
+    })
+    .nullable()
+    .optional(),
+  limit: z.number().int().min(1).max(10).optional(),
+});
+
+export const hereGeocodeRequestSchema = z.object({
+  addresses: z.array(z.string().trim().min(1).max(500)).min(1).max(MAX_STOPS),
+  region: z.string().length(2).optional(),
+});
+
+export const hereRefreshRequestSchema = z.object({
+  savedPlaceIds: z.array(z.string().uuid()).min(1).max(MAX_STOPS),
+});
+
 /**
  * `/place-details` — the re-hydration path.
  *
