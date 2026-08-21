@@ -80,6 +80,19 @@ jobs:
         working-directory: spike/flutter
         run: |
           flutter create --platforms=android --org com.doppiaelle --project-name twolmaps .
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('android/app/src/main/AndroidManifest.xml')
+          manifest = path.read_text()
+          permissions = (
+              '    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\\n'
+              '    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\\n'
+          )
+          if 'android.permission.ACCESS_FINE_LOCATION' not in manifest:
+              manifest = manifest.replace('</manifest>', permissions + '</manifest>')
+              path.write_text(manifest)
+          PY
+          grep -q 'android.permission.ACCESS_FINE_LOCATION' android/app/src/main/AndroidManifest.xml
           grep -Eq 'applicationId[[:space:]]*=[[:space:]]*"com.doppiaelle.twolmaps"' android/app/build.gradle.kts
           rm -f test/widget_test.dart
 
@@ -160,6 +173,8 @@ jobs:
             mv "$plugin_dir" plugins/here_sdk
           fi
           flutter create --platforms=ios --org com.doppiaelle --project-name twolmaps .
+          /usr/libexec/PlistBuddy -c "Add :NSLocationWhenInUseUsageDescription string '2L Maps usa la posizione per guidarti lungo l’itinerario.'" ios/Runner/Info.plist
+          grep -q 'NSLocationWhenInUseUsageDescription' ios/Runner/Info.plist
           grep -q 'PRODUCT_BUNDLE_IDENTIFIER = com.doppiaelle.twolmaps;' ios/Runner.xcodeproj/project.pbxproj
           rm -f test/widget_test.dart
           flutter pub get

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'app_bootstrap.dart';
 import 'app_theme.dart';
 import 'here_map_screen.dart';
+import 'location_tracking.dart';
 import 'auth_screen.dart';
 import 'auth_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -100,10 +101,134 @@ class SettingsScreen extends StatelessWidget {
     ),
   );
 }
-class NavigationScreen extends StatelessWidget {
+class NavigationScreen extends StatefulWidget {
   const NavigationScreen({super.key});
-  @override Widget build(BuildContext context) => const _Page(title: 'Navigazione', subtitle: 'La guida turn-by-turn apparirà qui.', icon: Icons.navigation_outlined, child: HereMapScreen());
+
+  @override
+  State<NavigationScreen> createState() => _NavigationScreenState();
 }
+
+class _NavigationScreenState extends State<NavigationScreen>
+    with WidgetsBindingObserver {
+  late final LocationTrackingController tracking;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    tracking = LocationTrackingController(
+      platform: const GeolocatorDeviceLocationPlatform(),
+    );
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      tracking.resume();
+    } else if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      tracking.suspend();
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    tracking.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+        animation: tracking,
+        builder: (context, _) => _Page(
+          title: 'Navigazione',
+          subtitle: _subtitle,
+          icon: Icons.navigation_outlined,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              HereMapScreen(
+                followPosition: tracking.hasPosition,
+                userPosition: tracking.latest,
+                routeSummary: tracking.hasPosition
+                    ? 'GPS attivo · precisione ${tracking.latest!.accuracyMeters.toStringAsFixed(0)} m'
+                    : null,
+              ),
+              const SizedBox(height: 12),
+              Card(
+                child: ListTile(
+                  leading: Icon(_statusIcon),
+                  title: Text(_statusTitle),
+                  subtitle: Text(tracking.message ??
+                      (tracking.hasPosition
+                          ? 'Posizione aggiornata in tempo reale.'
+                          : 'La posizione iniziale non è ancora disponibile.')),
+                  trailing: _action,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+
+  String get _subtitle => tracking.hasPosition
+      ? 'La mappa segue la tua posizione.'
+      : 'Attiva il GPS per avviare la guida.';
+
+  String get _statusTitle => switch (tracking.state) {
+        LocationTrackingState.active => tracking.hasPosition
+            ? 'Posizione rilevata'
+            : 'Ricerca posizione GPS',
+        LocationTrackingState.weakSignal => 'Segnale GPS debole',
+        LocationTrackingState.serviceDisabled => 'GPS disattivato',
+        LocationTrackingState.permissionDenied => 'Permesso negato',
+        LocationTrackingState.permissionDeniedForever => 'Permesso bloccato',
+        LocationTrackingState.suspended => 'Posizione sospesa',
+        LocationTrackingState.error => 'GPS non disponibile',
+        LocationTrackingState.requestingPermission => 'Richiesta permesso',
+        LocationTrackingState.idle => 'GPS non attivo',
+      };
+
+  IconData get _statusIcon => switch (tracking.state) {
+        LocationTrackingState.active => Icons.gps_fixed,
+        LocationTrackingState.weakSignal => Icons.gps_not_fixed,
+        LocationTrackingState.serviceDisabled => Icons.location_off,
+        LocationTrackingState.permissionDenied ||
+        LocationTrackingState.permissionDeniedForever => Icons.location_disabled,
+        LocationTrackingState.suspended => Icons.pause_circle_outline,
+        LocationTrackingState.error => Icons.error_outline,
+        LocationTrackingState.requestingPermission => Icons.location_searching,
+        LocationTrackingState.idle => Icons.gps_off,
+      };
+
+  Widget get _action {
+    final needsSettings = tracking.state == LocationTrackingState.serviceDisabled ||
+        tracking.state == LocationTrackingState.permissionDeniedForever;
+    if (needsSettings) {
+      return TextButton(
+        onPressed: tracking.openSettingsForCurrentIssue,
+        child: const Text('Impostazioni'),
+      );
+    }
+    if (tracking.state == LocationTrackingState.requestingPermission) {
+      return const SizedBox(
+        width: 24,
+        height: 24,
+        child: Padding(
+          padding: EdgeInsets.all(4),
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      );
+    }
+    return FilledButton(
+      onPressed: tracking.start,
+      child: Text(tracking.hasPosition ? 'Aggiorna' : 'Attiva GPS'),
+    );
+  }
+}
+
 class _Page extends StatelessWidget {
   const _Page({required this.title, required this.subtitle, required this.icon, required this.child});
   final String title, subtitle; final IconData icon; final Widget child;
