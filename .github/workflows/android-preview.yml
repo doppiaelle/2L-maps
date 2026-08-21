@@ -55,13 +55,40 @@ jobs:
       - name: Configure Android SDK levels and package
         run: |
           set -euo pipefail
-          sed -i 's/^name: .*/name: twolmaps/' pubspec.yaml
+          git show HEAD:spike/flutter/lib/main.dart > lib/main.dart
+          sed -i 's/^name: .*/name: twol_maps_spike/' pubspec.yaml
+          sed -i 's/package:twolmaps/package:twol_maps_spike/g' test/*.dart
           sed -i 's/compileSdk = flutter.compileSdkVersion/compileSdk = 36/' android/app/build.gradle.kts
           sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 24/' android/app/build.gradle.kts
           sed -i 's/targetSdk = flutter.targetSdkVersion/targetSdk = 36/' android/app/build.gradle.kts
           sed -i 's/namespace = "doppiaelle.twolmaps"/namespace = "com.doppiaelle.twolmaps"/' android/app/build.gradle.kts
           sed -i 's/applicationId = "doppiaelle.twolmaps"/applicationId = "com.doppiaelle.twolmaps"/' android/app/build.gradle.kts
-          grep -q '^name: twolmaps$' pubspec.yaml
+          grep -q '^name: twol_maps_spike
+          grep -q 'compileSdk = 36' android/app/build.gradle.kts
+          grep -q 'minSdk = 24' android/app/build.gradle.kts
+          grep -R "com.doppiaelle.twolmaps" android
+      - name: Dependencies and tests
+        run: |
+          flutter pub get
+          flutter test
+      - name: Build installable APK without provider secrets
+        run: |
+          set -euo pipefail
+          flutter build apk --debug
+          test -s build/app/outputs/flutter-apk/app-debug.apk
+      - name: Verify provider REST keys are absent
+        run: |
+          set -euo pipefail
+          apk="build/app/outputs/flutter-apk/app-debug.apk"
+          ! unzip -p "$apk" classes.dex | strings | grep -Eqi 'ORS_API_KEY|HERE_API_KEY|api\.heigit\.org|router\.hereapi\.com'
+      - name: Upload Android preview
+        uses: actions/upload-artifact@v4
+        with:
+          name: twolmaps-android-preview
+          path: spike/flutter/build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
+ pubspec.yaml
           grep -q 'compileSdk = 36' android/app/build.gradle.kts
           grep -q 'minSdk = 24' android/app/build.gradle.kts
           grep -R "com.doppiaelle.twolmaps" android
