@@ -123,11 +123,10 @@ describe('provider-neutral private places', () => {
     );
 
     await expect(
-      database.asUser(
+      database.asUser(alice, 'insert into favourites (user_id, saved_place_id) values ($1, $2)', [
         alice,
-        'insert into favourites (user_id, saved_place_id) values ($1, $2)',
-        [alice, alicePlace],
-      ),
+        alicePlace,
+      ]),
     ).rejects.toThrow(/duplicate key/i);
   });
 });
