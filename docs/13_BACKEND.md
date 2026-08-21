@@ -9,6 +9,13 @@
 
 ## 1. Purpose
 
+**Migration status:** `hybrid-optimize` and the authenticated `here-search`, `here-geocode`, and
+`here-place-details` functions run beside the legacy Google endpoints. HERE/ORS credentials stay
+in Supabase secrets. HERE coordinates are private per user, retained for at most 30 days, and
+refreshed from the durable user-authored address rather than from a permanent provider identifier.
+The new functions reuse the existing entitlement, rate-limit, quota, and usage-recording pipeline.
+
+
 This document specifies the server side: the Supabase Edge Functions, the pipeline every one of
 them runs, and how upstream Google calls are authenticated, limited, cached and recorded.
 

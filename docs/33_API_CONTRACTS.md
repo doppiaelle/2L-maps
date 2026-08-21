@@ -15,6 +15,23 @@
 
 ## 1. Purpose
 
+### Additive HERE migration contracts
+
+All three endpoints require a Supabase user JWT and reuse their legacy endpoint's existing
+entitlement, burst limit, quota, and usage event. Provider API keys never reach the client.
+
+- `POST /functions/v1/here-search`: `{ input, locale?, bias?: { lat, lng }, limit? }` returns
+  `{ suggestions: [{ address, latitude, longitude }] }`. Suggestions are transient and expose no
+  HERE place identifier.
+- `POST /functions/v1/here-geocode`: `{ addresses, region? }` returns
+  `{ resolved: [{ savedPlaceId, addressText, formattedAddress, latitude, longitude, fetchedAt,
+  expiresAt, index }], unresolved: [{ index, input }] }`. The internal UUID and user-authored
+  address remain durable; provider-derived values expire within 30 days.
+- `POST /functions/v1/here-place-details`: `{ savedPlaceIds }` returns the same resolved shape and
+  `{ unresolved: [{ savedPlaceId }] }`. Only the authenticated owner's saved places are readable;
+  fresh private coordinates are reused and expired coordinates are geocoded again.
+
+
 This document specifies every interface the app crosses: the internal contracts between client
 and Edge Functions, and the external contracts between Edge Functions and Google. For each it
 records inputs, outputs, errors, timeouts, retry policy, caching and rate limits.

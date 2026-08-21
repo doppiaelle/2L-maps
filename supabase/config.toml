@@ -64,6 +64,15 @@ verify_jwt = true
 [functions.places-autocomplete]
 verify_jwt = true
 
+[functions.here-search]
+verify_jwt = true
+
+[functions.here-geocode]
+verify_jwt = true
+
+[functions.here-place-details]
+verify_jwt = true
+
 [functions.place-details]
 verify_jwt = true
 

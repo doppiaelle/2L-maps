@@ -1,6 +1,6 @@
 # 41 — HERE Explore + ORS/VROOM Migration Program
 
-> **Status:** Hybrid server routing implemented; additive provider-neutral persistence and HERE retention introduced
+> **Status:** Hybrid server routing, provider-neutral persistence, HERE search/geocoding, and private coordinate refresh implemented
 > **Owner:** Product owner
 > **Last reviewed:** 2026-08-20
 > **Related:** [ADR-0030](adr/0030-here-platform-and-navigation-target.md) ·
