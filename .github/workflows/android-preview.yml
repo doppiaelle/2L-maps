@@ -47,12 +47,12 @@ jobs:
           if [ "$plugin_dir" != "spike/flutter/plugins/here_sdk" ]; then
             rm -rf spike/flutter/plugins/here_sdk
             mkdir -p spike/flutter/plugins/here_sdk
-            find "$plugin_dir" -mindepth 1 -maxdepth 1 -exec mv {} spike/flutter/plugins/here_sdk/ \;
+            find "$plugin_dir" -mindepth 1 -maxdepth 1 -exec mv {} spike/flutter/plugins/here_sdk/ ;
             rmdir "$plugin_dir" 2>/dev/null || true
           fi
       - name: Generate Android project
         run: flutter create --platforms=android --org com.doppiaelle --project-name twolmaps .
-      - name: Configure Android SDK levels and package
+      - name: Configure Android SDK levels, package and branding
         run: |
           set -euo pipefail
           git show HEAD:spike/flutter/lib/main.dart > lib/main.dart
@@ -64,10 +64,13 @@ jobs:
           sed -i 's/targetSdk = flutter.targetSdkVersion/targetSdk = 36/' android/app/build.gradle.kts
           sed -i 's/namespace = "doppiaelle.twolmaps"/namespace = "com.doppiaelle.twolmaps"/' android/app/build.gradle.kts
           sed -i 's/applicationId = "doppiaelle.twolmaps"/applicationId = "com.doppiaelle.twolmaps"/' android/app/build.gradle.kts
+          sed -i 's/android:label="twolmaps"/android:label="2L Maps"/' android/app/src/main/AndroidManifest.xml
+          sed -i 's/android:label="@string\\/app_name"/android:label="2L Maps"/' android/app/src/main/AndroidManifest.xml
           grep -q '^name: twol_maps_spike$' pubspec.yaml
           grep -q 'compileSdk = 36' android/app/build.gradle.kts
           grep -q 'minSdk = 24' android/app/build.gradle.kts
-          grep -R "com.doppiaelle.twolmaps" android
+          grep -q 'com.doppiaelle.twolmaps' android/app/build.gradle.kts
+          grep -q 'android:label="2L Maps"' android/app/src/main/AndroidManifest.xml
       - name: Dependencies and tests
         run: |
           flutter pub get
