@@ -25,6 +25,45 @@ void main() {
     );
   });
 
+  test('ORS parser rejects duplicate jobs', () {
+    final moreStops = [
+      ...stops.sublist(0, 2),
+      const Stop(id: 'b', latitude: 45.15, longitude: 9.15),
+      stops.last,
+    ];
+    expect(
+      () => const OrsOptimizationParser().parse({
+        'routes': [
+          {
+            'steps': [
+              {'type': 'job', 'job': 1},
+              {'type': 'job', 'job': 1},
+            ],
+          },
+        ],
+      }, moreStops),
+      throwsFormatException,
+    );
+  });
+
+  test('ORS parser rejects explicitly unassigned jobs', () {
+    expect(
+      () => const OrsOptimizationParser().parse({
+        'routes': [
+          {
+            'steps': [
+              {'type': 'job', 'job': 1},
+            ],
+          },
+        ],
+        'unassigned': [
+          {'id': 1},
+        ],
+      }, stops),
+      throwsFormatException,
+    );
+  });
+
   test('HERE request contains ordered route parameters', () {
     final uri = HereRoutingRequest(route: OrderedRoute(stops: stops)).uri(apiKey: 'test');
     expect(uri.host, 'router.hereapi.com');

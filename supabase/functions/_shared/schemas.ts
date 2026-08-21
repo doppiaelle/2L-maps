@@ -75,6 +75,28 @@ export const optimizeRequestSchema = z.object({
 export type OptimizeRequest = z.infer<typeof optimizeRequestSchema>;
 
 /**
+ * Provider-neutral coordinate routing for the ORS -> HERE migration.
+ *
+ * Identifiers belong to the app rather than a geocoder; server-side validation
+ * rejects malformed or oversized routes before either paid provider is called.
+ */
+export const hybridOptimizeRequestSchema = z.object({
+  stops: z
+    .array(
+      z.object({
+        id: z.string().min(1).max(128),
+        latitude: z.number().min(-90).max(90),
+        longitude: z.number().min(-180).max(180),
+        label: z.string().max(200).optional(),
+      }),
+    )
+    .min(3)
+    .max(MAX_STOPS),
+});
+
+export type HybridOptimizeRequest = z.infer<typeof hybridOptimizeRequestSchema>;
+
+/**
  * `/places-autocomplete`.
  *
  * The session token is required, not optional. Without one every keystroke bills

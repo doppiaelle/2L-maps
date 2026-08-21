@@ -79,7 +79,8 @@ jobs:
       - name: Generate Flutter platform projects
         working-directory: spike/flutter
         run: |
-          flutter create --platforms=android --org doppiaelle --project-name twolmaps .
+          flutter create --platforms=android --org com.doppiaelle --project-name twolmaps .
+          grep -Eq 'applicationId[[:space:]]*=[[:space:]]*"com.doppiaelle.twolmaps"' android/app/build.gradle.kts
           rm -f test/widget_test.dart
 
       - name: Configure Android SDK levels
@@ -104,9 +105,20 @@ jobs:
         env:
           SDK_ID: ${{ secrets.HERE_SDK_ACCESS_KEY_ID }}
           SDK_SECRET: ${{ secrets.HERE_SDK_ACCESS_KEY_SECRET }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
           set -euo pipefail
-          flutter build apk --debug             --dart-define=HERE_ACCESS_KEY_ID="$SDK_ID"             --dart-define=HERE_ACCESS_KEY_SECRET="$SDK_SECRET"
+          test -n "$SUPABASE_URL"
+          test -n "$SUPABASE_ANON_KEY"
+          flutter build apk --debug             --dart-define=HERE_ACCESS_KEY_ID="$SDK_ID"             --dart-define=HERE_ACCESS_KEY_SECRET="$SDK_SECRET"             --dart-define=SUPABASE_URL="$SUPABASE_URL"             --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"
+
+      - name: Verify provider keys never enter the mobile build
+        working-directory: spike/flutter
+        run: |
+          set -euo pipefail
+          ! grep -R -n "String.fromEnvironment(\x27ORS_API_KEY\x27)" lib
+          ! grep -R -n "String.fromEnvironment(\x27HERE_REST_API_KEY\x27)" lib
 
   ios:
     name: HERE Explore iOS bootstrap
@@ -147,7 +159,8 @@ jobs:
             rm -rf plugins/here_sdk
             mv "$plugin_dir" plugins/here_sdk
           fi
-          flutter create --platforms=ios --org doppiaelle --project-name twolmaps .
+          flutter create --platforms=ios --org com.doppiaelle --project-name twolmaps .
+          grep -q 'PRODUCT_BUNDLE_IDENTIFIER = com.doppiaelle.twolmaps;' ios/Runner.xcodeproj/project.pbxproj
           rm -f test/widget_test.dart
           flutter pub get
           flutter build ios --simulator --no-codesign             --dart-define=HERE_ACCESS_KEY_ID="$SDK_ID"             --dart-define=HERE_ACCESS_KEY_SECRET="$SDK_SECRET"

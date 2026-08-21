@@ -13,7 +13,7 @@
 >
 > The product owner accepts using the newly generated HERE/ORS credentials for the disposable
 > spike although they crossed project chat. Store them only in GitHub/Supabase protected secrets,
-> never print them, and rotate them before production. Never commit a populated `.env`; only
+> never print them, and rotate them only if exposure or compromise warrants it. Never commit a populated `.env`; only
 > `.env.example` may be versioned. Local ignored `.env` files are permitted.
 >
 > The replacement sequence is controlled by

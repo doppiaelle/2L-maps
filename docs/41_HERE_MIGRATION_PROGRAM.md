@@ -1,6 +1,6 @@
 # 41 — HERE Explore + ORS/VROOM Migration Program
 
-> **Status:** Approved target; accounts provisioned; final account checks and CI secret injection gated
+> **Status:** Approved target; protected inputs provisioned; hybrid spike in progress
 > **Owner:** Product owner
 > **Last reviewed:** 2026-08-20
 > **Related:** [ADR-0030](adr/0030-here-platform-and-navigation-target.md) ·
@@ -21,7 +21,8 @@ contract eligibility or measured usage.
 It records that ORS and HERE accounts now exist and that the downloaded Flutter package is
 `heresdk-explore-flutter-4.27.2.0.309975.zip`. The product owner accepts temporary use of the
 newly generated credentials for the disposable spike despite their having crossed the project chat;
-they are never committed or printed by CI and are rotated before production. Ordered-via billing,
+they are never committed or printed by CI. Existing valid credentials remain in use unless
+exposure, compromise, or an explicit security decision requires rotation. Ordered-via billing,
 retention, and every allowance still require measurement. It does not redefine every current screen,
 schema, or API payload; those owning documents change in later pull requests after their gates pass.
 
@@ -148,7 +149,7 @@ Boundary rules:
 
 The APP ID is an identifier, not an authentication secret. For the disposable spike, the product owner explicitly accepts the residual risk of using the
 newly generated keys shared in project chat. They must still be stored only as GitHub/Supabase
-secrets, masked from logs, and rotated before a production release. HERE SDK
+secrets and masked from logs. Existing valid keys do not require automatic rotation. HERE SDK
 credentials are necessarily consumed by the client runtime, but public source control still must
 not become their distribution mechanism. ORS and HERE REST keys never enter the mobile bundle.
 
@@ -356,10 +357,10 @@ mark them superseded where the new system actually replaces their decisions.
 
 ### Gate A — account, permitted use, and cost
 
-- [ ] HERE Base Plan account created.
+- [x] HERE Base Plan account created.
 - [ ] Android and iOS applications registered.
-- [ ] Explore credentials and Flutter package obtained.
-- [ ] Private package delivery method documented.
+- [x] Explore credentials and Flutter package obtained.
+- [x] Private package delivery method documented.
 - [ ] HERE confirms final routing of an externally ordered sequence is permitted without a HERE
       optimization product.
 - [ ] ORS Standard-plan commercial/product use and `/optimization` quota confirmed in the account.
@@ -372,11 +373,17 @@ mark them superseded where the new system actually replaces their decisions.
 
 ### Gate B — hybrid optimization and guidance spike
 
-- [ ] Exact Flutter and Explore versions pinned.
+PRs 15–30 established isolated Flutter contracts and Android HERE bootstrap. The authenticated
+`hybrid-optimize` function now proves the server-only ORS → HERE boundary against deterministic
+fixtures, including 5, 15 and 25 stops and all HERE route sections. This does not close Gate B:
+iOS rendering, live-provider evidence, account billing, custom style, adversarial replay, physical
+navigation and operating measurements remain unproven.
+
+- [x] Exact Flutter and Explore versions pinned.
 - [ ] Android and iOS map first frame proven.
 - [ ] Custom style loads and remains legible in light/dark.
 - [ ] ORS request/response contract proven for one vehicle, fixed start, optional return and 5–25 jobs.
-- [ ] ORS output validated for duplicates, omissions and unassigned jobs.
+- [x] ORS output validated for duplicates, omissions and unassigned jobs.
 - [ ] Hybrid quality benchmark and latency budget recorded; no claim of exact optimum.
 - [ ] HERE final-route request proven to use the ORS order without any HERE matrix/sequence call.
 - [ ] Route/maneuver contract proven from real HERE fixture responses.

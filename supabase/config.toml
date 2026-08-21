@@ -58,6 +58,9 @@ secret = "env(SUPABASE_AUTH_GOOGLE_SECRET)"
 [functions.optimize]
 verify_jwt = true
 
+[functions.hybrid-optimize]
+verify_jwt = true
+
 [functions.places-autocomplete]
 verify_jwt = true
 
