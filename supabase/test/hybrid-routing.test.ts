@@ -71,10 +71,7 @@ function adapterReturning(
 
 describe('server-mediated ORS to HERE routing', () => {
   it('uses one ORS optimization and one ordered HERE route', async () => {
-    const { adapter, calls } = adapterReturning([
-      { body: orsResponse() },
-      { body: hereResponse },
-    ]);
+    const { adapter, calls } = adapterReturning([{ body: orsResponse() }, { body: hereResponse }]);
 
     const result = await adapter.optimize(stops);
 
@@ -112,10 +109,7 @@ describe('server-mediated ORS to HERE routing', () => {
       longitude: 9 + index / 1000,
     }));
     const jobs = Array.from({ length: count - 2 }, (_, index) => index + 1).reverse();
-    const { adapter } = adapterReturning([
-      { body: orsResponse(jobs) },
-      { body: hereResponse },
-    ]);
+    const { adapter } = adapterReturning([{ body: orsResponse(jobs) }, { body: hereResponse }]);
 
     const result = await adapter.optimize(route);
     expect(result.orderedStopIds).toHaveLength(count);
