@@ -123,7 +123,8 @@ class TurnNavigationController {
       _instructionIndex++;
     }
     if (sectionIndex != null) {
-      _sectionIndex = sectionIndex.clamp(0, (_route!.sectionPolylines.length - 1).clamp(0, 1 << 30));
+      final maxSection = (_route!.sectionPolylines.length - 1).clamp(0, 1 << 30);
+      _sectionIndex = sectionIndex.clamp(0, maxSection).toInt();
     } else if (_route!.sectionPolylines.isNotEmpty &&
         _instructionIndex >= _route!.instructions.length) {
       _sectionIndex = (_route!.sectionPolylines.length - 1);
