@@ -40,6 +40,7 @@ void main() {
 
     final client = SupabaseClient('https://example.supabase.co', 'anon');
     await tester.pumpWidget(AuthScreen(auth: AuthSessionController(client: client)));
+    await tester.pumpAndSettle();
     expect(find.text('Accedi a 2L Maps'), findsOneWidget);
     expect(find.text('Continua con Google'), findsOneWidget);
   });
