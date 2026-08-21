@@ -14,8 +14,8 @@ jobs:
       run:
         working-directory: spike/flutter
     env:
-      SDK_URL: ${{ secrets.HERE_SDK_URL }}
-      SDK_VERSION: ${{ vars.HERE_SDK_VERSION }}
+      SDK_URL: ${{ secrets.HERE_SDK_URL || secrets.HERE_SDK_DOWNLOAD_URL }}
+      SDK_VERSION: ${{ vars.HERE_SDK_VERSION || vars.HERE_SDK_SDK_VERSION }}
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -26,8 +26,8 @@ jobs:
       - name: Validate SDK inputs
         run: |
           set -euo pipefail
-          test -n "$SDK_URL"
-          test -n "$SDK_VERSION"
+          test -n "$SDK_URL" || { echo "Missing HERE SDK download URL secret (HERE_SDK_URL or HERE_SDK_DOWNLOAD_URL)"; exit 1; }
+          test -n "$SDK_VERSION" || { echo "Missing HERE SDK version repository variable (HERE_SDK_VERSION)"; exit 1; }
       - name: Prepare HERE SDK plugin
         working-directory: .
         run: |
