@@ -104,6 +104,7 @@ void main() {
     expect(tracker.latest, isNull);
 
     tracker.resume();
+    platform.controller.add(fix(latitude: 44));
     await Future<void>.delayed(Duration.zero);
     expect(tracker.latest?.latitude, 44);
 
