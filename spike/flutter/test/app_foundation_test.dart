@@ -1,5 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../lib/auth_screen.dart';
+import '../lib/auth_service.dart';
 
 import '../lib/app.dart';
 import '../lib/app_bootstrap.dart';
@@ -36,8 +38,8 @@ void main() {
       ),
     );
 
-    await Supabase.initialize(url: 'https://example.supabase.co', anonKey: 'anon');
-    await tester.pumpWidget(TwolMapsApp(bootstrap: result));
+    final client = SupabaseClient('https://example.supabase.co', 'anon');
+    await tester.pumpWidget(AuthScreen(auth: AuthSessionController(client: client)));
     expect(find.text('Accedi a 2L Maps'), findsOneWidget);
     expect(find.text('Continua con Google'), findsOneWidget);
   });
