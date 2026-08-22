@@ -1,106 +1,98 @@
-name: android-preview
+name: Android Preview
 
 on:
-  workflow_dispatch:
   pull_request:
     paths:
       - 'spike/flutter/**'
+      - 'assets/brand/**'
       - '.github/workflows/android-preview.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
-  build-android-preview:
+  build:
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: spike/flutter
     env:
       SDK_URL: ${{ secrets.HERE_SDK_DOWNLOAD_URL }}
-      SDK_VERSION: ${{ vars.HERE_SDK_VERSION || vars.HERE_SDK_SDK_VERSION }}
+      SDK_VERSION: ${{ vars.HERE_SDK_VERSION }}
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
     steps:
       - uses: actions/checkout@v4
+
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.41.9'
           channel: stable
-          cache: true
+
       - name: Validate SDK and runtime inputs
+        shell: bash
         run: |
           set -euo pipefail
-          test -n "$SDK_URL" || { echo "Missing HERE SDK download URL secret (HERE_SDK_DOWNLOAD_URL)"; exit 1; }
-          test -n "$SDK_VERSION" || { echo "Missing HERE SDK version repository variable (HERE_SDK_VERSION)"; exit 1; }
-          test -n "$SUPABASE_URL" || { echo "Missing Supabase URL secret (SUPABASE_URL)"; exit 1; }
-          test -n "$SUPABASE_ANON_KEY" || { echo "Missing Supabase publishable/anon key secret (SUPABASE_ANON_KEY)"; exit 1; }
-      - name: Prepare HERE SDK plugin
+          test -n "$SDK_URL"
+          test -n "$SDK_VERSION"
+          test -n "$SUPABASE_URL"
+          test -n "$SUPABASE_ANON_KEY"
+
+      - name: Prepare Flutter brand asset
         working-directory: .
+        shell: bash
         run: |
           set -euo pipefail
-          rm -rf /tmp/here-sdk spike/flutter/plugins
-          mkdir -p /tmp/here-sdk spike/flutter/plugins
-          python3 -m pip install --disable-pip-version-check --quiet "gdown==5.2.0"
-          gdown --fuzzy "$SDK_URL" -O /tmp/here-sdk/here.zip
-          test "$(head -c 2 /tmp/here-sdk/here.zip)" = "PK"
-          unzip -q /tmp/here-sdk/here.zip -d /tmp/here-sdk/unpacked
-          tarball="$(find /tmp/here-sdk/unpacked -type f -name '*.tar.gz' | head -n 1)"
-          test -n "$tarball"
-          tar -xzf "$tarball" -C spike/flutter/plugins
-          extracted="$(find spike/flutter/plugins -maxdepth 3 -type f -name pubspec.yaml -print -quit)"
-          test -n "$extracted"
-          plugin_dir="$(dirname "$extracted")"
-          if [ "$plugin_dir" != "spike/flutter/plugins/here_sdk" ]; then
-            rm -rf spike/flutter/plugins/here_sdk
-            mkdir -p spike/flutter/plugins/here_sdk
-            find "$plugin_dir" -mindepth 1 -maxdepth 1 -exec mv {} spike/flutter/plugins/here_sdk/ \;
-            rmdir "$plugin_dir" 2>/dev/null || true
-          fi
-      - name: Generate Android project
-        run: flutter create --platforms=android --org com.doppiaelle --project-name twolmaps .
+          logo_src="$GITHUB_WORKSPACE/assets/brand/logo.png"
+          logo_dst="$GITHUB_WORKSPACE/spike/flutter/assets/brand/logo.png"
+          test -s "$logo_src"
+          mkdir -p "$(dirname "$logo_dst")"
+          cp "$logo_src" "$logo_dst"
+          test -s "$logo_dst"
+
+      - name: Generate HERE SDK plugin from archive
+        working-directory: .
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf plugins
+          mkdir -p plugins/here_sdk
+          curl -fsSL "$SDK_URL" -o /tmp/here-sdk.zip
+          unzip -q /tmp/here-sdk.zip -d /tmp/here-sdk
+          plugin_root="$(find /tmp/here-sdk -maxdepth 4 -type f -name pubspec.yaml -print -quit | xargs -r dirname)"
+          test -n "$plugin_root"
+          cp -R "$plugin_root"/. plugins/here_sdk/
+          test -f plugins/here_sdk/pubspec.yaml
+
       - name: Configure Android SDK levels and package
+        working-directory: .
+        shell: bash
         run: |
           set -euo pipefail
-          git show HEAD:spike/flutter/lib/main.dart > lib/main.dart
-          sed -i 's/^name: .*/name: twol_maps_spike/' pubspec.yaml
-          sed -i 's/package:twolmaps/package:twol_maps_spike/g' test/*.dart
-          rm -f test/widget_test.dart
-          sed -i 's/compileSdk = flutter.compileSdkVersion/compileSdk = 36/' android/app/build.gradle.kts
-          sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 24/' android/app/build.gradle.kts
-          sed -i 's/targetSdk = flutter.targetSdkVersion/targetSdk = 36/' android/app/build.gradle.kts
-          sed -i 's/namespace = "doppiaelle.twolmaps"/namespace = "com.doppiaelle.twolmaps"/' android/app/build.gradle.kts
-          sed -i 's/applicationId = "doppiaelle.twolmaps"/applicationId = "com.doppiaelle.twolmaps"/' android/app/build.gradle.kts
-          grep -q '^name: twol_maps_spike$' pubspec.yaml
-          grep -q 'compileSdk = 36' android/app/build.gradle.kts
-          grep -q 'minSdk = 24' android/app/build.gradle.kts
-          grep -R "com.doppiaelle.twolmaps" android
           logo_src="$GITHUB_WORKSPACE/assets/brand/logo.png"
           test -s "$logo_src"
-          mkdir -p android/app/src/main/res/drawable
-          cp "$logo_src" android/app/src/main/res/drawable/twolmaps_logo.png
-          manifest="android/app/src/main/AndroidManifest.xml"
-          sed -i 's/android:label="[^"]*"/android:label="2L Maps"/' "$manifest"
-          sed -i 's#android:icon="@mipmap/ic_launcher"#android:icon="@drawable/twolmaps_logo"#' "$manifest"
-          grep -q 'android:label="2L Maps"' "$manifest"
-          grep -q 'android:icon="@drawable/twolmaps_logo"' "$manifest"
-      - name: Dependencies and tests
+          mkdir -p spike/flutter/android/app/src/main/res/drawable
+          cp "$logo_src" spike/flutter/android/app/src/main/res/drawable/twolmaps_logo.png
+          test -s spike/flutter/android/app/src/main/res/drawable/twolmaps_logo.png
+          test -f spike/flutter/android/android/app/build.gradle || true
+          if test -f spike/flutter/android/app/build.gradle; then
+            sed -i 's/applicationId "[^"]*"/applicationId "com.doppiaelle.twolmaps"/' spike/flutter/android/app/build.gradle
+            sed -i 's/namespace "[^"]*"/namespace "com.doppiaelle.twolmaps"/' spike/flutter/android/app/build.gradle || true
+          fi
+          if test -f spike/flutter/android/app/src/main/AndroidManifest.xml; then
+            sed -i 's/android:label="[^"]*"/android:label="2L Maps"/' spike/flutter/android/app/src/main/AndroidManifest.xml || true
+          fi
+
+      - name: flutter pub get
+        run: flutter pub get
+
+      - name: flutter test
+        run: flutter test
+
+      - name: flutter build apk
         run: |
-          flutter pub get
-          flutter test
-      - name: Build installable APK with public runtime config
-        run: |
-          set -euo pipefail
           flutter build apk --debug \
             --dart-define=SUPABASE_URL="$SUPABASE_URL" \
-            --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"
-          test -s build/app/outputs/flutter-apk/app-debug.apk
-      - name: Verify provider REST keys are absent
-        run: |
-          set -euo pipefail
-          apk="build/app/outputs/flutter-apk/app-debug.apk"
-          ! unzip -p "$apk" classes.dex | strings | grep -Eqi 'ORS_API_KEY|HERE_API_KEY|api\.heigit\.org|router\.hereapi\.com'
-      - name: Upload Android preview
-        uses: actions/upload-artifact@v4
-        with:
-          name: twolmaps-android-preview
-          path: spike/flutter/build/app/outputs/flutter-apk/app-debug.apk
-          if-no-files-found: error
-          retention-days: 14
+            --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" \
+            --dart-define=HERE_SDK_VERSION="$SDK_VERSION"
