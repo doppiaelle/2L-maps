@@ -37,6 +37,8 @@ export interface SupabaseAuthPort {
    * Reading only `error` from this call — which is what this file used to do —
    * yields `{ ok: true }` and a user still looking at the sign-in screen.
    */
+  signInWithPassword: (args: { email: string; password: string }) => Promise<{ data: { session: { access_token: string; user: { id: string } } | null }; error: { message: string } | null }>;
+  signUp: (args: { email: string; password: string }) => Promise<{ data: { session: { access_token: string; user: { id: string } } | null }; error: { message: string } | null }>;
   signInWithOAuth: (args: {
     provider: SignInMethod;
     options: { redirectTo: string; skipBrowserRedirect: true };
@@ -121,8 +123,13 @@ export function createAuthProvider(
      * happened, which is the worst shape a failure can take: the screen reports
      * success and stays exactly where it was.
      */
-    signIn: async (method: SignInMethod): Promise<SignInOutcome> => {
+    signIn: async (method: SignInMethod, credentials): Promise<SignInOutcome> => {
       try {
+        if (method === 'email') {
+          if (credentials?.email === undefined || credentials.password === undefined) return { ok: false, reason: 'failed' };
+          const result = await auth.signInWithPassword({ email: credentials.email, password: credentials.password });
+          return result.error === null && result.data.session !== null ? { ok: true } : { ok: false, reason: 'failed' };
+        }
         const { data, error } = await auth.signInWithOAuth({
           provider: method,
           options: {
@@ -157,6 +164,15 @@ export function createAuthProvider(
 
         const exchange = await auth.exchangeCodeForSession(code);
         return exchange.error === null ? { ok: true } : { ok: false, reason: 'failed' };
+      } catch {
+        return { ok: false, reason: 'failed' };
+      }
+    },
+
+    signUp: async (credentials): Promise<SignInOutcome> => {
+      try {
+        const result = await auth.signUp(credentials);
+        return result.error === null && result.data.session !== null ? { ok: true } : { ok: false, reason: 'failed' };
       } catch {
         return { ok: false, reason: 'failed' };
       }
