@@ -7,14 +7,14 @@ import 'position_adapter.dart';
 class HereMapScreen extends StatefulWidget {
   const HereMapScreen({
     this.followPosition = false,
-    this.routeSummary,
     this.userPosition,
+    this.onRecenter,
     super.key,
   });
 
   final bool followPosition;
-  final String? routeSummary;
   final PositionFix? userPosition;
+  final Future<void> Function()? onRecenter;
 
   @override
   State<HereMapScreen> createState() => _HereMapScreenState();
@@ -22,6 +22,7 @@ class HereMapScreen extends StatefulWidget {
 
 class _HereMapScreenState extends State<HereMapScreen> {
   HereMapController? _controller;
+  LocationIndicator? _locationIndicator;
 
   MapScheme _scheme(BuildContext context) =>
       Theme.of(context).brightness == Brightness.dark
@@ -30,6 +31,13 @@ class _HereMapScreenState extends State<HereMapScreen> {
 
   void _onMapCreated(HereMapController controller) {
     _controller = controller;
+    final locationIndicator = LocationIndicator()
+      ..locationIndicatorStyle = LocationIndicatorIndicatorStyle.navigation
+      ..isAccuracyVisualized = false;
+    locationIndicator.enable(controller);
+    _locationIndicator = locationIndicator;
+    _updateLocationIndicator(widget.userPosition);
+
     controller.mapScene.loadSceneForMapScheme(_scheme(context), (error) {
       if (!mounted || error == null) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -42,54 +50,48 @@ class _HereMapScreenState extends State<HereMapScreen> {
   @override
   void didUpdateWidget(covariant HereMapScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.followPosition && widget.userPosition != oldWidget.userPosition) {
+    if (widget.userPosition != oldWidget.userPosition) {
+      _updateLocationIndicator(widget.userPosition);
+    }
+    if (!oldWidget.followPosition && widget.followPosition) {
       _follow(widget.userPosition);
     }
   }
 
+  void _updateLocationIndicator(PositionFix? fix) {
+    final indicator = _locationIndicator;
+    if (indicator == null || fix == null) return;
+    final location = Location.withCoordinates(
+      GeoCoordinates(fix.latitude, fix.longitude),
+    )
+      ..time = fix.timestamp;
+    final heading = fix.headingDegrees;
+    if (heading != null) location.bearingInDegrees = heading;
+    indicator.updateLocation(location);
+  }
+
   void _follow(PositionFix? fix) {
-    if (_controller == null || fix == null || !widget.followPosition) return;
-    final camera = _controller!.camera;
-    camera.lookAtPointWithMeasure(
+    if (_controller == null || fix == null) return;
+    _controller!.camera.lookAtPointWithMeasure(
       GeoCoordinates(fix.latitude, fix.longitude),
       MapMeasure(MapMeasureKind.distanceInMeters, 450),
     );
   }
 
+  Future<void> _recenter() async {
+    await widget.onRecenter?.call();
+    if (!mounted) return;
+    _follow(widget.userPosition);
+  }
+
   @override
-  Widget build(BuildContext context) => SizedBox(
-        height: 420,
+  Widget build(BuildContext context) => SizedBox.expand(
         child: Stack(
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(24),
               child: HereMap(onMapCreated: _onMapCreated),
             ),
-            if (widget.followPosition && widget.userPosition != null)
-              Center(
-                child: Transform.rotate(
-                  angle: (widget.userPosition!.headingDegrees ?? 0) *
-                      3.141592653589793 /
-                      180,
-                  child: DecoratedBox(
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF00F5D4),
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Color(0x6600F5D4),
-                          blurRadius: 20,
-                          spreadRadius: 8,
-                        ),
-                      ],
-                    ),
-                    child: const Padding(
-                      padding: EdgeInsets.all(10),
-                      child: Icon(Icons.navigation, color: Color(0xFF13201E)),
-                    ),
-                  ),
-                ),
-              ),
             Positioned(
               top: 12,
               right: 12,
@@ -102,34 +104,12 @@ class _HereMapScreenState extends State<HereMapScreen> {
                   shape: BoxShape.circle,
                 ),
                 child: IconButton(
-                  tooltip: widget.followPosition
-                      ? 'Camera centrata'
-                      : 'Panoramica itinerario',
-                  icon: Icon(widget.followPosition
-                      ? Icons.my_location
-                      : Icons.fit_screen),
-                  onPressed: () => _follow(widget.userPosition),
+                  tooltip: 'Ricentra sulla mia posizione',
+                  icon: const Icon(Icons.my_location),
+                  onPressed: _recenter,
                 ),
               ),
             ),
-            if (widget.routeSummary != null)
-              Positioned(
-                left: 16,
-                right: 16,
-                bottom: 12,
-                child: Card(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                    child: Text(
-                      widget.routeSummary!,
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                  ),
-                ),
-              ),
           ],
         ),
       );
