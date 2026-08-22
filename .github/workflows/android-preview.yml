@@ -16,6 +16,8 @@ jobs:
     env:
       SDK_URL: ${{ secrets.HERE_SDK_DOWNLOAD_URL }}
       SDK_VERSION: ${{ vars.HERE_SDK_VERSION || vars.HERE_SDK_SDK_VERSION }}
+      HERE_ACCESS_KEY_ID: ${{ secrets.HERE_SDK_ACCESS_KEY_ID }}
+      HERE_ACCESS_KEY_SECRET: ${{ secrets.HERE_SDK_ACCESS_KEY_SECRET }}
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
       DEBUG_AUTH_BYPASS: ${{ vars.DEBUG_AUTH_BYPASS || 'false' }}
