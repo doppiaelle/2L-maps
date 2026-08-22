@@ -299,16 +299,6 @@ class _PlannerViewState extends State<PlannerView> {
   Widget build(BuildContext context) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (!widget.controller.locationPermissionGranted)
-            const Card(
-              child: ListTile(
-                leading: Icon(Icons.location_off),
-                title: Text('Posizione non disponibile'),
-                subtitle: Text(
-                  'Consenti il GPS o inserisci una partenza manuale.',
-                ),
-              ),
-            ),
           _searchField(
             start,
             label: 'Cerca partenza',
