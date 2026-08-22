@@ -22,7 +22,6 @@ class TwolMapsApp extends StatefulWidget {
 }
 class _TwolMapsAppState extends State<TwolMapsApp> {
   ThemeMode mode = ThemeMode.light;
-  int index = 0;
   @override Widget build(BuildContext context) => MaterialApp(title: '2L Maps', theme: AppTheme.light(), darkTheme: AppTheme.dark(), themeMode: mode,
     home: widget.bootstrap.status == BootstrapStatus.ready ? _AuthGate(onTheme: (m) => setState(() => mode = m)) : ConfigurationScreen(result: widget.bootstrap));
   @override void dispose() { if (widget.bootstrap.status == BootstrapStatus.ready) disposeBootstrap(); super.dispose(); }
@@ -263,6 +262,9 @@ class _NavigationScreenState extends State<NavigationScreen>
     tracking = LocationTrackingController(
       platform: const GeolocatorDeviceLocationPlatform(),
     );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) tracking.start();
+    });
   }
 
   @override
