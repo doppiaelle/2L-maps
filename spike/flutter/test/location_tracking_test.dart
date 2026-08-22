@@ -37,6 +37,21 @@ class FakeLocationPlatform implements DeviceLocationPlatform {
   Future<void> close() => controller.close();
 }
 
+class FakeCurrentPositionLocationPlatform extends FakeLocationPlatform
+    implements CurrentPositionDeviceLocationPlatform {
+  FakeCurrentPositionLocationPlatform({
+    required this.currentPosition,
+    super.serviceEnabled,
+    super.permission,
+  });
+
+  final PositionFix currentPosition;
+
+  @override
+  Future<PositionFix> getCurrentPosition() async => currentPosition;
+}
+
+
 PositionFix fix({
   double latitude = 45,
   double longitude = 9,
@@ -68,6 +83,22 @@ void main() {
     expect(tracker.state, LocationTrackingState.active);
     expect(tracker.latest?.headingDegrees, 30);
     expect(tracker.latest?.latitude, 45);
+
+    tracker.dispose();
+    await platform.close();
+  });
+
+  test('uses the current device position before waiting for stream updates', () async {
+    final platform = FakeCurrentPositionLocationPlatform(
+      currentPosition: fix(latitude: 46, longitude: 11),
+    );
+    final tracker = LocationTrackingController(platform: platform);
+
+    await tracker.start();
+
+    expect(tracker.state, LocationTrackingState.active);
+    expect(tracker.latest?.latitude, 46);
+    expect(tracker.latest?.longitude, 11);
 
     tracker.dispose();
     await platform.close();
