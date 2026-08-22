@@ -88,10 +88,9 @@ describe('HERE server-side search adapter', () => {
     const places = createHereSearchAdapter({
       apiKey: 'server-only-key',
       fetchImpl: (async () =>
-        new Response(
-          JSON.stringify({ error: { code: 'E401', message: 'Invalid API key' } }),
-          { status: 401 },
-        )) as typeof fetch,
+        new Response(JSON.stringify({ error: { code: 'E401', message: 'Invalid API key' } }), {
+          status: 401,
+        })) as typeof fetch,
     });
 
     await expect(places.geocode('Via Roma')).rejects.toMatchObject({

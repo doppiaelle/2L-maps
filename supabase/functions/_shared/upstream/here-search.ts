@@ -116,15 +116,10 @@ export function createHereSearchAdapter(options: HereSearchOptions): HereSearchP
   };
 }
 
-function unavailable(
-  providerStatus?: number,
-  providerError?: UpstreamError | null,
-): ApiError {
+function unavailable(providerStatus?: number, providerError?: UpstreamError | null): ApiError {
   const details = {
     ...(providerStatus === undefined ? {} : { providerStatus }),
-    ...(providerError?.status === undefined
-      ? {}
-      : { providerCode: providerError.status }),
+    ...(providerError?.status === undefined ? {} : { providerCode: providerError.status }),
     ...(providerError?.message === undefined || providerError.message === ''
       ? {}
       : { providerMessage: providerError.message }),
@@ -135,10 +130,7 @@ function unavailable(
   });
 }
 
-function readHereError(
-  body: string,
-  redact: readonly string[],
-): UpstreamError | null {
+function readHereError(body: string, redact: readonly string[]): UpstreamError | null {
   let parsed: unknown;
   try {
     parsed = JSON.parse(body);
