@@ -56,11 +56,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          rm -rf plugins
-          mkdir -p plugins/here_sdk
-          curl -fsSL "$SDK_URL" -o /tmp/here-sdk.zip
+          rm -rf plugins /tmp/here-sdk /tmp/here-sdk.zip
+          mkdir -p plugins/here_sdk /tmp/here-sdk
+          curl -fsSL --retry 3 --retry-all-errors "$SDK_URL" -o /tmp/here-sdk.zip
+          if ! unzip -tq /tmp/here-sdk.zip >/dev/null 2>&1; then
+            echo "::error::HERE_SDK_DOWNLOAD_URL did not return a valid ZIP archive. Set it to a direct downloadable HERE SDK ZIP URL (not a Drive/GitHub HTML page or landing page)."
+            file /tmp/here-sdk.zip || true
+            exit 1
+          fi
           unzip -q /tmp/here-sdk.zip -d /tmp/here-sdk
-          plugin_root="$(find /tmp/here-sdk -maxdepth 4 -type f -name pubspec.yaml -print -quit | xargs -r dirname)"
+          plugin_root="$(find /tmp/here-sdk -maxdepth 6 -type f -name pubspec.yaml -print -quit | xargs -r dirname)"
           test -n "$plugin_root"
           cp -R "$plugin_root"/. plugins/here_sdk/
           test -f plugins/here_sdk/pubspec.yaml
@@ -92,7 +97,4 @@ jobs:
 
       - name: flutter build apk
         run: |
-          flutter build apk --debug \
-            --dart-define=SUPABASE_URL="$SUPABASE_URL" \
-            --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" \
-            --dart-define=HERE_SDK_VERSION="$SDK_VERSION"
+          flutter build apk --debug             --dart-define=SUPABASE_URL="$SUPABASE_URL"             --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"             --dart-define=HERE_SDK_VERSION="$SDK_VERSION"
