@@ -35,8 +35,10 @@ JsonRequest createJsonRequest({
       final response = await request.close().timeout(timeout);
       final text = await utf8.decoder.bind(response).join();
       final decoded = jsonDecode(text);
-      final body = decoded is Map ? decoded.cast<String, Object?>() : null;
-      final rawError = body?['error'];
+      final responseBody = decoded is Map
+          ? Map<String, Object?>.from(decoded)
+          : null;
+      final rawError = responseBody?['error'];
       final code = rawError is Map && rawError['code'] is String
           ? rawError['code'] as String
           : null;
@@ -51,8 +53,10 @@ JsonRequest createJsonRequest({
           code: code,
         );
       }
-      if (body == null) throw const FormatException('Expected JSON object');
-      return body;
+      if (responseBody == null) {
+        throw const FormatException('Expected JSON object');
+      }
+      return responseBody;
     } catch (error) {
       AppDiagnostics.record('http failure ${uri.path} type=${error.runtimeType}');
       rethrow;
