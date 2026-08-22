@@ -187,7 +187,14 @@ export function SignInScreen(): React.JSX.Element {
             placeholder="Password"
             placeholderTextColor={palette.textSecondary}
             accessibilityLabel="Password"
-            style={{ backgroundColor: palette.surface, color: palette.textPrimary, borderRadius: radius.radiusLg, paddingHorizontal: space.space4, minHeight: layout.actionMinHeight, marginTop: space.space3 }}
+            style={{
+              backgroundColor: palette.surface,
+              color: palette.textPrimary,
+              borderRadius: radius.radiusLg,
+              paddingHorizontal: space.space4,
+              minHeight: layout.actionMinHeight,
+              marginTop: space.space3,
+            }}
           />
           <SignInButton
             label={mode === 'sign-up' ? 'Create account' : 'Sign in'}
