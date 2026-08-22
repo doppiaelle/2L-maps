@@ -20,6 +20,10 @@ class AppDiagnostics {
 
   static String get snapshot => _events.join('\n');
 
+  static void clear() {
+    _events.clear();
+  }
+
   static Future<void> copyToClipboard() async {
     await Clipboard.setData(ClipboardData(text: snapshot));
   }
