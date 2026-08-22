@@ -9,12 +9,14 @@ class HereMapScreen extends StatefulWidget {
     this.followPosition = false,
     this.routeSummary,
     this.userPosition,
+    this.height,
     super.key,
   });
 
   final bool followPosition;
   final String? routeSummary;
   final PositionFix? userPosition;
+  final double? height;
 
   @override
   State<HereMapScreen> createState() => _HereMapScreenState();
@@ -57,8 +59,14 @@ class _HereMapScreenState extends State<HereMapScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => SizedBox(
-        height: 420,
+  Widget build(BuildContext context) => LayoutBuilder(
+        builder: (context, constraints) {
+          final mapHeight = widget.height ??
+              (constraints.hasBoundedHeight && constraints.maxHeight.isFinite
+                  ? constraints.maxHeight
+                  : 420);
+          return SizedBox(
+            height: mapHeight,
         child: Stack(
           children: [
             ClipRRect(
@@ -132,5 +140,7 @@ class _HereMapScreenState extends State<HereMapScreen> {
               ),
           ],
         ),
+          );
+        },
       );
 }
