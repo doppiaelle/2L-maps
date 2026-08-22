@@ -35,6 +35,15 @@ jobs:
           test -n "$SDK_VERSION" || { echo "Missing HERE SDK version repository variable (HERE_SDK_VERSION)"; exit 1; }
           test -n "$SUPABASE_URL" || { echo "Missing Supabase URL secret (SUPABASE_URL)"; exit 1; }
           test -n "$SUPABASE_ANON_KEY" || { echo "Missing Supabase publishable/anon key secret (SUPABASE_ANON_KEY)"; exit 1; }
+          test -n "$HERE_ACCESS_KEY_ID" || {
+            echo "Missing HERE SDK access key ID"
+            exit 1
+          }
+
+          test -n "$HERE_ACCESS_KEY_SECRET" || {
+            echo "Missing HERE SDK access key secret"
+            exit 1
+          }
       - name: Prepare HERE SDK plugin
         working-directory: .
         run: |
@@ -104,6 +113,8 @@ jobs:
         run: |
           set -euo pipefail
           flutter build apk --debug \
+            --dart-define=HERE_ACCESS_KEY_ID="$HERE_ACCESS_KEY_ID" \
+            --dart-define=HERE_ACCESS_KEY_SECRET="$HERE_ACCESS_KEY_SECRET" \
             --dart-define=SUPABASE_URL="$SUPABASE_URL" \
             --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" \
             --dart-define=DEBUG_AUTH_BYPASS="$DEBUG_AUTH_BYPASS"
