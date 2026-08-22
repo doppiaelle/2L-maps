@@ -52,7 +52,7 @@ class _HereMapScreenState extends State<HereMapScreen> {
     if (widget.followPosition != oldWidget.followPosition ||
         widget.userPosition != oldWidget.userPosition) {
       _updateLocationIndicator(widget.userPosition);
-      if (widget.followPosition) {
+      if (!oldWidget.followPosition && widget.followPosition) {
         _follow(widget.userPosition);
       }
     }
@@ -63,13 +63,13 @@ class _HereMapScreenState extends State<HereMapScreen> {
     final indicator = LocationIndicator();
     indicator.locationIndicatorStyle =
         LocationIndicatorIndicatorStyle.navigation;
-    indicator.isAccuracyVisualized = true;
+    indicator.isAccuracyVisualized = false;
     _locationIndicator = indicator;
   }
 
   void _updateLocationIndicator(PositionFix? fix) {
     final controller = _controller;
-    if (controller == null || fix == null || !widget.followPosition) {
+    if (controller == null || fix == null) {
       if (_locationIndicatorEnabled) {
         _locationIndicator?.disable();
         _locationIndicatorEnabled = false;
