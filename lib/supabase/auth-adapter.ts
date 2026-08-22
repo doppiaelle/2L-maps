@@ -37,8 +37,8 @@ export interface SupabaseAuthPort {
    * Reading only `error` from this call — which is what this file used to do —
    * yields `{ ok: true }` and a user still looking at the sign-in screen.
    */
-  signInWithPassword: (args: { email: string; password: string }) => Promise<{ data: { session: { access_token: string; user: { id: string } } | null }; error: { message: string } | null }>;
-  signUp: (args: { email: string; password: string }) => Promise<{ data: { session: { access_token: string; user: { id: string } } | null }; error: { message: string } | null }>;
+  signInWithPassword?: (args: { email: string; password: string }) => Promise<{ data: { session: { access_token: string; user: { id: string } } | null }; error: { message: string } | null }>;
+  signUp?: (args: { email: string; password: string }) => Promise<{ data: { session: { access_token: string; user: { id: string } } | null }; error: { message: string } | null }>;
   signInWithOAuth: (args: {
     provider: SignInMethod;
     options: { redirectTo: string; skipBrowserRedirect: true };
@@ -127,6 +127,7 @@ export function createAuthProvider(
       try {
         if (method === 'email') {
           if (credentials?.email === undefined || credentials.password === undefined) return { ok: false, reason: 'failed' };
+          if (auth.signInWithPassword === undefined) return { ok: false, reason: 'unavailable' };
           const result = await auth.signInWithPassword({ email: credentials.email, password: credentials.password });
           return result.error === null && result.data.session !== null ? { ok: true } : { ok: false, reason: 'failed' };
         }
@@ -171,6 +172,7 @@ export function createAuthProvider(
 
     signUp: async (credentials): Promise<SignInOutcome> => {
       try {
+        if (auth.signUp === undefined) return { ok: false, reason: 'unavailable' };
         const result = await auth.signUp(credentials);
         return result.error === null && result.data.session !== null ? { ok: true } : { ok: false, reason: 'failed' };
       } catch {
