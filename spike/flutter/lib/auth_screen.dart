@@ -38,7 +38,7 @@ class _AuthScreenState extends State<AuthScreen> {
           child: Card(child: Padding(
             padding: const EdgeInsets.all(28),
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              Icon(Icons.route, size: 52, color: Theme.of(context).colorScheme.primary),
+              Image.asset('assets/brand/logo.png', height: 72, fit: BoxFit.contain),
               const SizedBox(height: 16),
               Text(register ? 'Crea il tuo account' : 'Accedi a 2L Maps', style: Theme.of(context).textTheme.headlineSmall),
               const SizedBox(height: 20),
