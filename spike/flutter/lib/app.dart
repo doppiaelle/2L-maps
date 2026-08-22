@@ -328,23 +328,27 @@ class _NavigationScreenState extends State<NavigationScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              HereMapScreen(
-                followPosition: tracking.hasPosition,
-                userPosition: tracking.latest,
-                routeSummary: tracking.hasPosition
-                    ? 'GPS attivo · precisione ${tracking.latest!.accuracyMeters.toStringAsFixed(0)} m'
-                    : null,
+              Expanded(
+                child: HereMapScreen(
+                  followPosition: tracking.hasPosition,
+                  userPosition: tracking.latest,
+                  routeSummary: tracking.hasPosition
+                      ? 'GPS attivo · precisione ${tracking.latest!.accuracyMeters.toStringAsFixed(0)} m'
+                      : null,
+                ),
               ),
               const SizedBox(height: 12),
-              Card(
-                child: ListTile(
+              Flexible(
+                child: Card(
+                  child: ListTile(
                   leading: Icon(_statusIcon),
                   title: Text(_statusTitle),
                   subtitle: Text(tracking.message ??
                       (tracking.hasPosition
                           ? 'Posizione aggiornata in tempo reale.'
                           : 'La posizione iniziale non è ancora disponibile.')),
-                  trailing: _action,
+                    trailing: _action,
+                  ),
                 ),
               ),
             ],
@@ -425,39 +429,55 @@ class _Page extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final content = Padding(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
+    final header = Row(
+      children: [
+        CircleAvatar(
+          backgroundColor: AppColors.mint,
+          child: Icon(icon, color: AppColors.ink),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              CircleAvatar(
-                backgroundColor: AppColors.mint,
-                child: Icon(icon, color: AppColors.ink),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(title, style: Theme.of(context).textTheme.headlineSmall),
-                    Text(subtitle),
-                  ],
-                ),
-              ),
+              Text(title, style: Theme.of(context).textTheme.headlineSmall),
+              Text(subtitle),
             ],
           ),
-          const SizedBox(height: 28),
-          child,
-        ],
-      ),
+        ),
+      ],
     );
 
+    if (scrollable) {
+      return SafeArea(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                header,
+                const SizedBox(height: 28),
+                child,
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return SafeArea(
-      child: scrollable
-          ? SingleChildScrollView(child: content)
-          : content,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            header,
+            const SizedBox(height: 16),
+            Expanded(child: child),
+          ],
+        ),
+      ),
     );
   }
 }
