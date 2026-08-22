@@ -85,6 +85,12 @@ jobs:
 
           manifest = Path('android/app/src/main/AndroidManifest.xml')
           content = manifest.read_text()
+          permissions = (
+              '    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\\n'
+              '    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\\n'
+          )
+          if 'android.permission.ACCESS_FINE_LOCATION' not in content:
+              content = content.replace('</manifest>', permissions + '</manifest>', 1)
           marker = '\n        </activity>'
           intent_filter = '''
                 <intent-filter>
@@ -102,6 +108,8 @@ jobs:
           grep -q '^name: twol_maps_spike$' pubspec.yaml
           grep -q 'compileSdk = 36' android/app/build.gradle.kts
           grep -q 'minSdk = 24' android/app/build.gradle.kts
+          grep -q 'android.permission.ACCESS_FINE_LOCATION' android/app/src/main/AndroidManifest.xml
+          grep -q 'android.permission.ACCESS_COARSE_LOCATION' android/app/src/main/AndroidManifest.xml
           grep -q 'android:scheme="twolmaps"' android/app/src/main/AndroidManifest.xml
           grep -q 'android:host="auth-callback"' android/app/src/main/AndroidManifest.xml
           grep -R "com.doppiaelle.twolmaps" android
