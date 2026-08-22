@@ -12,6 +12,7 @@ import 'route_models.dart';
 import 'route_orchestrator.dart';
 import 'routing_config.dart';
 import 'routing_transport.dart';
+import 'search_transport.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class TwolMapsApp extends StatefulWidget {
