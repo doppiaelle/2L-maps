@@ -274,7 +274,7 @@ export interface AuthProvider {
   currentSession: () => Promise<Session | null>;
   subscribe: (listener: (session: Session | null) => void) => () => void;
   signIn: (method: SignInMethod, credentials?: { readonly email?: string; readonly password?: string }) => Promise<SignInOutcome>;
-  signUp: (credentials: { readonly email: string; readonly password: string }) => Promise<SignInOutcome>;
+  signUp?: (credentials: { readonly email: string; readonly password: string }) => Promise<SignInOutcome>;
   signOut: () => Promise<void>;
 }
 
