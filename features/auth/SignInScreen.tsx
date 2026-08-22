@@ -190,7 +190,7 @@ export function SignInScreen(): React.JSX.Element {
               const action = mode === 'sign-up' ? signUp({ email: email.trim(), password }) : signIn('email', { email: email.trim(), password });
               void action.then((outcome) => {
                 setIsWorking(false);
-                if (!outcome.ok) setFailure(outcome.reason);
+                if (!outcome.ok && outcome.reason !== 'cancelled') setFailure(outcome.reason);
               });
             }}
             isWorking={isWorking}
