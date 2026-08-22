@@ -116,9 +116,7 @@ export function createHereSearchAdapter(options: HereSearchOptions): HereSearchP
 
 function unavailable(providerStatus?: number): ApiError {
   return new ApiError('UPSTREAM_UNAVAILABLE', 'Could not reach the address service', {
-    ...(providerStatus === undefined
-      ? {}
-      : { details: { providerStatus } }),
+    ...(providerStatus === undefined ? {} : { details: { providerStatus } }),
     degradationHint: 'RETRY_LATER',
   });
 }
