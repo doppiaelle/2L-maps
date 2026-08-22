@@ -20,8 +20,14 @@ import type { AuthProvider, Session, SignInMethod, SignInOutcome } from '@/lib/p
 export interface SessionContextValue {
   readonly session: Session | null;
   readonly isRestored: boolean;
-  signIn: (method: SignInMethod, credentials?: { readonly email?: string; readonly password?: string }) => Promise<SignInOutcome>;
-  signUp: (credentials: { readonly email: string; readonly password: string }) => Promise<SignInOutcome>;
+  signIn: (
+    method: SignInMethod,
+    credentials?: { readonly email?: string; readonly password?: string },
+  ) => Promise<SignInOutcome>;
+  signUp: (credentials: {
+    readonly email: string;
+    readonly password: string;
+  }) => Promise<SignInOutcome>;
   signOut: () => Promise<void>;
 }
 
@@ -66,18 +72,27 @@ export function SessionProvider({ auth, children }: SessionProviderProps): React
   }, [auth]);
 
   const signIn = useCallback(
-    async (method: SignInMethod, credentials?: { readonly email?: string; readonly password?: string }): Promise<SignInOutcome> => {
+    async (
+      method: SignInMethod,
+      credentials?: { readonly email?: string; readonly password?: string },
+    ): Promise<SignInOutcome> => {
       if (auth === null) return { ok: false, reason: 'unavailable' };
       return auth.signIn(method, credentials);
     },
     [auth],
   );
 
-  const signUp = useCallback(async (credentials: { readonly email: string; readonly password: string }): Promise<SignInOutcome> => {
-    if (auth === null) return { ok: false, reason: 'unavailable' };
-    if (auth.signUp === undefined) return { ok: false, reason: 'unavailable' };
-    return auth.signUp(credentials);
-  }, [auth]);
+  const signUp = useCallback(
+    async (credentials: {
+      readonly email: string;
+      readonly password: string;
+    }): Promise<SignInOutcome> => {
+      if (auth === null) return { ok: false, reason: 'unavailable' };
+      if (auth.signUp === undefined) return { ok: false, reason: 'unavailable' };
+      return auth.signUp(credentials);
+    },
+    [auth],
+  );
 
   const signOut = useCallback(async () => {
     // Cleared locally as well as remotely. Waiting for the provider to confirm
