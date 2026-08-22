@@ -203,7 +203,8 @@ class PlannerController extends ChangeNotifier {
           this.error = error is JsonRequestException
               ? 'Ricerca indirizzi non disponibile '
                   '(HTTP ${error.statusCode}'
-                  '${error.code == null ? '' : ': ${error.code}'})'
+                  '${error.code == null ? '' : ': ${error.code}'}'
+                  '${error.providerStatus == null ? '' : '; HERE HTTP ${error.providerStatus}'})'
               : 'Ricerca indirizzi non disponibile.';
         }
       }
