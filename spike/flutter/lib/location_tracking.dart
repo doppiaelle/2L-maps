@@ -213,7 +213,10 @@ class LocationTrackingController extends ChangeNotifier {
       _set(LocationTrackingState.active, 'Ricerca posizione iniziale…');
       final initialProvider = platform;
       if (initialProvider is CurrentPositionDeviceLocationPlatform) {
-        final initial = await _readInitialPosition(initialProvider, timeout);
+        final initial = await _readInitialPosition(
+          initialProvider as CurrentPositionDeviceLocationPlatform,
+          timeout,
+        );
         _onFix(initial);
       }
     } catch (error) {
