@@ -220,9 +220,8 @@ class SettingsScreen extends StatelessWidget {
             onChanged: (m) { if (m != null) onTheme(m); },
           ),
         ),
-        if (AuthSessionController.debugToolsEnabled) const Divider(),
-        if (AuthSessionController.debugToolsEnabled)
-          ListTile(
+        const Divider(),
+        ListTile(
             leading: const Icon(Icons.article_outlined),
             title: const Text('Log diagnostico'),
             subtitle: const Text('Visualizza e copia gli ultimi eventi dell’app'),
@@ -325,29 +324,12 @@ class _NavigationScreenState extends State<NavigationScreen>
           subtitle: _subtitle,
           icon: Icons.navigation_outlined,
           scrollable: false,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              HereMapScreen(
-                followPosition: tracking.hasPosition,
-                userPosition: tracking.latest,
-                routeSummary: tracking.hasPosition
-                    ? 'GPS attivo · precisione ${tracking.latest!.accuracyMeters.toStringAsFixed(0)} m'
-                    : null,
-              ),
-              const SizedBox(height: 12),
-              Card(
-                child: ListTile(
-                  leading: Icon(_statusIcon),
-                  title: Text(_statusTitle),
-                  subtitle: Text(tracking.message ??
-                      (tracking.hasPosition
-                          ? 'Posizione aggiornata in tempo reale.'
-                          : 'La posizione iniziale non è ancora disponibile.')),
-                  trailing: _action,
-                ),
-              ),
-            ],
+          child: Expanded(
+            child: HereMapScreen(
+              followPosition: tracking.hasPosition,
+              userPosition: tracking.latest,
+              onRecenter: tracking.start,
+            ),
           ),
         ),
       );
@@ -355,57 +337,6 @@ class _NavigationScreenState extends State<NavigationScreen>
   String get _subtitle => tracking.hasPosition
       ? 'La mappa segue la tua posizione.'
       : 'Attiva il GPS per avviare la guida.';
-
-  String get _statusTitle => switch (tracking.state) {
-        LocationTrackingState.active => tracking.hasPosition
-            ? 'Posizione rilevata'
-            : 'Ricerca posizione GPS',
-        LocationTrackingState.weakSignal => 'Segnale GPS debole',
-        LocationTrackingState.serviceDisabled => 'GPS disattivato',
-        LocationTrackingState.permissionDenied => 'Permesso negato',
-        LocationTrackingState.permissionDeniedForever => 'Permesso bloccato',
-        LocationTrackingState.suspended => 'Posizione sospesa',
-        LocationTrackingState.error => 'GPS non disponibile',
-        LocationTrackingState.requestingPermission => 'Richiesta permesso',
-        LocationTrackingState.idle => 'GPS non attivo',
-      };
-
-  IconData get _statusIcon => switch (tracking.state) {
-        LocationTrackingState.active => Icons.gps_fixed,
-        LocationTrackingState.weakSignal => Icons.gps_not_fixed,
-        LocationTrackingState.serviceDisabled => Icons.location_off,
-        LocationTrackingState.permissionDenied ||
-        LocationTrackingState.permissionDeniedForever => Icons.location_disabled,
-        LocationTrackingState.suspended => Icons.pause_circle_outline,
-        LocationTrackingState.error => Icons.error_outline,
-        LocationTrackingState.requestingPermission => Icons.location_searching,
-        LocationTrackingState.idle => Icons.gps_off,
-      };
-
-  Widget get _action {
-    final needsSettings = tracking.state == LocationTrackingState.serviceDisabled ||
-        tracking.state == LocationTrackingState.permissionDeniedForever;
-    if (needsSettings) {
-      return TextButton(
-        onPressed: tracking.openSettingsForCurrentIssue,
-        child: const Text('Impostazioni'),
-      );
-    }
-    if (tracking.state == LocationTrackingState.requestingPermission) {
-      return const SizedBox(
-        width: 24,
-        height: 24,
-        child: Padding(
-          padding: EdgeInsets.all(4),
-          child: CircularProgressIndicator(strokeWidth: 2),
-        ),
-      );
-    }
-    return FilledButton(
-      onPressed: tracking.start,
-      child: Text(tracking.hasPosition ? 'Aggiorna' : 'Attiva GPS'),
-    );
-  }
 }
 
 class _Page extends StatelessWidget {
