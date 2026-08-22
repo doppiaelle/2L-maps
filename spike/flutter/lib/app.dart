@@ -223,15 +223,44 @@ class SettingsScreen extends StatelessWidget {
         if (AuthSessionController.debugToolsEnabled) const Divider(),
         if (AuthSessionController.debugToolsEnabled)
           ListTile(
-            leading: const Icon(Icons.bug_report_outlined),
-            title: const Text('Copia diagnostica'),
-            subtitle: const Text('Eventi auth e bootstrap recenti'),
+            leading: const Icon(Icons.article_outlined),
+            title: const Text('Log diagnostico'),
+            subtitle: const Text('Visualizza e copia gli ultimi eventi dell’app'),
             onTap: () async {
-              await AppDiagnostics.copyToClipboard();
-              if (!context.mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Diagnostica copiata negli appunti.'),
+              final log = AppDiagnostics.snapshot;
+              await showDialog<void>(
+                context: context,
+                builder: (dialogContext) => AlertDialog(
+                  title: const Text('Log diagnostico'),
+                  content: SizedBox(
+                    width: double.maxFinite,
+                    height: 420,
+                    child: SingleChildScrollView(
+                      child: SelectableText(
+                        log.isEmpty ? 'Nessun evento registrato.' : log,
+                      ),
+                    ),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(dialogContext).pop(),
+                      child: const Text('Chiudi'),
+                    ),
+                    FilledButton.icon(
+                      onPressed: () async {
+                        await AppDiagnostics.copyToClipboard();
+                        if (!context.mounted) return;
+                        Navigator.of(dialogContext).pop();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Log copiato negli appunti.'),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.copy),
+                      label: const Text('Copia'),
+                    ),
+                  ],
                 ),
               );
             },
