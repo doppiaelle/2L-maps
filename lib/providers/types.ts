@@ -251,7 +251,7 @@ export interface Session {
   readonly accessToken: string;
 }
 
-export type SignInMethod = 'apple' | 'google';
+export type SignInMethod = 'apple' | 'google' | 'email';
 
 export type SignInOutcome =
   | { readonly ok: true }
