@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'app_bootstrap.dart';
 import 'app_theme.dart';
@@ -263,6 +265,9 @@ class _NavigationScreenState extends State<NavigationScreen>
     tracking = LocationTrackingController(
       platform: const GeolocatorDeviceLocationPlatform(),
     );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(tracking.start());
+    });
   }
 
   @override
@@ -290,6 +295,7 @@ class _NavigationScreenState extends State<NavigationScreen>
           title: 'Navigazione',
           subtitle: _subtitle,
           icon: Icons.navigation_outlined,
+          scrollable: false,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -374,10 +380,55 @@ class _NavigationScreenState extends State<NavigationScreen>
 }
 
 class _Page extends StatelessWidget {
-  const _Page({required this.title, required this.subtitle, required this.icon, required this.child});
-  final String title, subtitle; final IconData icon; final Widget child;
-  @override Widget build(BuildContext context) => SafeArea(child: SingleChildScrollView(padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-    Row(children: [CircleAvatar(backgroundColor: AppColors.mint, child: Icon(icon, color: AppColors.ink)), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: Theme.of(context).textTheme.headlineSmall), Text(subtitle)]))]),
-    const SizedBox(height: 28), child,
-  ])));
+  const _Page({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.child,
+    this.scrollable = true,
+  });
+
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Widget child;
+  final bool scrollable;
+
+  @override
+  Widget build(BuildContext context) {
+    final content = Padding(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: AppColors.mint,
+                child: Icon(icon, color: AppColors.ink),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: Theme.of(context).textTheme.headlineSmall),
+                    Text(subtitle),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 28),
+          child,
+        ],
+      ),
+    );
+
+    return SafeArea(
+      child: scrollable
+          ? SingleChildScrollView(child: content)
+          : content,
+    );
+  }
 }
