@@ -64,6 +64,15 @@ export interface AuthBrowserPort {
   ) => Promise<{ readonly type: string; readonly url?: string }>;
 }
 
+const AUTH_FLOW_TIMEOUT_MS = 30_000;
+
+function withAuthTimeout<T>(promise: Promise<T>): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error('Authentication timed out')), AUTH_FLOW_TIMEOUT_MS)),
+  ]);
+}
+
 const toSession = (raw: { access_token: string; user: { id: string } } | null): Session | null => {
   if (raw === null) return null;
   // A session with no token is not a session. Supabase should never produce one,
@@ -149,7 +158,7 @@ export function createAuthProvider(
         // a failure rather than as a success nobody can see.
         if (data.url === null) return { ok: false, reason: 'failed' };
 
-        const result = await browser.openAuthSession(data.url, options.redirectTo);
+        const result = await withAuthTimeout(browser.openAuthSession(data.url, options.redirectTo));
 
         // Backing out of the provider's sheet is not an error and is never shown
         // as one — the user changed their mind, and a red banner for that is the
@@ -163,7 +172,7 @@ export function createAuthProvider(
         // the consent screen. Either way there is no session to exchange for.
         if (code === null) return { ok: false, reason: 'failed' };
 
-        const exchange = await auth.exchangeCodeForSession(code);
+        const exchange = await withAuthTimeout(auth.exchangeCodeForSession(code));
         return exchange.error === null ? { ok: true } : { ok: false, reason: 'failed' };
       } catch {
         return { ok: false, reason: 'failed' };
