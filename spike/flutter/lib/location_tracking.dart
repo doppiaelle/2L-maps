@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart' as geo;
 
 import 'position_adapter.dart';
+import 'app_diagnostics.dart';
 
 enum LocationTrackingState {
   idle,
@@ -139,35 +140,43 @@ class LocationTrackingController extends ChangeNotifier {
 
   Future<void> start() async {
     _set(LocationTrackingState.requestingPermission);
-    if (!await platform.isServiceEnabled()) {
-      _set(LocationTrackingState.serviceDisabled, 'Attiva il GPS per continuare.');
-      return;
-    }
+    try {
+      if (!await platform.isServiceEnabled()) {
+        _set(LocationTrackingState.serviceDisabled, 'Attiva il GPS per continuare.');
+        return;
+      }
 
-    var permission = await platform.checkPermission();
-    if (permission == DeviceLocationPermission.denied) {
-      permission = await platform.requestPermission();
-    }
-    if (permission == DeviceLocationPermission.deniedForever) {
-      _set(LocationTrackingState.permissionDeniedForever,
-          'Consenti la posizione nelle impostazioni dell’app.');
-      return;
-    }
-    if (permission == DeviceLocationPermission.denied) {
-      _set(LocationTrackingState.permissionDenied,
-          'Il permesso di posizione è necessario per la navigazione.');
-      return;
-    }
+      var permission = await platform.checkPermission();
+      if (permission == DeviceLocationPermission.denied) {
+        permission = await platform.requestPermission();
+      }
+      if (permission == DeviceLocationPermission.deniedForever) {
+        _set(LocationTrackingState.permissionDeniedForever,
+            'Consenti la posizione nelle impostazioni dell’app.');
+        return;
+      }
+      if (permission == DeviceLocationPermission.denied) {
+        _set(LocationTrackingState.permissionDenied,
+            'Il permesso di posizione è necessario per la navigazione.');
+        return;
+      }
 
-    await _subscription?.cancel();
-    _subscription = platform.fixes.listen(
-      _onFix,
-      onError: (_, __) => _set(
+      await _subscription?.cancel();
+      _subscription = platform.fixes.listen(
+        _onFix,
+        onError: (_, __) => _set(
+          LocationTrackingState.error,
+          'Impossibile leggere la posizione del dispositivo.',
+        ),
+      );
+      _set(LocationTrackingState.active, 'Ricerca posizione iniziale…');
+    } catch (error) {
+      AppDiagnostics.record('location failure type=${error.runtimeType}');
+      _set(
         LocationTrackingState.error,
-        'Impossibile leggere la posizione del dispositivo.',
-      ),
-    );
-    _set(LocationTrackingState.active, 'Ricerca posizione iniziale…');
+        'Impossibile attivare il GPS. Controlla i permessi dell’app.',
+      );
+    }
   }
 
   void _onFix(PositionFix fix) {
