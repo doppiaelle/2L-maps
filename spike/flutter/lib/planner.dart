@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import 'http_json_transport.dart';
 import 'route_models.dart';
 import 'route_orchestrator.dart';
 import 'routing_transport.dart';
@@ -199,7 +200,11 @@ class PlannerController extends ChangeNotifier {
       } catch (error) {
         if (id == _requestId) {
           suggestions = [];
-          this.error = 'Ricerca indirizzi non disponibile.';
+          this.error = error is JsonRequestException
+              ? 'Ricerca indirizzi non disponibile '
+                  '(HTTP ${error.statusCode}'
+                  '${error.code == null ? '' : ': ${error.code}'})'
+              : 'Ricerca indirizzi non disponibile.';
         }
       }
       if (id == _requestId) {
@@ -299,16 +304,6 @@ class _PlannerViewState extends State<PlannerView> {
   Widget build(BuildContext context) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (!widget.controller.locationPermissionGranted)
-            const Card(
-              child: ListTile(
-                leading: Icon(Icons.location_off),
-                title: Text('Posizione non disponibile'),
-                subtitle: Text(
-                  'Consenti il GPS o inserisci una partenza manuale.',
-                ),
-              ),
-            ),
           _searchField(
             start,
             label: 'Cerca partenza',
