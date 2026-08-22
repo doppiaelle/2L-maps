@@ -273,8 +273,14 @@ export interface AuthProvider {
    *  signed out, and is a normal answer rather than a failure. */
   currentSession: () => Promise<Session | null>;
   subscribe: (listener: (session: Session | null) => void) => () => void;
-  signIn: (method: SignInMethod, credentials?: { readonly email?: string; readonly password?: string }) => Promise<SignInOutcome>;
-  signUp?: (credentials: { readonly email: string; readonly password: string }) => Promise<SignInOutcome>;
+  signIn: (
+    method: SignInMethod,
+    credentials?: { readonly email?: string; readonly password?: string },
+  ) => Promise<SignInOutcome>;
+  signUp?: (credentials: {
+    readonly email: string;
+    readonly password: string;
+  }) => Promise<SignInOutcome>;
   signOut: () => Promise<void>;
 }
 
