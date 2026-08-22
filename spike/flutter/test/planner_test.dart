@@ -18,6 +18,25 @@ void main() {
     expect(planner.suggestions.single.address, 'Via Roma 1');
     planner.dispose();
   });
+  test('planner stores resolved start and clears suggestions', () {
+    final planner = PlannerController(
+      search: SupabaseSearchClient(
+        fakeRequest,
+        config: const RoutingConfig(
+          supabaseUrl: 'https://example.supabase.co',
+          supabaseAnonKey: 'anon',
+        ),
+      ),
+    );
+    planner.setStart('Via Roma 1', latitude: 41.9, longitude: 12.5);
+    planner.addStop('Colosseo', latitude: 41.89, longitude: 12.49);
+    expect(planner.start?.resolved, isTrue);
+    expect(planner.stops.single.resolved, isTrue);
+    planner.suggestions = const [];
+    planner.clearSuggestions();
+    expect(planner.suggestions, isEmpty);
+    planner.dispose();
+  });
   test('planner enforces limits and supports reorder/remove', () {
     final planner = PlannerController(search: SupabaseSearchClient(fakeRequest, config: const RoutingConfig(supabaseUrl: 'https://example.supabase.co', supabaseAnonKey: 'anon')), maxStops: 2);
     planner.addStop('A'); planner.addStop('B'); planner.addStop('C');

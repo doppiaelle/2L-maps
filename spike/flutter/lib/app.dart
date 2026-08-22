@@ -6,6 +6,13 @@ import 'location_tracking.dart';
 import 'auth_screen.dart';
 import 'auth_service.dart';
 import 'app_diagnostics.dart';
+import 'http_json_transport.dart';
+import 'planner.dart';
+import 'route_models.dart';
+import 'route_orchestrator.dart';
+import 'routing_config.dart';
+import 'routing_transport.dart';
+import 'search_transport.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class TwolMapsApp extends StatefulWidget {
@@ -20,16 +27,61 @@ class _TwolMapsAppState extends State<TwolMapsApp> {
     home: widget.bootstrap.status == BootstrapStatus.ready ? _AuthGate(onTheme: (m) => setState(() => mode = m)) : ConfigurationScreen(result: widget.bootstrap));
   @override void dispose() { if (widget.bootstrap.status == BootstrapStatus.ready) disposeBootstrap(); super.dispose(); }
 }
-class _Shell extends StatelessWidget {
-  const _Shell({required this.index, required this.onIndex, required this.onTheme, this.onLogout});
-  final int index; final ValueChanged<int> onIndex; final ValueChanged<ThemeMode> onTheme; final Future<void> Function()? onLogout;
-  @override Widget build(BuildContext context) {
-    final pages = [const PlannerScreen(), const HistoryScreen(), SettingsScreen(onTheme: onTheme, onLogout: onLogout), const NavigationScreen()];
-    return Scaffold(body: IndexedStack(index: index, children: pages), bottomNavigationBar: NavigationBar(selectedIndex: index, onDestinationSelected: onIndex, destinations: const [
-      NavigationDestination(icon: Icon(Icons.route), label: 'Planner'), NavigationDestination(icon: Icon(Icons.history), label: 'Storico'),
-      NavigationDestination(icon: Icon(Icons.settings_outlined), label: 'Impostazioni'), NavigationDestination(icon: Icon(Icons.navigation_outlined), label: 'Navigazione'),
-    ]));
+class _Shell extends StatefulWidget {
+  const _Shell({required this.auth, required this.onTheme});
+
+  final AuthSessionController auth;
+  final ValueChanged<ThemeMode> onTheme;
+
+  @override
+  State<_Shell> createState() => _ShellState();
+}
+
+class _ShellState extends State<_Shell> {
+  late final List<Widget> pages;
+  int selectedIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    pages = [
+      PlannerScreen(accessToken: widget.auth.session?.accessToken ?? ''),
+      const HistoryScreen(),
+      SettingsScreen(
+        onTheme: widget.onTheme,
+        onLogout: widget.auth.signOut,
+      ),
+      const NavigationScreen(),
+    ];
   }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        body: IndexedStack(index: selectedIndex, children: pages),
+        bottomNavigationBar: NavigationBar(
+          selectedIndex: selectedIndex,
+          onDestinationSelected: (index) =>
+              setState(() => selectedIndex = index),
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.route),
+              label: 'Planner',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.history),
+              label: 'Storico',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.settings_outlined),
+              label: 'Impostazioni',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.navigation_outlined),
+              label: 'Navigazione',
+            ),
+          ],
+        ),
+      );
 }
 class _AuthGate extends StatefulWidget {
   const _AuthGate({required this.onTheme});
@@ -44,7 +96,7 @@ class _AuthGateState extends State<_AuthGate> {
     initialData: AuthState(AuthChangeEvent.initialSession, auth.session),
     builder: (context, snapshot) => snapshot.data?.session == null
       ? AuthScreen(auth: auth)
-      : _Shell(index: 0, onIndex: (_) {}, onTheme: widget.onTheme, onLogout: auth.signOut),
+      : _Shell(auth: auth, onTheme: widget.onTheme),
   );
 }
 
@@ -57,13 +109,88 @@ class ConfigurationScreen extends StatelessWidget {
     const SizedBox(height: 12), Text(result.message ?? 'Controlla la configurazione di build.', textAlign: TextAlign.center),
   ]))))));
 }
-class PlannerScreen extends StatelessWidget {
-  const PlannerScreen({super.key});
-  @override Widget build(BuildContext context) => const _Page(title: 'Dove vuoi andare oggi?', subtitle: 'Crea un itinerario ottimizzato in pochi passi.', icon: Icons.edit_location_alt_outlined, child: Column(children: [
-    TextField(decoration: InputDecoration(labelText: 'Posizione di partenza', hintText: 'La tua posizione attuale', prefixIcon: Icon(Icons.my_location_outlined))),
-    SizedBox(height: 12), TextField(decoration: InputDecoration(labelText: 'Prima destinazione', hintText: 'Cerca un indirizzo', prefixIcon: Icon(Icons.place_outlined))),
-    SizedBox(height: 20), FilledButton(onPressed: null, child: Text('Ottimizza itinerario')),
-  ]));
+class PlannerScreen extends StatefulWidget {
+  const PlannerScreen({required this.accessToken, super.key});
+
+  final String accessToken;
+
+  @override
+  State<PlannerScreen> createState() => _PlannerScreenState();
+}
+
+class _PlannerScreenState extends State<PlannerScreen> {
+  late final PlannerController planner;
+
+  @override
+  void initState() {
+    super.initState();
+    final config = RoutingConfig.fromEnvironment();
+    final request = createJsonRequest();
+    planner = PlannerController(
+      search: SupabaseSearchClient(request, config: config),
+      orchestrator: RouteOrchestrator(
+        client: SupabaseRoutingClient(request, config: config),
+      ),
+    );
+  }
+
+  Future<void> optimize() async {
+    final start = planner.start;
+    if (start == null || !start.resolved ||
+        planner.stops.any((stop) => !stop.resolved)) {
+      _showMessage('Seleziona risultati validi per partenza e tappe.');
+      return;
+    }
+    final route = [
+      Stop(
+        id: 'start',
+        latitude: start.latitude!,
+        longitude: start.longitude!,
+        label: start.address,
+      ),
+      for (var i = 0; i < planner.stops.length; i++)
+        Stop(
+          id: 'stop-$i',
+          latitude: planner.stops[i].latitude!,
+          longitude: planner.stops[i].longitude!,
+          label: planner.stops[i].address,
+        ),
+    ];
+    final result = await planner.optimizeRoute(
+      route,
+      accessToken: widget.accessToken,
+    );
+    if (!mounted) return;
+    _showMessage(
+      result == null
+          ? planner.optimizationError ?? 'Ottimizzazione non riuscita.'
+          : 'Percorso calcolato: ${result.route.distanceMeters.round()} m.',
+    );
+  }
+
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  @override
+  void dispose() {
+    planner.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => _Page(
+        title: 'Dove vuoi andare oggi?',
+        subtitle: 'Cerca partenza e destinazioni per creare un itinerario.',
+        icon: Icons.edit_location_alt_outlined,
+        child: PlannerView(
+          controller: planner,
+          accessToken: widget.accessToken,
+          onOptimize: optimize,
+        ),
+      );
 }
 class HistoryScreen extends StatelessWidget {
   const HistoryScreen({super.key});
