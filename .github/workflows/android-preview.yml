@@ -72,6 +72,15 @@ jobs:
           grep -q 'compileSdk = 36' android/app/build.gradle.kts
           grep -q 'minSdk = 24' android/app/build.gradle.kts
           grep -R "com.doppiaelle.twolmaps" android
+          logo_src="$GITHUB_WORKSPACE/assets/brand/logo.png"
+          test -s "$logo_src"
+          mkdir -p android/app/src/main/res/drawable
+          cp "$logo_src" android/app/src/main/res/drawable/twolmaps_logo.png
+          manifest="android/app/src/main/AndroidManifest.xml"
+          sed -i 's/android:label="[^"]*"/android:label="2L Maps"/' "$manifest"
+          sed -i 's#android:icon="@mipmap/ic_launcher"#android:icon="@drawable/twolmaps_logo"#' "$manifest"
+          grep -q 'android:label="2L Maps"' "$manifest"
+          grep -q 'android:icon="@drawable/twolmaps_logo"' "$manifest"
       - name: Dependencies and tests
         run: |
           flutter pub get
