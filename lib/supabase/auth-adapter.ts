@@ -37,17 +37,11 @@ export interface SupabaseAuthPort {
    * Reading only `error` from this call — which is what this file used to do —
    * yields `{ ok: true }` and a user still looking at the sign-in screen.
    */
-  signInWithPassword?: (args: {
-    email: string;
-    password: string;
-  }) => Promise<{
+  signInWithPassword?: (args: { email: string; password: string }) => Promise<{
     data: { session: { access_token: string; user: { id: string } } | null };
     error: { message: string } | null;
   }>;
-  signUp?: (args: {
-    email: string;
-    password: string;
-  }) => Promise<{
+  signUp?: (args: { email: string; password: string }) => Promise<{
     data: { session: { access_token: string; user: { id: string } } | null };
     error: { message: string } | null;
   }>;
