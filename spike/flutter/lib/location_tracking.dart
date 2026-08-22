@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+
+import 'app_diagnostics.dart';
 import 'package:geolocator/geolocator.dart' as geo;
 
 import 'position_adapter.dart';
@@ -131,6 +133,7 @@ class LocationTrackingController extends ChangeNotifier {
   LocationTrackingState _state = LocationTrackingState.idle;
   String? _message;
   bool _suspended = false;
+  bool _startInFlight = false;
 
   PositionFix? get latest => _latest;
   LocationTrackingState get state => _state;
@@ -138,36 +141,57 @@ class LocationTrackingController extends ChangeNotifier {
   bool get hasPosition => _latest != null;
 
   Future<void> start() async {
+    if (_startInFlight) return;
+    _startInFlight = true;
     _set(LocationTrackingState.requestingPermission);
-    if (!await platform.isServiceEnabled()) {
-      _set(LocationTrackingState.serviceDisabled, 'Attiva il GPS per continuare.');
-      return;
-    }
 
-    var permission = await platform.checkPermission();
-    if (permission == DeviceLocationPermission.denied) {
-      permission = await platform.requestPermission();
-    }
-    if (permission == DeviceLocationPermission.deniedForever) {
-      _set(LocationTrackingState.permissionDeniedForever,
-          'Consenti la posizione nelle impostazioni dell’app.');
-      return;
-    }
-    if (permission == DeviceLocationPermission.denied) {
-      _set(LocationTrackingState.permissionDenied,
-          'Il permesso di posizione è necessario per la navigazione.');
-      return;
-    }
+    const timeout = Duration(seconds: 12);
+    try {
+      if (!await platform.isServiceEnabled().timeout(timeout)) {
+        _set(
+          LocationTrackingState.serviceDisabled,
+          'Attiva il GPS per continuare.',
+        );
+        return;
+      }
 
-    await _subscription?.cancel();
-    _subscription = platform.fixes.listen(
-      _onFix,
-      onError: (_, __) => _set(
+      var permission = await platform.checkPermission().timeout(timeout);
+      if (permission == DeviceLocationPermission.denied) {
+        permission = await platform.requestPermission().timeout(timeout);
+      }
+      if (permission == DeviceLocationPermission.deniedForever) {
+        _set(
+          LocationTrackingState.permissionDeniedForever,
+          'Consenti la posizione nelle impostazioni dell’app.',
+        );
+        return;
+      }
+      if (permission == DeviceLocationPermission.denied) {
+        _set(
+          LocationTrackingState.permissionDenied,
+          'Il permesso di posizione è necessario per la navigazione.',
+        );
+        return;
+      }
+
+      await _subscription?.cancel();
+      _subscription = platform.fixes.listen(
+        _onFix,
+        onError: (_, __) => _set(
+          LocationTrackingState.error,
+          'Impossibile leggere la posizione del dispositivo.',
+        ),
+      );
+      _set(LocationTrackingState.active, 'Ricerca posizione iniziale…');
+    } catch (error) {
+      AppDiagnostics.record('gps failure type=${error.runtimeType}');
+      _set(
         LocationTrackingState.error,
-        'Impossibile leggere la posizione del dispositivo.',
-      ),
-    );
-    _set(LocationTrackingState.active, 'Ricerca posizione iniziale…');
+        'Impossibile attivare il GPS (${error.runtimeType}).',
+      );
+    } finally {
+      _startInFlight = false;
+    }
   }
 
   void _onFix(PositionFix fix) {
