@@ -9,7 +9,8 @@ class AppDiagnostics {
   static final ListQueue<String> _events = ListQueue<String>();
 
   static void record(String message) {
-    final line = '${DateTime.now().toUtc().toIso8601String()} $message';
+    final line =
+        '${DateTime.now().toUtc().toIso8601String()} ${sanitize(message)}';
     if (_events.length >= _maxEvents) {
       _events.removeFirst();
     }
@@ -19,6 +20,23 @@ class AppDiagnostics {
   }
 
   static String get snapshot => _events.join('\n');
+
+  /// Keeps diagnostics useful without allowing credentials into copied logs.
+  static String sanitize(String message) {
+    var value = message.replaceAll(RegExp(r'[\r\n]+'), r'\n');
+    value = value.replaceAll(
+      RegExp(r'Bearer\s+[^\s]+', caseSensitive: false),
+      'Bearer <redacted>',
+    );
+    value = value.replaceAll(
+      RegExp(
+        r'(?:api[_-]?key|access[_-]?key(?:[_-]?(?:id|secret))?|password|token)\s*[=:]\s*[^\s,;]+',
+        caseSensitive: false,
+      ),
+      '<credential-redacted>',
+    );
+    return value.length > 600 ? '${value.substring(0, 600)}…' : value;
+  }
 
   static void clear() {
     _events.clear();

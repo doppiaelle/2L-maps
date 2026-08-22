@@ -10,12 +10,16 @@ class JsonRequestException implements Exception {
     required this.uri,
     this.code,
     this.providerStatus,
+    this.providerCode,
+    this.providerMessage,
   });
 
   final int statusCode;
   final Uri uri;
   final String? code;
   final int? providerStatus;
+  final String? providerCode;
+  final String? providerMessage;
 
   @override
   String toString() =>
@@ -49,10 +53,19 @@ JsonRequest createJsonRequest({
           details is Map && details['providerStatus'] is num
               ? (details['providerStatus'] as num).toInt()
               : null;
+      final providerCode = details is Map && details['providerCode'] is String
+          ? details['providerCode'] as String
+          : null;
+      final providerMessage =
+          details is Map && details['providerMessage'] is String
+              ? details['providerMessage'] as String
+              : null;
       AppDiagnostics.record(
         'http response ${uri.path} status=${response.statusCode}'
         '${code == null ? '' : ' code=$code'}'
-        '${providerStatus == null ? '' : ' provider_status=$providerStatus'}',
+        '${providerStatus == null ? '' : ' provider_status=$providerStatus'}'
+        '${providerCode == null ? '' : ' provider_code=$providerCode'}'
+        '${providerMessage == null ? '' : ' provider_message=$providerMessage'}',
       );
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw JsonRequestException(
@@ -60,6 +73,8 @@ JsonRequest createJsonRequest({
           uri: uri,
           code: code,
           providerStatus: providerStatus,
+          providerCode: providerCode,
+          providerMessage: providerMessage,
         );
       }
       if (responseBody == null) {
