@@ -18,6 +18,7 @@ jobs:
       SDK_VERSION: ${{ vars.HERE_SDK_VERSION || vars.HERE_SDK_SDK_VERSION }}
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      DEBUG_AUTH_BYPASS: ${{ vars.DEBUG_AUTH_BYPASS || 'false' }}
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -56,7 +57,7 @@ jobs:
           fi
       - name: Generate Android project
         run: flutter create --platforms=android --org com.doppiaelle --project-name twolmaps .
-      - name: Configure Android SDK levels and package
+      - name: Configure Android SDK levels, package, and auth deep link
         run: |
           set -euo pipefail
           git show HEAD:spike/flutter/lib/main.dart > lib/main.dart
@@ -68,9 +69,30 @@ jobs:
           sed -i 's/targetSdk = flutter.targetSdkVersion/targetSdk = 36/' android/app/build.gradle.kts
           sed -i 's/namespace = "doppiaelle.twolmaps"/namespace = "com.doppiaelle.twolmaps"/' android/app/build.gradle.kts
           sed -i 's/applicationId = "doppiaelle.twolmaps"/applicationId = "com.doppiaelle.twolmaps"/' android/app/build.gradle.kts
+          python3 - <<'PY'
+          from pathlib import Path
+
+          manifest = Path('android/app/src/main/AndroidManifest.xml')
+          content = manifest.read_text()
+          marker = '\n        </activity>'
+          intent_filter = '''
+                <intent-filter>
+                    <action android:name="android.intent.action.VIEW" />
+                    <category android:name="android.intent.category.DEFAULT" />
+                    <category android:name="android.intent.category.BROWSABLE" />
+                    <data android:scheme="twolmaps" android:host="auth-callback" />
+                </intent-filter>'''
+          if 'android:scheme="twolmaps"' not in content:
+              if marker not in content:
+                  raise SystemExit('Could not find MainActivity in AndroidManifest.xml')
+              content = content.replace(marker, intent_filter + marker, 1)
+              manifest.write_text(content)
+          PY
           grep -q '^name: twol_maps_spike$' pubspec.yaml
           grep -q 'compileSdk = 36' android/app/build.gradle.kts
           grep -q 'minSdk = 24' android/app/build.gradle.kts
+          grep -q 'android:scheme="twolmaps"' android/app/src/main/AndroidManifest.xml
+          grep -q 'android:host="auth-callback"' android/app/src/main/AndroidManifest.xml
           grep -R "com.doppiaelle.twolmaps" android
       - name: Dependencies and tests
         run: |
@@ -81,7 +103,8 @@ jobs:
           set -euo pipefail
           flutter build apk --debug \
             --dart-define=SUPABASE_URL="$SUPABASE_URL" \
-            --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"
+            --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" \
+            --dart-define=DEBUG_AUTH_BYPASS="$DEBUG_AUTH_BYPASS"
           test -s build/app/outputs/flutter-apk/app-debug.apk
       - name: Verify provider REST keys are absent
         run: |

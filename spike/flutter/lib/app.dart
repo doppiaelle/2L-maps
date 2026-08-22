@@ -5,6 +5,7 @@ import 'here_map_screen.dart';
 import 'location_tracking.dart';
 import 'auth_screen.dart';
 import 'auth_service.dart';
+import 'app_diagnostics.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class TwolMapsApp extends StatefulWidget {
@@ -90,6 +91,22 @@ class SettingsScreen extends StatelessWidget {
             onChanged: (m) { if (m != null) onTheme(m); },
           ),
         ),
+        if (AuthSessionController.debugToolsEnabled) const Divider(),
+        if (AuthSessionController.debugToolsEnabled)
+          ListTile(
+            leading: const Icon(Icons.bug_report_outlined),
+            title: const Text('Copia diagnostica'),
+            subtitle: const Text('Eventi auth e bootstrap recenti'),
+            onTap: () async {
+              await AppDiagnostics.copyToClipboard();
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Diagnostica copiata negli appunti.'),
+                ),
+              );
+            },
+          ),
         if (onLogout != null) const Divider(),
         if (onLogout != null)
           ListTile(
