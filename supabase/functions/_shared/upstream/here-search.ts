@@ -38,7 +38,10 @@ export function createHereSearchAdapter(options: HereSearchOptions): HereSearchP
       throw unavailable();
     }
 
-    if (!response.ok) throw unavailable();
+    if (!response.ok) {
+      console.error(JSON.stringify({ event: 'here_upstream_http_error', status: response.status }));
+      throw unavailable(response.status);
+    }
 
     let payload: unknown;
     try {
@@ -106,8 +109,9 @@ export function createHereSearchAdapter(options: HereSearchOptions): HereSearchP
   };
 }
 
-function unavailable(): ApiError {
+function unavailable(providerStatus?: number): ApiError {
   return new ApiError('UPSTREAM_UNAVAILABLE', 'Could not reach the address service', {
+    ...(providerStatus === undefined ? {} : { details: { providerStatus } }),
     degradationHint: 'RETRY_LATER',
   });
 }
