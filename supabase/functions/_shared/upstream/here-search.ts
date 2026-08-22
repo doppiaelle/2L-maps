@@ -1,4 +1,5 @@
 import { ApiError } from '../errors.ts';
+import { logUpstreamRefusal, scrub, type UpstreamError } from './upstream-error.ts';
 
 export interface HerePlace {
   readonly providerPlaceId: string;
@@ -39,13 +40,13 @@ export function createHereSearchAdapter(options: HereSearchOptions): HereSearchP
     }
 
     if (!response.ok) {
-      console.error(
-        JSON.stringify({
-          event: 'here_upstream_http_error',
-          status: response.status,
-        }),
-      );
-      throw unavailable(response.status);
+      const body = await response.text().catch(() => '');
+      const providerError = readHereError(body, [
+        url.searchParams.get('q') ?? '',
+        url.searchParams.get('at') ?? '',
+      ]);
+      logUpstreamRefusal('here-search', response.status, providerError);
+      throw unavailable(response.status, providerError);
     }
 
     let payload: unknown;
@@ -96,11 +97,12 @@ export function createHereSearchAdapter(options: HereSearchOptions): HereSearchP
       url.searchParams.set('q', input);
       url.searchParams.set('limit', String(settings.limit ?? 8));
       if (settings.locale != null) url.searchParams.set('lang', settings.locale);
-      if (settings.bias != null) {
-        url.searchParams.set('at', settings.bias.lat + ',' + settings.bias.lng);
-      } else {
-        url.searchParams.set('in', 'countryCode:ITA');
-      }
+      const context = settings.bias ?? { lat: 41.8719, lng: 12.5674 };
+      // HERE Autosuggest requires a spatial context. When GPS is not ready,
+      // use the centre of Italy so the country filter remains valid rather than
+      // sending an invalid country-only request.
+      url.searchParams.set('at', context.lat + ',' + context.lng);
+      url.searchParams.set('in', 'countryCode:ITA');
       return request(url);
     },
     geocode: async (address, region = 'IT') => {
@@ -114,11 +116,52 @@ export function createHereSearchAdapter(options: HereSearchOptions): HereSearchP
   };
 }
 
-function unavailable(providerStatus?: number): ApiError {
+function unavailable(providerStatus?: number, providerError?: UpstreamError | null): ApiError {
+  const details = {
+    ...(providerStatus === undefined ? {} : { providerStatus }),
+    ...(providerError?.status === undefined ? {} : { providerCode: providerError.status }),
+    ...(providerError?.message === undefined || providerError.message === ''
+      ? {}
+      : { providerMessage: providerError.message }),
+  };
   return new ApiError('UPSTREAM_UNAVAILABLE', 'Could not reach the address service', {
-    ...(providerStatus === undefined ? {} : { details: { providerStatus } }),
+    ...(Object.keys(details).length === 0 ? {} : { details }),
     degradationHint: 'RETRY_LATER',
   });
+}
+
+function readHereError(body: string, redact: readonly string[]): UpstreamError | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    return null;
+  }
+  if (!isRecord(parsed)) return null;
+
+  const nested = isRecord(parsed.error) ? parsed.error : parsed;
+  const status =
+    typeof nested.status === 'string'
+      ? nested.status
+      : typeof nested.code === 'string'
+        ? nested.code
+        : typeof nested.code === 'number'
+          ? String(nested.code)
+          : typeof parsed.error === 'string'
+            ? parsed.error
+            : 'UNKNOWN';
+  const message =
+    typeof nested.message === 'string'
+      ? nested.message
+      : typeof nested.error_description === 'string'
+        ? nested.error_description
+        : typeof parsed.error_description === 'string'
+          ? parsed.error_description
+          : typeof parsed.error === 'string'
+            ? parsed.error
+            : '';
+
+  return { status, message: scrub(message, redact) };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

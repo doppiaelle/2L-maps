@@ -74,6 +74,7 @@ describe('HERE server-side search adapter', () => {
     const result = await hereSuggestionsUpstream({ input: 'Via Roma' }, places);
 
     expect(calls[0]?.hostname).toBe('autosuggest.search.hereapi.com');
+    expect(calls[0]?.searchParams.get('at')).toBe('41.8719,12.5674');
     expect(calls[0]?.searchParams.get('in')).toBe('countryCode:ITA');
     expect(calls[0]?.searchParams.get('apiKey')).toBe('server-only-key');
     expect(result.result.suggestions).toEqual([
@@ -86,11 +87,17 @@ describe('HERE server-side search adapter', () => {
   it('maps upstream failures to a sanitized retryable error', async () => {
     const places = createHereSearchAdapter({
       apiKey: 'server-only-key',
-      fetchImpl: (async () => ({ ok: false, status: 401 }) as Response) as typeof fetch,
+      fetchImpl: (async () =>
+        new Response(JSON.stringify({ error: { code: 'E401', message: 'Invalid API key' } }), {
+          status: 401,
+        })) as typeof fetch,
     });
 
     await expect(places.geocode('Via Roma')).rejects.toMatchObject({
       code: 'UPSTREAM_UNAVAILABLE',
+      options: {
+        details: { providerStatus: 401, providerCode: 'E401' },
+      },
     });
   });
 

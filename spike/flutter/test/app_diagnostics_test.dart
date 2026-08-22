@@ -10,6 +10,17 @@ void main() {
     expect(AppDiagnostics.snapshot, contains('test_event'));
   });
 
+  test('redacts credentials from copied diagnostics', () {
+    AppDiagnostics.record(
+      'request authorization=Bearer secret-token apiKey=private-key password=hunter2',
+    );
+
+    expect(AppDiagnostics.snapshot, isNot(contains('secret-token')));
+    expect(AppDiagnostics.snapshot, isNot(contains('private-key')));
+    expect(AppDiagnostics.snapshot, isNot(contains('hunter2')));
+    expect(AppDiagnostics.snapshot, contains('<redacted>'));
+  });
+
   test('clear removes recorded events', () {
     AppDiagnostics.record('test_event');
 
