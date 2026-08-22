@@ -213,9 +213,7 @@ class LocationTrackingController extends ChangeNotifier {
       _set(LocationTrackingState.active, 'Ricerca posizione iniziale…');
       final initialProvider = platform;
       if (initialProvider is CurrentPositionDeviceLocationPlatform) {
-        final initial = await (initialProvider as CurrentPositionDeviceLocationPlatform)
-            .getCurrentPosition()
-            .timeout(timeout);
+        final initial = await _readInitialPosition(initialProvider, timeout);
         _onFix(initial);
       }
     } catch (error) {
@@ -230,6 +228,12 @@ class LocationTrackingController extends ChangeNotifier {
       _startInFlight = false;
     }
   }
+
+  Future<PositionFix> _readInitialPosition(
+    CurrentPositionDeviceLocationPlatform provider,
+    Duration timeout,
+  ) =>
+      provider.getCurrentPosition().timeout(timeout);
 
   void _onFix(PositionFix fix) {
     if (_suspended) return;
