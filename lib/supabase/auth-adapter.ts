@@ -37,6 +37,14 @@ export interface SupabaseAuthPort {
    * Reading only `error` from this call — which is what this file used to do —
    * yields `{ ok: true }` and a user still looking at the sign-in screen.
    */
+  signInWithPassword?: (args: { email: string; password: string }) => Promise<{
+    data: { session: { access_token: string; user: { id: string } } | null };
+    error: { message: string } | null;
+  }>;
+  signUp?: (args: { email: string; password: string }) => Promise<{
+    data: { session: { access_token: string; user: { id: string } } | null };
+    error: { message: string } | null;
+  }>;
   signInWithOAuth: (args: {
     provider: SignInMethod;
     options: { redirectTo: string; skipBrowserRedirect: true };
@@ -60,6 +68,17 @@ export interface AuthBrowserPort {
     url: string,
     redirectTo: string,
   ) => Promise<{ readonly type: string; readonly url?: string }>;
+}
+
+const AUTH_FLOW_TIMEOUT_MS = 30_000;
+
+function withAuthTimeout<T>(promise: Promise<T>): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error('Authentication timed out')), AUTH_FLOW_TIMEOUT_MS),
+    ),
+  ]);
 }
 
 const toSession = (raw: { access_token: string; user: { id: string } } | null): Session | null => {
@@ -121,8 +140,20 @@ export function createAuthProvider(
      * happened, which is the worst shape a failure can take: the screen reports
      * success and stays exactly where it was.
      */
-    signIn: async (method: SignInMethod): Promise<SignInOutcome> => {
+    signIn: async (method: SignInMethod, credentials): Promise<SignInOutcome> => {
       try {
+        if (method === 'email') {
+          if (credentials?.email === undefined || credentials.password === undefined)
+            return { ok: false, reason: 'failed' };
+          if (auth.signInWithPassword === undefined) return { ok: false, reason: 'unavailable' };
+          const result = await auth.signInWithPassword({
+            email: credentials.email,
+            password: credentials.password,
+          });
+          return result.error === null && result.data.session !== null
+            ? { ok: true }
+            : { ok: false, reason: 'failed' };
+        }
         const { data, error } = await auth.signInWithOAuth({
           provider: method,
           options: {
@@ -141,7 +172,7 @@ export function createAuthProvider(
         // a failure rather than as a success nobody can see.
         if (data.url === null) return { ok: false, reason: 'failed' };
 
-        const result = await browser.openAuthSession(data.url, options.redirectTo);
+        const result = await withAuthTimeout(browser.openAuthSession(data.url, options.redirectTo));
 
         // Backing out of the provider's sheet is not an error and is never shown
         // as one — the user changed their mind, and a red banner for that is the
@@ -155,8 +186,20 @@ export function createAuthProvider(
         // the consent screen. Either way there is no session to exchange for.
         if (code === null) return { ok: false, reason: 'failed' };
 
-        const exchange = await auth.exchangeCodeForSession(code);
+        const exchange = await withAuthTimeout(auth.exchangeCodeForSession(code));
         return exchange.error === null ? { ok: true } : { ok: false, reason: 'failed' };
+      } catch {
+        return { ok: false, reason: 'failed' };
+      }
+    },
+
+    signUp: async (credentials): Promise<SignInOutcome> => {
+      try {
+        if (auth.signUp === undefined) return { ok: false, reason: 'unavailable' };
+        const result = await auth.signUp(credentials);
+        return result.error === null && result.data.session !== null
+          ? { ok: true }
+          : { ok: false, reason: 'failed' };
       } catch {
         return { ok: false, reason: 'failed' };
       }

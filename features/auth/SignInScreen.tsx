@@ -6,6 +6,7 @@ import {
   Pressable,
   ScrollView,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -43,13 +44,16 @@ import type { ThemeName } from '@/lib/design/tokens';
  * something to look at.
  */
 export function SignInScreen(): React.JSX.Element {
-  const { signIn } = useSession();
+  const { signIn, signUp } = useSession();
   const theme = useAppTheme();
   const palette = colours[theme];
   const insets = useSafeAreaInsets();
   const { target } = usePendingDeepLinkContext();
   const [failure, setFailure] = useState<'unavailable' | 'failed' | null>(null);
   const [isWorking, setIsWorking] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [mode, setMode] = useState<'sign-in' | 'sign-up'>('sign-in');
 
   const attempt = (method: 'apple' | 'google') => {
     setFailure(null);
@@ -158,6 +162,71 @@ export function SignInScreen(): React.JSX.Element {
                 : 'Sign-in did not complete. Check your connection and try again.'}
             </Text>
           )}
+
+          <TextInput
+            value={email}
+            onChangeText={setEmail}
+            autoCapitalize="none"
+            keyboardType="email-address"
+            placeholder="Email"
+            placeholderTextColor={palette.textSecondary}
+            accessibilityLabel="Email"
+            style={{
+              backgroundColor: palette.surface,
+              color: palette.textPrimary,
+              borderRadius: radius.radiusLg,
+              paddingHorizontal: space.space4,
+              minHeight: layout.actionMinHeight,
+              marginTop: space.space3,
+            }}
+          />
+          <TextInput
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            placeholder="Password"
+            placeholderTextColor={palette.textSecondary}
+            accessibilityLabel="Password"
+            style={{
+              backgroundColor: palette.surface,
+              color: palette.textPrimary,
+              borderRadius: radius.radiusLg,
+              paddingHorizontal: space.space4,
+              minHeight: layout.actionMinHeight,
+              marginTop: space.space3,
+            }}
+          />
+          <SignInButton
+            label={mode === 'sign-up' ? 'Create account' : 'Sign in'}
+            onPress={() => {
+              setFailure(null);
+              setIsWorking(true);
+              const action =
+                mode === 'sign-up'
+                  ? signUp({ email: email.trim(), password })
+                  : signIn('email', { email: email.trim(), password });
+              void action.then((outcome) => {
+                setIsWorking(false);
+                if (!outcome.ok && outcome.reason !== 'cancelled') setFailure(outcome.reason);
+              });
+            }}
+            isWorking={isWorking}
+            isPrimary
+            theme={theme}
+            testID="sign-in-email"
+          />
+          <Pressable
+            onPress={() => setMode(mode === 'sign-up' ? 'sign-in' : 'sign-up')}
+            accessibilityRole="button"
+          >
+            <Text
+              style={{ color: palette.textSecondary, textAlign: 'center', marginTop: space.space3 }}
+            >
+              {mode === 'sign-up'
+                ? 'Already have an account? Sign in'
+                : 'Need an account? Register'}
+            </Text>
+          </Pressable>
 
           {Platform.OS === 'ios' && (
             <SignInButton
