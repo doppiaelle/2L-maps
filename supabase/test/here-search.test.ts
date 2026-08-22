@@ -91,6 +91,7 @@ describe('HERE server-side search adapter', () => {
 
     await expect(places.geocode('Via Roma')).rejects.toMatchObject({
       code: 'UPSTREAM_UNAVAILABLE',
+      details: { providerStatus: 401 },
     });
   });
 
