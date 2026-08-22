@@ -42,6 +42,14 @@ function requireEnv(key: string): string {
   return value;
 }
 
+function requireAnyEnv(keys: readonly string[]): string {
+  for (const key of keys) {
+    const value = typeof Deno === 'undefined' ? undefined : Deno.env.get(key);
+    if (value !== undefined && value !== '') return value;
+  }
+  throw new Error(`Missing required secret: ${keys.join(' or ')}`);
+}
+
 export function googleServerKey(): string {
   // Distinct from the client's Maps rendering key, which is restricted to the
   // Maps SDK and useless for these APIs (CLAUDE.md §0 rule 1).
@@ -62,7 +70,7 @@ export function hybridRoutingAdapter(): ReturnType<typeof createHybridRoutingAda
 
 export function hereSearchAdapter(): ReturnType<typeof createHereSearchAdapter> {
   return createHereSearchAdapter({
-    apiKey: requireEnv('HERE_REST_API_KEY'),
+    apiKey: requireAnyEnv(['HERE_REST_API_KEY', 'HERE_API_KEY']),
     fetchImpl: fetch,
   });
 }
