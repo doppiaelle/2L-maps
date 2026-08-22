@@ -66,7 +66,7 @@ export function SessionProvider({ auth, children }: SessionProviderProps): React
   }, [auth]);
 
   const signIn = useCallback(
-    async (method: SignInMethod, credentials): Promise<SignInOutcome> => {
+    async (method: SignInMethod, credentials?: { readonly email?: string; readonly password?: string }): Promise<SignInOutcome> => {
       if (auth === null) return { ok: false, reason: 'unavailable' };
       return auth.signIn(method, credentials);
     },
@@ -75,6 +75,7 @@ export function SessionProvider({ auth, children }: SessionProviderProps): React
 
   const signUp = useCallback(async (credentials: { readonly email: string; readonly password: string }): Promise<SignInOutcome> => {
     if (auth === null) return { ok: false, reason: 'unavailable' };
+    if (auth.signUp === undefined) return { ok: false, reason: 'unavailable' };
     return auth.signUp(credentials);
   }, [auth]);
 
