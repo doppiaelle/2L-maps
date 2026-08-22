@@ -51,7 +51,8 @@ JsonRequest createJsonRequest({
               : null;
       AppDiagnostics.record(
         'http response ${uri.path} status=${response.statusCode}'
-        '${code == null ? '' : ' code=$code'}',
+        '${code == null ? '' : ' code=$code'}'
+        '${providerStatus == null ? '' : ' provider_status=$providerStatus'}',
       );
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw JsonRequestException(
