@@ -20,7 +20,8 @@ import type { AuthProvider, Session, SignInMethod, SignInOutcome } from '@/lib/p
 export interface SessionContextValue {
   readonly session: Session | null;
   readonly isRestored: boolean;
-  signIn: (method: SignInMethod) => Promise<SignInOutcome>;
+  signIn: (method: SignInMethod, credentials?: { readonly email?: string; readonly password?: string }) => Promise<SignInOutcome>;
+  signUp: (credentials: { readonly email: string; readonly password: string }) => Promise<SignInOutcome>;
   signOut: () => Promise<void>;
 }
 
@@ -65,12 +66,17 @@ export function SessionProvider({ auth, children }: SessionProviderProps): React
   }, [auth]);
 
   const signIn = useCallback(
-    async (method: SignInMethod): Promise<SignInOutcome> => {
+    async (method: SignInMethod, credentials): Promise<SignInOutcome> => {
       if (auth === null) return { ok: false, reason: 'unavailable' };
-      return auth.signIn(method);
+      return auth.signIn(method, credentials);
     },
     [auth],
   );
+
+  const signUp = useCallback(async (credentials: { readonly email: string; readonly password: string }): Promise<SignInOutcome> => {
+    if (auth === null) return { ok: false, reason: 'unavailable' };
+    return auth.signUp(credentials);
+  }, [auth]);
 
   const signOut = useCallback(async () => {
     // Cleared locally as well as remotely. Waiting for the provider to confirm
@@ -80,8 +86,8 @@ export function SessionProvider({ auth, children }: SessionProviderProps): React
   }, [auth]);
 
   const value = useMemo<SessionContextValue>(
-    () => ({ session, isRestored, signIn, signOut }),
-    [session, isRestored, signIn, signOut],
+    () => ({ session, isRestored, signIn, signUp, signOut }),
+    [session, isRestored, signIn, signUp, signOut],
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
