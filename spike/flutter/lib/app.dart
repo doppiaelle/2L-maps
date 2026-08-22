@@ -220,9 +220,8 @@ class SettingsScreen extends StatelessWidget {
             onChanged: (m) { if (m != null) onTheme(m); },
           ),
         ),
-        if (AuthSessionController.debugToolsEnabled) const Divider(),
-        if (AuthSessionController.debugToolsEnabled)
-          ListTile(
+        const Divider(),
+        ListTile(
             leading: const Icon(Icons.article_outlined),
             title: const Text('Log diagnostico'),
             subtitle: const Text('Visualizza e copia gli ultimi eventi dell’app'),
@@ -325,10 +324,12 @@ class _NavigationScreenState extends State<NavigationScreen>
           subtitle: _subtitle,
           icon: Icons.navigation_outlined,
           scrollable: false,
-          child: HereMapScreen(
-            followPosition: tracking.hasPosition,
-            userPosition: tracking.latest,
-            onRecenter: tracking.start,
+          child: Expanded(
+            child: HereMapScreen(
+              followPosition: tracking.hasPosition,
+              userPosition: tracking.latest,
+              onRecenter: tracking.start,
+            ),
           ),
         ),
       );
