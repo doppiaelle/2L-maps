@@ -35,7 +35,12 @@ abstract interface class DeviceLocationPlatform {
   Future<bool> openLocationSettings();
 }
 
-class GeolocatorDeviceLocationPlatform implements DeviceLocationPlatform {
+abstract interface class CurrentPositionDeviceLocationPlatform {
+  Future<PositionFix> getCurrentPosition();
+}
+
+class GeolocatorDeviceLocationPlatform
+    implements DeviceLocationPlatform, CurrentPositionDeviceLocationPlatform {
   const GeolocatorDeviceLocationPlatform({
     this.distanceFilterMeters = 5,
     this.accuracy = geo.LocationAccuracy.bestForNavigation,
@@ -54,6 +59,21 @@ class GeolocatorDeviceLocationPlatform implements DeviceLocationPlatform {
   @override
   Future<DeviceLocationPermission> requestPermission() async =>
       _permission(await geo.Geolocator.requestPermission());
+
+  @override
+  Future<PositionFix> getCurrentPosition() async {
+    final position = await geo.Geolocator.getCurrentPosition(
+      locationSettings: geo.LocationSettings(accuracy: accuracy),
+    );
+    return PositionFix(
+      latitude: position.latitude,
+      longitude: position.longitude,
+      accuracyMeters: position.accuracy,
+      headingDegrees: position.heading >= 0 ? position.heading : null,
+      speedMetersPerSecond: position.speed >= 0 ? position.speed : null,
+      timestamp: position.timestamp,
+    );
+  }
 
   @override
   Stream<PositionFix> get fixes => geo.Geolocator.getPositionStream(
@@ -147,7 +167,9 @@ class LocationTrackingController extends ChangeNotifier {
 
     const timeout = Duration(seconds: 12);
     try {
-      if (!await platform.isServiceEnabled().timeout(timeout)) {
+      final serviceEnabled = await platform.isServiceEnabled().timeout(timeout);
+      AppDiagnostics.record('gps service_enabled=$serviceEnabled');
+      if (!serviceEnabled) {
         _set(
           LocationTrackingState.serviceDisabled,
           'Attiva il GPS per continuare.',
@@ -159,6 +181,7 @@ class LocationTrackingController extends ChangeNotifier {
       if (permission == DeviceLocationPermission.denied) {
         permission = await platform.requestPermission().timeout(timeout);
       }
+      AppDiagnostics.record('gps permission=${permission.name}');
       if (permission == DeviceLocationPermission.deniedForever) {
         _set(
           LocationTrackingState.permissionDeniedForever,
@@ -177,14 +200,26 @@ class LocationTrackingController extends ChangeNotifier {
       await _subscription?.cancel();
       _subscription = platform.fixes.listen(
         _onFix,
-        onError: (_, __) => _set(
-          LocationTrackingState.error,
-          'Impossibile leggere la posizione del dispositivo.',
-        ),
+        onError: (error, _) {
+          AppDiagnostics.record(
+            'gps stream failure type=${error.runtimeType}',
+          );
+          _set(
+            LocationTrackingState.error,
+            'Impossibile leggere la posizione del dispositivo.',
+          );
+        },
       );
       _set(LocationTrackingState.active, 'Ricerca posizione iniziale…');
+      final initialProvider = platform;
+      if (initialProvider is CurrentPositionDeviceLocationPlatform) {
+        final initial = await initialProvider.getCurrentPosition().timeout(timeout);
+        _onFix(initial);
+      }
     } catch (error) {
       AppDiagnostics.record('gps failure type=${error.runtimeType}');
+      await _subscription?.cancel();
+      _subscription = null;
       _set(
         LocationTrackingState.error,
         'Impossibile attivare il GPS (${error.runtimeType}).',
@@ -198,6 +233,7 @@ class LocationTrackingController extends ChangeNotifier {
     if (_suspended) return;
     final rejection = filter.rejectionReason(fix);
     if (rejection != null) {
+      AppDiagnostics.record('gps fix rejected reason=$rejection');
       _set(LocationTrackingState.weakSignal, rejection);
       return;
     }
